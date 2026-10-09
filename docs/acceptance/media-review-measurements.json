@@ -1,0 +1,295 @@
+{
+  "fixturesOnly": true,
+  "liveDataUsed": false,
+  "ocr": {
+    "engine": "Tesseract.js 7.0.0 / LSTM only / tessdata_fast tha+eng",
+    "startupMs": 212,
+    "results": [
+      {
+        "language": "en",
+        "width": 1200,
+        "height": 800,
+        "inputBytes": 44706,
+        "durationMs": 312,
+        "engineConfidence": 95,
+        "containsAmount": true,
+        "containsDate": true,
+        "textSha256": "6393ab34847364c88858ac1d95c1ac793518f84eecb649cd6a48aecffb4c11cc"
+      },
+      {
+        "language": "th",
+        "width": 1200,
+        "height": 800,
+        "inputBytes": 53185,
+        "durationMs": 237,
+        "engineConfidence": 93,
+        "containsAmount": true,
+        "containsDate": true,
+        "textSha256": "17923ab71b372a17acf0b0f525f03807c0dbfae657f1914b45b0d2c32da51328"
+      }
+    ],
+    "privacy": "fictional images; no external OCR service",
+    "status": "PASS"
+  },
+  "browser": {
+    "timings": [
+      {
+        "language": "English",
+        "width": 375,
+        "inputWidth": 1200,
+        "inputHeight": 800,
+        "preparationMs": 31,
+        "ocrMs": 578
+      },
+      {
+        "language": "English",
+        "ocrMs": 434,
+        "preparationMs": 31,
+        "width": 1440
+      },
+      {
+        "amount": "120.00",
+        "date": "2026-10-09",
+        "language": "Thai",
+        "ocrMs": 469,
+        "preparationMs": 29,
+        "width": 375
+      }
+    ],
+    "light": [
+      {
+        "avatarLoaded": true,
+        "height": 900,
+        "pageWidth": 305,
+        "width": 320
+      },
+      {
+        "avatarLoaded": true,
+        "height": 900,
+        "pageWidth": 360,
+        "width": 375
+      },
+      {
+        "avatarLoaded": true,
+        "height": 900,
+        "pageWidth": 753,
+        "width": 768
+      },
+      {
+        "avatarLoaded": true,
+        "height": 900,
+        "pageWidth": 1009,
+        "width": 1024
+      },
+      {
+        "avatarLoaded": true,
+        "height": 900,
+        "pageWidth": 1425,
+        "width": 1440
+      }
+    ],
+    "dark": [
+      {
+        "pageWidth": 305,
+        "preview": [
+          {
+            "height": 134,
+            "width": 202
+          }
+        ],
+        "width": 320
+      },
+      {
+        "pageWidth": 360,
+        "preview": [
+          {
+            "height": 171,
+            "width": 257
+          }
+        ],
+        "width": 375
+      },
+      {
+        "pageWidth": 753,
+        "preview": [
+          {
+            "height": 277,
+            "width": 416
+          }
+        ],
+        "width": 768
+      },
+      {
+        "pageWidth": 1009,
+        "preview": [
+          {
+            "height": 320,
+            "width": 480
+          }
+        ],
+        "width": 1024
+      },
+      {
+        "pageWidth": 1425,
+        "preview": [
+          {
+            "height": 320,
+            "width": 480
+          }
+        ],
+        "width": 1440
+      }
+    ],
+    "actualEngine": true,
+    "syntheticOnly": true,
+    "cancelObserved": true,
+    "modalFocusReturned": true
+  },
+  "avatar": {
+    "profiles": [
+      {
+        "pageWidth": 305,
+        "previewWidth": 192,
+        "theme": "light",
+        "width": 320
+      },
+      {
+        "pageWidth": 360,
+        "previewWidth": 192,
+        "theme": "light",
+        "width": 375
+      },
+      {
+        "pageWidth": 753,
+        "previewWidth": 192,
+        "theme": "light",
+        "width": 768
+      },
+      {
+        "pageWidth": 1009,
+        "previewWidth": 192,
+        "theme": "light",
+        "width": 1024
+      },
+      {
+        "pageWidth": 1425,
+        "previewWidth": 192,
+        "theme": "light",
+        "width": 1440
+      },
+      {
+        "avatars": [
+          {
+            "loaded": true,
+            "width": 44
+          },
+          {
+            "loaded": true,
+            "width": 44
+          }
+        ],
+        "pageWidth": 305,
+        "theme": "dark",
+        "width": 320
+      },
+      {
+        "avatars": [
+          {
+            "loaded": true,
+            "width": 44
+          },
+          {
+            "loaded": true,
+            "width": 44
+          }
+        ],
+        "pageWidth": 360,
+        "theme": "dark",
+        "width": 375
+      },
+      {
+        "avatars": [
+          {
+            "loaded": true,
+            "width": 44
+          },
+          {
+            "loaded": true,
+            "width": 44
+          }
+        ],
+        "pageWidth": 753,
+        "theme": "dark",
+        "width": 768
+      },
+      {
+        "avatars": [
+          {
+            "loaded": true,
+            "width": 44
+          },
+          {
+            "loaded": true,
+            "width": 44
+          }
+        ],
+        "pageWidth": 1009,
+        "theme": "dark",
+        "width": 1024
+      },
+      {
+        "avatars": [
+          {
+            "loaded": true,
+            "width": 44
+          },
+          {
+            "loaded": true,
+            "width": 44
+          }
+        ],
+        "pageWidth": 1425,
+        "theme": "dark",
+        "width": 1440
+      }
+    ],
+    "preparationMs": 63,
+    "logoutLoginSameOwner": true,
+    "otherOwnerHasNoPreviousAvatar": true,
+    "serverRestartRetainedAvatar": true,
+    "presetReplacement": true,
+    "removeConfirmation": true,
+    "defaultAfterRemove": true
+  },
+  "database": {
+    "passes": [
+      "idempotent staged-image + record save is one transaction",
+      "anonymous/cross-owner access and wrong-Origin writes fail without revealing attachment existence",
+      "invalid owner and oversell roll back record, link, accounting and staging state",
+      "correction shares immutable bytes, void retains evidence, removing one link preserves the other",
+      "avatar save/retry, failed replacement preserves old image, replace/remove release quota without changing AuthUser",
+      "concurrent uploads respect owner quota under the shared database lock",
+      "crypto and stock creation/correction atomically preserve receipt evidence",
+      "financial JSON remains compatible and restores no image IDs/bytes",
+      "blocked accounts immediately lose access to stored images",
+      "stored normalized image survives a new database connection (restart checked separately)"
+    ],
+    "size": {
+      "database_bytes": "13702847",
+      "media_table_bytes": "3211264",
+      "payload_bytes": "2370764"
+    }
+  },
+  "lifecycle": {
+    "status": "PASS",
+    "passes": [
+      "All forward migrations deploy successfully to a new empty PostgreSQL 18 database",
+      "Existing dynamic restore evidence matches every table (including media), rows, constraints, functions, triggers, indexes and sequences before deletion replay",
+      "An unexpected stricter media constraint fails aggregate comparison; test DDL is rolled back",
+      "Restricted operator purge removes only the blocked fictional owner and all media",
+      "Actual pg_dump/pg_restore contains media; replaying deletion suppresses restored private bytes and preserves another owner",
+      "PostgreSQL container restart retains confirmed normalized image bytes"
+    ],
+    "externalArchiveUsed": false
+  }
+}

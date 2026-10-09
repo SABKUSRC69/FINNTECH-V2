@@ -1,0 +1,387 @@
+diff --git a/apps/web/src/App.tsx b/apps/web/src/App.tsx
+index 4ed0e12..0857ac2 100644
+--- a/apps/web/src/App.tsx
++++ b/apps/web/src/App.tsx
+@@ -24,6 +24,7 @@ function AccountApp(): JSX.Element {
+   const [recoveryLink, setRecoveryLink] = useState<RecoveryLink>()
+   const [recoveryOpen, setRecoveryOpen] = useState(false)
+   const [demoPending, setDemoPending] = useState(false)
++  const freshNeedsVerification = useRef(false)
+ 
+   useEffect(() => {
+     const link = takeRecoveryLink()
+@@ -49,10 +50,19 @@ function AccountApp(): JSX.Element {
+     setBusy(true)
+     setMessage('')
+     try {
+-      setView(await readAccount())
++      const snapshot = await readAccount()
++      if (freshNeedsVerification.current) {
++        if (snapshot.status !== 'signed-out') throw new AuthRequestError('ยังยืนยันการออกจากระบบไม่ได้ กรุณาตรวจสอบสถานะอีกครั้ง', true)
++        freshNeedsVerification.current = false
++        setMode(snapshot.demoAvailable ? 'demo' : 'sign-in')
++      }
++      setView(snapshot)
+       setUncertain(false)
+     } catch (error) {
+-      setView({ status: 'unavailable' })
++      setView(previous => ({ status: 'unavailable',
++        ...('beta' in previous && previous.beta ? { beta: true } : {}),
++        ...('demoAvailable' in previous && previous.demoAvailable ? { demoAvailable: true } : {}),
++        ...('recovery' in previous && previous.recovery ? { recovery: true } : {}) }))
+       setMessage(error instanceof AuthRequestError ? error.message : 'ตรวจสอบระบบไม่สำเร็จ กรุณาลองอีกครั้ง')
+     } finally { inFlight.current = false; setBusy(false) }
+   }
+@@ -60,14 +70,22 @@ function AccountApp(): JSX.Element {
+   async function freshDemo(): Promise<void> {
+     if (inFlight.current || busy || uncertain) return
+     inFlight.current = true; setBusy(true); setMessage('')
++    let committed = false
+     try {
+       await submitAuth('sign-out')
++      committed = true; freshNeedsVerification.current = true
+       const snapshot = await readAccount()
+       if (snapshot.status !== 'signed-out') throw new AuthRequestError('ยังยืนยันการออกจากระบบไม่ได้', true)
++      freshNeedsVerification.current = false
+       setView(snapshot)
+       setMode(snapshot.demoAvailable ? 'demo' : 'sign-in')
+       await submitDemo('reset')
+-    } catch (error) { setMessage(error instanceof Error ? error.message : 'ยังไม่ทราบผล'); setUncertain(!(error instanceof AuthRequestError) || error.outcomeUnknown) }
++    } catch (error) {
++      setMessage(error instanceof Error ? error.message : 'ยังไม่ทราบผล')
++      const unknown = committed || !(error instanceof AuthRequestError) || error.outcomeUnknown
++      if (unknown) freshNeedsVerification.current = true
++      setUncertain(unknown)
++    }
+     finally { inFlight.current = false; setBusy(false) }
+   }
+ 
+@@ -160,7 +178,7 @@ function AccountApp(): JSX.Element {
+             <div className="journal-auth-tabs mb-7 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1" aria-label="เลือกการใช้งานบัญชี">
+               {([['sign-in', 'เข้าสู่ระบบ'], ['sign-up', 'สมัครบัญชี'], ...(view.demoAvailable ? [['demo', 'ทดลองใช้งาน']] : [])] as [FormMode, string][]).map(([value, label]) => <button key={value} type="button" aria-pressed={mode === value} disabled={busy || uncertain || demoPending} onClick={() => switchMode(value)} className={`rounded-lg px-3 py-2.5 text-sm font-medium transition ${mode === value ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>{label}</button>)}
+             </div>
+-            {mode === 'demo' ? <DemoEntry disabled={view.status === 'checking' || view.status === 'unavailable'} complete={snapshot => { setDemoPending(false); setView(snapshot) }} pendingLock={setDemoPending} lock={setBusy} /> : <><h2 className="text-2xl font-semibold">{mode === 'sign-in' ? 'ยินดีต้อนรับกลับ' : 'สร้างบัญชีของคุณ'}</h2>
++            {mode === 'demo' ? <DemoEntry disabled={uncertain || view.status === 'checking' || view.status === 'unavailable'} complete={snapshot => { setDemoPending(false); setView(snapshot) }} pendingLock={setDemoPending} lock={setBusy} /> : <><h2 className="text-2xl font-semibold">{mode === 'sign-in' ? 'ยินดีต้อนรับกลับ' : 'สร้างบัญชีของคุณ'}</h2>
+             <p className="mt-2 text-sm leading-6 text-slate-500">{view.beta ? 'ใช้บัญชีของคุณเองและข้อมูลสมมติสำหรับทดลอง Beta' : 'ใช้บัญชีและข้อมูลสังเคราะห์สำหรับทดสอบในเครื่อง'}</p>
+             <form onSubmit={(event) => { void handleAuth(event) }} className="mt-7 space-y-4" aria-label={mode === 'sign-in' ? 'ฟอร์มเข้าสู่ระบบ' : 'ฟอร์มสมัครบัญชี'}>
+               {mode === 'sign-up' && <label className="auth-label">ชื่อที่ใช้แสดง<input name="name" autoComplete="nickname" required maxLength={64} value={name} onChange={event => setName(event.target.value)} disabled={disabled} className="auth-input" /></label>}
+
+diff --git a/apps/web/src/App.test.tsx b/apps/web/src/App.test.tsx
+index 0d10feb..65b558f 100644
+--- a/apps/web/src/App.test.tsx
++++ b/apps/web/src/App.test.tsx
+@@ -35,6 +35,111 @@ function fillLogin(form: HTMLElement) {
+ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
+ 
+ describe('Thai Auth UI', () => {
++  it('actual pre-entry invalid-code rejection remains editable and a corrected code reuses the prepared request', async () => {
++    const mock = fixture(null, true); render(<App />)
++    await waitFor(() => expect(screen.getByRole('button', { name: 'ทดลองใช้งาน' }).hasAttribute('disabled')).toBe(false))
++    fireEvent.click(screen.getByRole('button', { name: 'ทดลองใช้งาน' }))
++    const field = screen.getByLabelText('รหัสทดลอง') as HTMLInputElement
++    fireEvent.change(field, { target: { value: 'synthetic-invalid-code' } })
++    mock.mockResolvedValueOnce(reply({ prepared: true })).mockResolvedValueOnce(reply({}, 403))
++    fireEvent.submit(screen.getByRole('form', { name: 'เข้า DEMO' }))
++    await screen.findByText('รหัสทดลองไม่ถูกต้อง หรือเจ้าของยังไม่เปิด DEMO')
++    expect(field.disabled).toBe(false)
++    expect(screen.getByRole('button', { name: 'เริ่มพื้นที่ทดลองใหม่' }).hasAttribute('disabled')).toBe(false)
++    expect(screen.getByRole('link', { name: 'FINNTECH หน้าหลัก' })).toBeTruthy()
++    const corrected = randomBytes(24).toString('hex')
++    fireEvent.change(field, { target: { value: corrected } }); fireEvent.submit(screen.getByRole('form', { name: 'เข้า DEMO' }))
++    await screen.findByText('สวัสดี ผู้ทดสอบ')
++    expect(mock.mock.calls.filter(([path]) => path === '/api/auth/demo/prepare')).toHaveLength(1)
++    expect(mock.mock.calls.filter(([path]) => path === '/api/auth/demo/reset')).toHaveLength(0)
++    expect(mock.mock.calls.filter(([path]) => path === '/api/auth/demo/enter').map(([, options]) => options?.body)).toEqual([JSON.stringify({ code: 'synthetic-invalid-code' }), JSON.stringify({ code: corrected })])
++  })
++  it.each([
++    ['/api/health', 503, {}], ['/api/auth/get-session', 503, {}], ['/api/me', 503, {}],
++    ['/api/health', 200, {}], ['/api/auth/get-session', 200, { user: { name: false } }], ['/api/me', 200, {}],
++  ])('keeps the original DEMO request locked after entry succeeds but %s (%s) verification fails', async (failedRoute, status, body) => {
++    const mock = fixture(null, true), normal = mock.getMockImplementation()!
++    let entered = false, failed = false
++    mock.mockImplementation(async (path, options) => {
++      if (entered && !failed && path === failedRoute) { failed = true; return reply(body, status as number) }
++      const response = await normal(path, options)
++      if (path === '/api/auth/demo/enter') entered = true
++      return response
++    })
++    const storage = vi.spyOn(Storage.prototype, 'setItem')
++    render(<App />)
++    await waitFor(() => expect(screen.getByRole('button', { name: 'ทดลองใช้งาน' }).hasAttribute('disabled')).toBe(false))
++    fireEvent.click(screen.getByRole('button', { name: 'ทดลองใช้งาน' }))
++    const code = randomBytes(24).toString('hex'), field = screen.getByLabelText('รหัสทดลอง') as HTMLInputElement
++    fireEvent.change(field, { target: { value: code } }); fireEvent.submit(screen.getByRole('form', { name: 'เข้า DEMO' }))
++    const retry = await screen.findByRole('button', { name: 'ตรวจผลคำขอ DEMO เดิม' })
++    expect(field.disabled).toBe(true); expect(field.value).toBe(code)
++    for (const label of ['เข้าสู่ระบบ', 'สมัครบัญชี', 'ทดลองใช้งาน', 'เริ่มพื้นที่ทดลองใหม่', 'เข้าพื้นที่ทดลอง']) expect(screen.getByRole('button', { name: label }).hasAttribute('disabled')).toBe(true)
++    expect(screen.queryByRole('link', { name: 'FINNTECH หน้าหลัก' })).toBeNull()
++    fireEvent.submit(screen.getByRole('form', { name: 'เข้า DEMO' }))
++    expect(mock.mock.calls.filter(([path]) => path === '/api/auth/demo/enter')).toHaveLength(1)
++    fireEvent.click(retry); await screen.findByText('สวัสดี ผู้ทดสอบ')
++    const writes = mock.mock.calls.filter(([path]) => path === '/api/auth/demo/enter')
++    expect(writes).toHaveLength(2); expect(writes.map(([, options]) => options?.body)).toEqual([JSON.stringify({ code }), JSON.stringify({ code })])
++    expect(mock.mock.calls.filter(([path]) => path === '/api/auth/demo/prepare')).toHaveLength(1)
++    expect(mock.mock.calls.filter(([path]) => path === '/api/auth/demo/reset')).toHaveLength(0)
++    expect(storage).not.toHaveBeenCalled(); expect(screen.queryByLabelText('รหัสทดลอง')).toBeNull()
++    fireEvent.click(screen.getByRole('button', { name: 'บัญชีและดูแลข้อมูล' }))
++    fireEvent.click(await screen.findByRole('button', { name: 'ออกและเริ่มพื้นที่ทดลองใหม่' }))
++    expect((await screen.findByLabelText('รหัสทดลอง') as HTMLInputElement).value).toBe('')
++  })
++  it('requires confirmed signed-out state even across another failed read and a still-signed-in reconciliation', async () => {
++    const mock = fixture(session, true), normal = mock.getMockImplementation()!
++    let loggedOut = false, failures = 0
++    mock.mockImplementation(async (path, options) => {
++      if (loggedOut && path === '/api/health' && failures < 2) { failures++; return reply({}, 503) }
++      if (loggedOut && failures === 2 && path === '/api/auth/get-session') return reply(session)
++      if (loggedOut && failures === 2 && path === '/api/me') { failures++; return reply({ ownerId: 'synthetic-server-owner', demo: true }) }
++      const response = await normal(path, options); if (path === '/api/auth/sign-out') loggedOut = true; return response
++    })
++    render(<App />); await screen.findByText('สวัสดี ผู้ทดสอบ')
++    fireEvent.click(screen.getByRole('button', { name: 'บัญชีและดูแลข้อมูล' }))
++    fireEvent.click(await screen.findByRole('button', { name: 'ออกและเริ่มพื้นที่ทดลองใหม่' }))
++    for (const count of [2, 3]) {
++      fireEvent.click(await screen.findByRole('button', { name: 'ตรวจสอบสถานะอีกครั้ง' }))
++      await waitFor(() => expect(failures).toBe(count))
++      await waitFor(() => expect(screen.getByRole('button', { name: 'ตรวจสอบสถานะอีกครั้ง' }).hasAttribute('disabled')).toBe(false))
++      for (const name of ['เข้าสู่ระบบ', 'สมัครบัญชี', 'ทดลองใช้งาน']) for (const button of screen.getAllByRole('button', { name })) expect(button.hasAttribute('disabled')).toBe(true)
++      expect(screen.queryByRole('link', { name: 'FINNTECH หน้าหลัก' })).toBeNull()
++    }
++    fireEvent.click(screen.getByRole('button', { name: 'ตรวจสอบสถานะอีกครั้ง' }))
++    const field = await screen.findByLabelText('รหัสทดลอง'); await waitFor(() => expect(field.hasAttribute('disabled')).toBe(false))
++    expect(mock.mock.calls.filter(([path]) => path === '/api/auth/demo/reset')).toHaveLength(0)
++    expect(mock.mock.calls.filter(([path]) => path === '/api/auth/sign-out')).toHaveLength(1)
++  })
++  it.each(['/api/health', '/api/auth/get-session', '/api/me'])('keeps fresh logout locked after success and failed %s reconciliation, then permits deliberate fresh entry', async failedRoute => {
++    const mock = fixture(session, true), normal = mock.getMockImplementation()!
++    let loggedOut = false, failed = false
++    mock.mockImplementation(async (path, options) => {
++      if (loggedOut && !failed && path === '/api/auth/get-session' && failedRoute === '/api/me') return reply(session)
++      if (loggedOut && !failed && path === failedRoute) { failed = true; return reply({}, 503) }
++      const response = await normal(path, options)
++      if (path === '/api/auth/sign-out') loggedOut = true
++      return response
++    })
++    render(<App />); await screen.findByText('สวัสดี ผู้ทดสอบ')
++    fireEvent.click(screen.getByRole('button', { name: 'บัญชีและดูแลข้อมูล' }))
++    const fresh = await screen.findByRole('button', { name: 'ออกและเริ่มพื้นที่ทดลองใหม่' })
++    fireEvent.click(fresh)
++    const retry = await screen.findByRole('button', { name: 'ตรวจสอบสถานะอีกครั้ง' })
++    expect(fresh.hasAttribute('disabled')).toBe(true)
++    for (const label of ['ออกจากระบบ', 'ออกจากระบบบัญชีนี้', 'ไปสำรองและกู้คืนข้อมูล', 'รายรับรายจ่าย']) expect(screen.getByRole('button', { name: label }).hasAttribute('disabled')).toBe(true)
++    expect(mock.mock.calls.filter(([path]) => path === '/api/auth/demo/reset')).toHaveLength(0)
++    fireEvent.click(fresh); expect(mock.mock.calls.filter(([path]) => path === '/api/auth/sign-out')).toHaveLength(1)
++    fireEvent.click(retry)
++    const field = await screen.findByLabelText('รหัสทดลอง')
++    await waitFor(() => expect(field.hasAttribute('disabled')).toBe(false))
++    // Account reconciliation itself never creates or resets a workspace.
++    expect(mock.mock.calls.filter(([path]) => path === '/api/auth/demo/reset')).toHaveLength(0)
++    fireEvent.click(screen.getByRole('button', { name: 'เริ่มพื้นที่ทดลองใหม่' }))
++    await screen.findByText('พร้อมเริ่มพื้นที่ใหม่ กรอกรหัสทดลองอีกครั้ง')
++    expect(mock.mock.calls.filter(([path]) => path === '/api/auth/demo/reset')).toHaveLength(1)
++  })
+   it('returning demo browser resumes its authenticated session without submitting a new demo code', async () => {
+     const mock = fixture(session, true); render(<App />)
+     await screen.findByText('สวัสดี ผู้ทดสอบ')
+
+diff --git a/apps/web/src/auth/DemoEntry.tsx b/apps/web/src/auth/DemoEntry.tsx
+index c6f8bb1..60c25fb 100644
+--- a/apps/web/src/auth/DemoEntry.tsx
++++ b/apps/web/src/auth/DemoEntry.tsx
+@@ -4,19 +4,26 @@ import { AuthRequestError, readAccount, submitDemo, type AccountSnapshot } from
+ export default function DemoEntry({ complete, lock, pendingLock, disabled }: { complete: (snapshot: AccountSnapshot) => void; lock: (busy: boolean) => void; pendingLock: (pending: boolean) => void; disabled: boolean }): JSX.Element {
+   const [code, setCode] = useState(''), [message, setMessage] = useState(''), [pending, setPending] = useState(false)
+   const [busy, setBusy] = useState(false), sending = useRef(false), prepared = useRef(false)
++  const needsVerification = useRef(false)
+   async function enter(event?: FormEvent): Promise<void> {
+     event?.preventDefault()
+-    if (sending.current) return
++    if (sending.current || disabled || (event && pending)) return
+     sending.current = true; setBusy(true); lock(true); setMessage('')
+     try {
+       if (!prepared.current) { await submitDemo('prepare'); prepared.current = true }
+       await submitDemo('enter', code)
++      needsVerification.current = true
+       const snapshot = await readAccount()
+       if (snapshot.status !== 'signed-in') throw new AuthRequestError('ยังยืนยัน session ไม่ได้ กรุณาตรวจผลคำขอเดิม', true)
++      needsVerification.current = false
+       setCode(''); setPending(false); pendingLock(false); complete(snapshot)
+     } catch (error) {
+       setMessage(error instanceof AuthRequestError ? error.message : 'ยังไม่ทราบผล กรุณาตรวจผลคำขอเดิม')
+-      const unknown = !(error instanceof AuthRequestError) || error.outcomeUnknown
++      // A failed GET or a later replay rejection cannot undo a successful/unknown
++      // entry. Only an authoritative ended receipt permits a deliberate fresh action.
++      if (error instanceof AuthRequestError && error.demoEnded) needsVerification.current = false
++      else if (!(error instanceof AuthRequestError) || error.outcomeUnknown) needsVerification.current = true
++      const unknown = needsVerification.current
+       setPending(unknown); pendingLock(unknown)
+     } finally { sending.current = false; setBusy(false); lock(false) }
+   }
+
+diff --git a/apps/web/src/auth/DemoEntry.test.tsx b/apps/web/src/auth/DemoEntry.test.tsx
+index 44ace5a..9ae3de5 100644
+--- a/apps/web/src/auth/DemoEntry.test.tsx
++++ b/apps/web/src/auth/DemoEntry.test.tsx
+@@ -7,6 +7,42 @@ import { AuthRequestError, readAccount, submitDemo } from './client'
+ vi.mock('./client', async importOriginal => ({ ...await importOriginal<typeof import('./client')>(), readAccount: vi.fn(), submitDemo: vi.fn() }))
+ afterEach(() => { cleanup(); vi.resetAllMocks() })
+ describe('demo entry workflow', () => {
++  it('keeps a committed entry locked across repeated verification failure and nonterminal replay rejection', async () => {
++    const code = randomBytes(24).toString('hex'), complete = vi.fn(), pendingLock = vi.fn()
++    vi.mocked(submitDemo).mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined)
++      .mockRejectedValueOnce(new AuthRequestError('temporarily rejected')).mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined)
++    vi.mocked(readAccount).mockRejectedValueOnce(new AuthRequestError('GET failed'))
++      .mockRejectedValueOnce(new AuthRequestError('GET still failed')).mockResolvedValueOnce({ status: 'signed-in', account: { name: 'Synthetic', demo: true } })
++    render(<DemoEntry complete={complete} lock={vi.fn()} pendingLock={pendingLock} disabled={false} />)
++    const field = screen.getByLabelText('รหัสทดลอง') as HTMLInputElement
++    fireEvent.change(field, { target: { value: code } }); fireEvent.submit(screen.getByRole('form'))
++    for (const text of ['GET failed', 'temporarily rejected', 'GET still failed']) {
++      await screen.findByText(text)
++      expect(field.disabled).toBe(true); expect(field.value).toBe(code)
++      expect(screen.getByRole('button', { name: 'เริ่มพื้นที่ทดลองใหม่' }).hasAttribute('disabled')).toBe(true)
++      expect(pendingLock).not.toHaveBeenCalledWith(false)
++      fireEvent.click(screen.getByRole('button', { name: 'ตรวจผลคำขอ DEMO เดิม' }))
++    }
++    await waitFor(() => expect(complete).toHaveBeenCalledOnce())
++    expect(submitDemo).toHaveBeenCalledTimes(5)
++    expect(vi.mocked(submitDemo).mock.calls).toEqual([['prepare'], ...Array.from({ length: 4 }, () => ['enter', code])])
++    expect(field.value).toBe(''); expect(pendingLock).toHaveBeenLastCalledWith(false)
++  })
++  it('allows a deliberate fresh action only after the original receipt returns terminal 410', async () => {
++    const pendingLock = vi.fn()
++    vi.mocked(submitDemo).mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined)
++      .mockRejectedValueOnce(new AuthRequestError('ended receipt', false, true)).mockResolvedValueOnce(undefined)
++    vi.mocked(readAccount).mockRejectedValueOnce(new AuthRequestError('verification failed'))
++    render(<DemoEntry complete={vi.fn()} lock={vi.fn()} pendingLock={pendingLock} disabled={false} />)
++    fireEvent.change(screen.getByLabelText('รหัสทดลอง'), { target: { value: randomBytes(24).toString('hex') } }); fireEvent.submit(screen.getByRole('form'))
++    fireEvent.click(await screen.findByRole('button', { name: 'ตรวจผลคำขอ DEMO เดิม' }))
++    await screen.findByText('ended receipt')
++    expect(screen.queryByRole('button', { name: 'ตรวจผลคำขอ DEMO เดิม' })).toBeNull()
++    expect(pendingLock).toHaveBeenLastCalledWith(false)
++    expect(submitDemo).not.toHaveBeenCalledWith('reset')
++    fireEvent.click(screen.getByRole('button', { name: 'เริ่มพื้นที่ทดลองใหม่' }))
++    await waitFor(() => expect(submitDemo).toHaveBeenCalledWith('reset'))
++  })
+   it('submits one prepared request despite double click, then verifies the authenticated account', async () => {
+     const code = randomBytes(24).toString('hex'), complete = vi.fn(), lock = vi.fn(), pendingLock = vi.fn()
+     let finish!: () => void
+
+diff --git a/apps/web/src/auth/client.ts b/apps/web/src/auth/client.ts
+index 580f43b..3f0b31b 100644
+--- a/apps/web/src/auth/client.ts
++++ b/apps/web/src/auth/client.ts
+@@ -5,7 +5,7 @@ export type AccountSnapshot = ({ status: 'signed-out' } | { status: 'signed-in';
+ export type AuthAction = 'sign-in' | 'sign-up' | 'sign-out'
+ 
+ export class AuthRequestError extends Error {
+-  constructor(message: string, readonly outcomeUnknown = false) { super(message) }
++  constructor(message: string, readonly outcomeUnknown = false, readonly demoEnded = false) { super(message) }
+ }
+ 
+ interface ApiReply { status: number; ok: boolean; body: unknown }
+@@ -65,7 +65,7 @@ export async function submitDemo(route: 'prepare' | 'enter' | 'reset', code?: st
+   if (response.ok) return
+   if (response.status >= 500) throw new AuthRequestError('ยังไม่ทราบผล กรุณาตรวจสอบหรือลองคำขอเดิมอีกครั้ง', true)
+   if (response.status === 429) throw new AuthRequestError('ทำรายการถี่เกินไปหรือพื้นที่ DEMO เต็ม กรุณาลองภายหลัง')
+-  if (response.status === 410) throw new AuthRequestError('พื้นที่ทดลองเดิมสิ้นสุดแล้ว กรุณาเริ่มพื้นที่ทดลองใหม่')
++  if (response.status === 410) throw new AuthRequestError('พื้นที่ทดลองเดิมสิ้นสุดแล้ว กรุณาเริ่มพื้นที่ทดลองใหม่', false, true)
+   throw new AuthRequestError('รหัสทดลองไม่ถูกต้อง หรือเจ้าของยังไม่เปิด DEMO')
+ }
+ 
+
+diff --git a/apps/web/src/auth/client.test.ts b/apps/web/src/auth/client.test.ts
+index 2f2bacc..be74d64 100644
+--- a/apps/web/src/auth/client.test.ts
++++ b/apps/web/src/auth/client.test.ts
+@@ -1,5 +1,5 @@
+ import { afterEach, describe, expect, it, vi } from 'vitest'
+-import { AuthRequestError, readAccount, submitAuth } from './client'
++import { AuthRequestError, readAccount, submitAuth, submitDemo } from './client'
+ 
+ const healthy = { status: 'ok', service: 'tracker-api', checks: { process: 'ok', database: 'ok', auth: 'not_checked' } }
+ const reply = (body: unknown, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body })
+@@ -7,6 +7,15 @@ const reply = (body: unknown, status = 200) => ({ ok: status >= 200 && status <
+ afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
+ 
+ describe('same-origin Auth client boundary', () => {
++  it('marks only a terminal DEMO receipt response as ended; ordinary rejection cannot clear a pending entry', async () => {
++    const mock = vi.fn().mockResolvedValueOnce(reply({}, 403)).mockResolvedValueOnce(reply({}, 429))
++      .mockResolvedValueOnce(reply({}, 503)).mockResolvedValueOnce(reply({}, 410))
++    vi.stubGlobal('fetch', mock)
++    await expect(submitDemo('enter', 'synthetic-code-only')).rejects.toMatchObject({ demoEnded: false, outcomeUnknown: false })
++    await expect(submitDemo('enter', 'synthetic-code-only')).rejects.toMatchObject({ demoEnded: false, outcomeUnknown: false })
++    await expect(submitDemo('enter', 'synthetic-code-only')).rejects.toMatchObject({ demoEnded: false, outcomeUnknown: true })
++    await expect(submitDemo('enter', 'synthetic-code-only')).rejects.toMatchObject({ demoEnded: true, outcomeUnknown: false })
++  })
+   it('keeps recovery and Beta capabilities when owner authorization expires during the read', async () => {
+     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(reply({ ...healthy, capabilities: { recovery: true }, beta: { dataMode: 'synthetic' } }))
+       .mockResolvedValueOnce(reply({ user: { name: 'Synthetic' } })).mockResolvedValueOnce(reply({}, 401)))
+
+diff --git a/docs/acceptance/demo-review-fix-20261008.md b/docs/acceptance/demo-review-fix-20261008.md
+new file mode 100644
+index 0000000..5d0d05e
+--- /dev/null
++++ b/docs/acceptance/demo-review-fix-20261008.md
+@@ -0,0 +1,63 @@
++# DEMO reconciliation review fix — 8 October 2026 (Asia/Bangkok)
++
++**Prepared locally; stopped for review. No commit, push or deployment in this task.** The Beta release checkout remains clean at `e8caa93e92ca169ffa7759aebd8f4b1d74adc222`. The deployed site still has the pre-fix behavior until a separately authorized release is prepared/deployed.
++
++Read the root `FINNTECH_DEMO_REVIEW_FIX_PROMPT_EN.md`, independent review, deployment report, setup instructions, package scripts and related source/tests. No `AGENTS.md` was found in the repository search. Existing tracked/untracked owner changes were preserved. A byte-for-byte before snapshot of the six edited files and initial Git status is saved under `.demo-review-fix-20261008.local/`; no owner source was reset or staged.
++
++## Cause, fix and boundaries
++
++`/demo/enter` could succeed and create a genuine session, then health/session/owner verification could throw an `AuthRequestError` with `outcomeUnknown=false` because the failing request was a GET. The old catch cleared pending/navigation locks solely from that flag. A successful write is not reversed by a later failed read.
++
++`DemoEntry` now retains a request-level `needsVerification` ref after successful entry or unknown outcome, including across repeated reconciliation attempts. It keeps the code field, ordinary submit, fresh action, auth mode tabs and brand navigation locked. The original-request reconciliation button remains available and uses the same code, same-origin cookies and previously prepared request; it does not prepare/reset again or persist code in browser storage. A later nonterminal replay rejection does not undo this state. Verified sign-in clears pending/code state and completes entry. Only an authoritative terminal receipt HTTP **410** permits deliberate fresh action. A genuine initial invalid-code rejection remains editable.
++
++The existing `AuthRequestError` carries an optional `demoEnded=false` marker; only `submitDemo`'s HTTP 410 sets it. Other auth/recovery errors retain existing defaults. No server error details or secrets are exposed.
++
++`freshDemo` explicitly tracks completed sign-out. A later failed GET keeps `uncertain` and the existing tracker navigation locks. Account reconciliation requires a confirmed **signed-out** snapshot, including after repeated failures or a contradictory still-signed-in result. A failed refresh retains the already-known Beta/demo/recovery capabilities while marking the account unavailable; tabs remain visible and locked. A confirmed signed-out refresh returns to DEMO entry without automatically resetting or creating a workspace; the user can then deliberately select fresh. The DEMO form also respects the parent's uncertain lock. Existing ordinary login/logout handlers remain in place and their regressions pass.
++
++No backend, schema, WS deadline, dependency, finance/Decimal/ledger, original financial payload/key, ownership/session, expiry/epoch, signup, recovery, design or production setting was changed. No owner code, cloud database or production token/expiry/rotation/deletion experiment was accessed. All new tests use synthetic inputs and mocked HTTP/component boundaries.
++
++## Files / incremental patch
++
++| File | Change |
++| --- | --- |
++| `apps/web/src/auth/DemoEntry.tsx` | Persistent original-entry reconciliation state and ordinary resubmit guard |
++| `apps/web/src/auth/client.ts` | Explicit terminal receipt error marker |
++| `apps/web/src/App.tsx` | Fresh logout commit/reconciliation state; retain feature flags on failed refresh; parent uncertain form lock |
++| `apps/web/src/auth/DemoEntry.test.tsx` | Repeated post-success failures/nonterminal replay rejection; terminal 410 then deliberate fresh |
++| `apps/web/src/auth/client.test.ts` | Actual HTTP 403/429/503/410 classification |
++| `apps/web/src/App.test.tsx` | Actual client flow: post-entry health/session/me 503 and malformed responses, nav/code/fresh locks, same payload retry and unlocked recovery, invalid-code correction, fresh logout GET failures and repeated/still-signed-in reconciliation |
++
++Deliverable: [demo-review-fix-20261008.patch](demo-review-fix-20261008.patch), incremental against the **saved pre-task dirty-tree files**, not against the root Git HEAD. It includes all six source/test changes plus this new review report. The previous 31-file DEMO patch/report remains historical and is not replaced. Apply to a matching reviewed baseline only; do not overwrite unrelated owner work. The generated before/after hash manifest and `git apply --check` evidence are under [demo-review-fix-evidence-20261008](demo-review-fix-evidence-20261008/verification.json).
++
++## New verification results
++
++These results were actually run in this task. Prior deployment/reviewer test numbers are not represented as new checks, and overlapping suites must not be summed as unique tests.
++
++| Exact command | Result | Exit |
++| --- | --- | ---: |
++| `npm --workspace apps/web run test -- src/App.test.tsx src/auth/DemoEntry.test.tsx src/auth/client.test.ts` (new first six regressions, before fix) | Expected FAIL: 6 failed / 21 passed, 3 files; reproduces both confirmed issues | 1 |
++| Same focused command, final | PASS: **35 / 35**, 3 files | 0 |
++| `npm test` | PASS: **356 / 356**, 41 files | 0 |
++| `npm run build` | PASS: legacy build | 0 |
++| `npm run tracker:typecheck` | PASS | 0 |
++| `npm run tracker:test` | PASS: **227 / 227** — finance 21, contracts 13, API 98, web 95; dev web smoke stopped | 0 |
++| `npm run tracker:build` | PASS | 0 |
++| `node --no-strip-types scripts/tracker-package-smoke.mjs` | PASS | 0 |
++| `git diff --check` | PASS, existing CRLF normalization warnings only | 0 |
++| Incremental patch `git -c core.autocrlf=false apply --check --directory=.demo-review-fix-20261008.local/patch-check docs/acceptance/demo-review-fix-20261008.patch` | PASS against exact saved baseline | 0 |
++| Final deployed source manifest preservation check | PASS: all **132 non-target files** of the 138-file previous release remain hash-identical in the workspace | 0 |
++
++Final safe logs are copied to `demo-review-fix-evidence-20261008/`. API's existing WS regression is included unchanged in the acceptance suite; no timeout/deadline was increased. The tracker web smoke creates/stops its own temporary dev process. No PostgreSQL/container/cloud process was started in this task.
++
++Intermediate failures were recorded, rather than hidden: first post-fix run **3 failed / 28 passed**, exit 1, because a new test expected a detached/unmounted input DOM node to be updated. It was corrected to verify the actual subsequent fresh form is empty; the component-level clear assertion remains. Another intermediate run **1 failed / 34 passed**, exit 1, used an ambiguous sign-in button query; it was corrected to assert both tab and submit are disabled. That revealed a missing DEMO tab after failed refresh because feature flags were discarded; retaining already-known flags fixed it. Final focused **35 passed**. No existing assertion was weakened or skipped. No sandbox/environment execution failure was encountered in these elevated check runs.
++
++## Open / NOT TESTED in this task
++
++- Production natural expiry and Render idle/cold start; production code/epoch rotation remains unexercised.
++- Final-runtime advisory inventory/reachability triage. Independent review reported five high package findings in the dependency tree; those are not proof of five reachable deployed vulnerabilities. No new audit was run, no dependency/lock changes and no `npm audit fix --force`.
++- Two physical browser profiles/devices, real browser network-loss interruption, physical touch/screen-reader or new responsive browser screenshots. The new HTTP failure tests use the real frontend client with mocked responses, not a production/browser failure injection.
++- Isolated full database restore drill. Prior archive listing is not a restore drill.
++- Retention/capacity policy: retained workspaces count toward the default ceiling, and no automatic deletion is introduced.
++- New real HTTPS/WSS or isolated PostgreSQL rerun for this frontend-only fix. Prior deployment/database evidence remains separate; no backend source changed.
++
++This closes preparation of the focused P2 fix and waits for independent review. It does not claim complete readiness or change the live Beta.

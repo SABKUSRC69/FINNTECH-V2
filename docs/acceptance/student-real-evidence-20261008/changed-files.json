@@ -1,0 +1,234 @@
+{
+  "baselineFiles": 476,
+  "changedFiles": 38,
+  "files": [
+    {
+      "path": "apps/api/db-test/password-mode.integration.ts",
+      "status": "added",
+      "before": null,
+      "after": "988a6fd55a90c356a74ca96ab72c206ade3b82e03ab837c28242f7d3570c9a87"
+    },
+    {
+      "path": "apps/api/src/app.ts",
+      "status": "modified",
+      "before": "d2437b100e12758777272c15278eff268c81eaab6996b68e8bcb601a08663cc0",
+      "after": "7e95c0fd7e0e7bf7e6280cbaba5136cb836846e25ec2f365d7768515d23481ac"
+    },
+    {
+      "path": "apps/api/src/auth/authorization.ts",
+      "status": "modified",
+      "before": "656a7e4b660dcbdb4b2021745b9ad5438e06bccf73ef388e605fb0ace829b490",
+      "after": "addc7ae80640bd52628d1ec9e2b8b719fc37d14af997c5057bdbd7f9cbc2c82c"
+    },
+    {
+      "path": "apps/api/src/auth/config.ts",
+      "status": "modified",
+      "before": "a8cadba32cd622cd9480dcb8a164dbc7a8b32dae1de68c23df55de151a99a5d4",
+      "after": "7e08e4937981c0fa5226da800a0a5a8529487a461864a1e51d97877eff4cba6b"
+    },
+    {
+      "path": "apps/api/src/auth/password-registration.ts",
+      "status": "added",
+      "before": null,
+      "after": "e93e650c7990fbcc991d408d460b0b1c3b04b86b26c8ca0518c9d1b986b33031"
+    },
+    {
+      "path": "apps/api/src/auth/real.ts",
+      "status": "modified",
+      "before": "618be31f5063ddf7cfe1633bb0ab483593ebb5fefb41f10658f9f6963132b3e9",
+      "after": "344b7253c72b46d1cd48c598fc01746cf7cc35c9394b6974a8dc37253156f82f"
+    },
+    {
+      "path": "apps/api/src/auth/runtime.ts",
+      "status": "modified",
+      "before": "0a6d5d7c4d42ef2431e13fc45564ceaee929219ec42338e07943ea48b233d31d",
+      "after": "74e016f2448ff2a929a6960b2ff415ca068afd8f31bbf540663444823917a933"
+    },
+    {
+      "path": "apps/api/src/persistence/database.ts",
+      "status": "modified",
+      "before": "7a937d318b2c241b6ee9ee62fa827feb78e3f41d965b2038a886023c2f2ea3f5",
+      "after": "0d8bfe7366ab98566e89bc11cc2c7fd1e9185974fec1509736d360f71f998958"
+    },
+    {
+      "path": "apps/api/test/real-config-mail.test.ts",
+      "status": "modified",
+      "before": "40f5990349f93eb43cb377876a7971cdc7857818c60ec4871eb1ed8b0f50dc87",
+      "after": "42316d4ed20f46c12d829bde652c0614a690b27aec1360aac31a43569e01e6bb"
+    },
+    {
+      "path": "apps/web/src/App.tsx",
+      "status": "modified",
+      "before": "9511ac68b777f9de5eb9a6a8c67a7e55ef14cd9d845c048de24642cd67ad6e2c",
+      "after": "a1e20beb4cc26842f1aa67212eae3388df695b291c62d12ab4f6a55e15a8d39d"
+    },
+    {
+      "path": "apps/web/src/auth/RealUseNotice.tsx",
+      "status": "modified",
+      "before": "3a9ef76afb12d5a317e73944fa7d9b82a06f89ef03f26646394d5c23860fe181",
+      "after": "5b16d91fb7d45ddf69b843f2b6aa7c68f242fc2c1379465b43f5c717b40386b6"
+    },
+    {
+      "path": "apps/web/src/real-use.test.tsx",
+      "status": "modified",
+      "before": "d1239721ad8e264094dd445e0890b9831968cce8e8ed2614c4c53d0e6ce1b496",
+      "after": "a354966826692ce462c67a7a2985e0103e001157cf638a5fa8e3dbc8e8ca4292"
+    },
+    {
+      "path": "apps/web/src/tracker/Account.tsx",
+      "status": "modified",
+      "before": "11a65b52c6e8a04955675984780e0c233235f51fb136e9c6e21af1cc08c16276",
+      "after": "b120fa17c8ec0dcef440cb56f5ee402b520281fb58396629c3591eafe6ae2d6e"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/audit-assessment.json",
+      "status": "added",
+      "before": null,
+      "after": "65d36b4946f8770b26bda4ea368418128d9ec7ba76b544bb89397cab0fed1f48"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/authenticated-finance.jpg",
+      "status": "added",
+      "before": null,
+      "after": "69d184dd16361e44ac4142578d3f47c88c95e9eaedcf624f4f1cc774fa441217"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/browser-download.json",
+      "status": "added",
+      "before": null,
+      "after": "a186ae9828a72ad36dc44dee4034e8d45e6d677a2d6d12d09b0175b209912708"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/check-1.txt",
+      "status": "added",
+      "before": null,
+      "after": "03a5fb9072e3d637c766ee2156d44e6830a48f32e3f968ee7ddab54d2ce48d6b"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/check-2.txt",
+      "status": "added",
+      "before": null,
+      "after": "ef18437bfab59f0423cb1054e65fe90cec1e60d6d71c42d981cf94e54a88d2d3"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/check-3.txt",
+      "status": "added",
+      "before": null,
+      "after": "3308e236ef4c5e042f8772dfaf6390db6409bc5329dc63606d4abefa76497081"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/check-4.txt",
+      "status": "added",
+      "before": null,
+      "after": "1e8ec5dd78b2ef407ade1665987ffb86c3bef5c1111b559dee7fe627201e6e18"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/check-5.txt",
+      "status": "added",
+      "before": null,
+      "after": "a2aa78902af442873d9e2931cf548b0f15103eaf387ad5afccfffdcdf6251a04"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/cloud-acceptance.json",
+      "status": "added",
+      "before": null,
+      "after": "e7e59c9660f08809f13da9f913af0dae01cf956188dafe90a56d611e044926bb"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/cloud-created.json",
+      "status": "added",
+      "before": null,
+      "after": "7be12e2b282a3fde614e132a3110ace67cadbb3cc3c0c6b820f0a94ec1621d2c"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/cloud-persistence.json",
+      "status": "added",
+      "before": null,
+      "after": "8264fd4ffecf571799647e5fc54e24b2cc713c055d87517e0ad3ebdcbd2a8005"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/cloud-public.json",
+      "status": "added",
+      "before": null,
+      "after": "e6a8bbb694d6b64ade991c554e340a26511d41baa36fa6e0bbf19bae1bda3112"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/image-smoke.txt",
+      "status": "added",
+      "before": null,
+      "after": "66d3651f66d25dd505839e96ed5508cb42a54901971af09fd5697ec61ee1749e"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/password-pg-release.txt",
+      "status": "added",
+      "before": null,
+      "after": "28d13390513d68e17b80413529d502d3f12de28932a0f3305b4c8f2867bdca09"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/public-activation.json",
+      "status": "added",
+      "before": null,
+      "after": "19a7b757ee3a4eec6c9ac31fac0fa776be441393839d019ea8252011ee5bc56d"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/public-signup.jpg",
+      "status": "added",
+      "before": null,
+      "after": "021739da7eccc91cbb49de6403eaf5d171f3437bb80d00c19afe1b37c9004f43"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/published-final.json",
+      "status": "added",
+      "before": null,
+      "after": "786be575260611e6d658aa4425e7346e6436b121aab8e16ee6e0257bd7caf00d"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/published.json",
+      "status": "added",
+      "before": null,
+      "after": "6fa60f9ada13cee6eaa612df3d1b01417b32b552affed312d0bc0d0027ffcc51"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/readiness-api-tests.txt",
+      "status": "added",
+      "before": null,
+      "after": "40c23dac77824d19da701422a98dad21d058d3546aace1ce1fe01f040e8d81c2"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/readiness-typecheck.txt",
+      "status": "added",
+      "before": null,
+      "after": "a51ea794da8a4222f2e06f725ada5c37419bbdbff2f5fcbc148ac1e5e6720546"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/release-manifest.json",
+      "status": "added",
+      "before": null,
+      "after": "8c2ffcc0eccc23d5e8d0572f108b25ffef1e53f25e9a3e1aea357879cf2965d0"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/secret-scan.json",
+      "status": "added",
+      "before": null,
+      "after": "befc2754174b58b27f3d7a0e43e0204902e2a9c4d1f4bd3d2a9f6c4af528ca1c"
+    },
+    {
+      "path": "docs/acceptance/student-real-evidence-20261008/staging-login.jpg",
+      "status": "added",
+      "before": null,
+      "after": "b71a492c7222ae0810a97621b19e43d322acd8cdaefdafaf12dc96486b33a2ed"
+    },
+    {
+      "path": "docs/acceptance/student-real-use-launch-20261008.md",
+      "status": "added",
+      "before": null,
+      "after": "fb0c7aff4f51e554974fc6c2c4fd36fddb457654daffd39c1e72ad2ec0f00910"
+    },
+    {
+      "path": "docs/operations/student-real-use.md",
+      "status": "added",
+      "before": null,
+      "after": "a98b27ca53df3e0ee497d00f9de45a340332453218082e4aeb9b5d8a359aeb22"
+    }
+  ]
+}

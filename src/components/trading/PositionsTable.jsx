@@ -1,15 +1,18 @@
 import React, { useState } from 'react'
 import { formatCurrency, formatNumber } from '../../utils/formatters'
 import { Layers, History, Target, XCircle, Wallet, ArrowDownLeft, ArrowUpRight, CheckCircle2 } from 'lucide-react'
+import { calculateSpotWalletValuation } from '../../utils/assetValuation'
 
 export default function PositionsTable({
   spotBalances = {},
   openOrders = [],
   tradeHistory = [],
   currentPrices = {},
+  marketSnapshot,
   onCancelOpenOrder,
   onSelectSymbol,
   limitOrders = [],
+  orderRulesVerified = false,
 }) {
   const [activeTab, setActiveTab] = useState('orders') // 'orders' | 'balances' | 'history'
 
@@ -28,40 +31,12 @@ export default function PositionsTable({
     DOGE: { name: 'Dogecoin', symbol: 'DOGE', pairSymbol: 'DOGE/THB' },
   }
 
-  // Calculate asset valuation in THB
-  const assetsList = Object.keys(spotBalances).map((key) => {
-    const amount = spotBalances[key] || 0
-    const meta = assetMetadata[key] || { name: key, symbol: key, pairSymbol: `${key}/THB` }
-    
-    let priceInTHB = 1
-    if (key === 'THB') {
-      priceInTHB = 1
-    } else {
-      const pairKey = `${key}/THB`
-      priceInTHB = currentPrices[pairKey] || 0
-      if (!priceInTHB && key === 'USDT') priceInTHB = 35.80
-    }
-
-    const valuationTHB = amount * priceInTHB
-
-    // Calculate in-order locked amount
-    const inOrder = allOpenOrders
-      .filter((o) => (o.side === 'SELL' && (o.baseAsset === key || o.symbol.startsWith(key))))
-      .reduce((sum, o) => sum + (o.amount || 0), 0)
-
-    return {
-      key,
-      name: meta.name,
-      amount,
-      inOrder,
-      total: amount + inOrder,
-      priceInTHB,
-      valuationTHB,
-      pairSymbol: meta.pairSymbol,
-    }
-  }).filter((a) => a.total > 0 || a.key === 'THB')
-
-  const totalPortfolioValuation = assetsList.reduce((sum, a) => sum + a.valuationTHB, 0)
+  const walletValuation = calculateSpotWalletValuation(spotBalances, allOpenOrders, marketSnapshot)
+  const assetsList = walletValuation.rows.map((row) => {
+    const meta = assetMetadata[row.asset] || { name: row.asset, symbol: row.asset, pairSymbol: `${row.asset}/THB` }
+    return { ...row, key: row.asset, name: meta.name, amount: row.available, inOrder: row.locked, valuationTHB: row.valueTHB, pairSymbol: meta.pairSymbol }
+  })
+  const totalPortfolioValuation = walletValuation.totalValueTHB
 
   return (
     <div className="bg-white dark:bg-[#0c1017] border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 shadow-sm overflow-hidden flex flex-col font-mono text-xs transition-colors">
@@ -110,7 +85,7 @@ export default function PositionsTable({
         <div className="text-right hidden sm:block">
           <span className="text-slate-400 text-[11px]">มูลค่าพอร์ตประเมิน: </span>
           <span className="text-slate-900 dark:text-white font-bold text-xs">
-            ฿{formatNumber(totalPortfolioValuation, 2)} THB
+            {totalPortfolioValuation === null ? 'N/A' : `฿${formatNumber(totalPortfolioValuation, 2)} THB`}
           </span>
         </div>
       </div>
@@ -120,7 +95,9 @@ export default function PositionsTable({
         <div className="overflow-x-auto">
           {allOpenOrders.length === 0 ? (
             <div className="py-12 text-center text-slate-400 text-xs">
-              ไม่มีคำสั่งรอจับคู่ในขณะนี้ (สามารถตั้งราคาซื้อ-ขายล่วงหน้าด้วยคำสั่ง Limit ได้)
+              {orderRulesVerified
+                ? 'ไม่มีคำสั่งรอจับคู่ในขณะนี้ (สามารถตั้งราคาซื้อ-ขายล่วงหน้าด้วยคำสั่ง Limit ได้)'
+                : 'ไม่มีคำสั่งรอจับคู่ในขณะนี้ — คำสั่ง PAPER พักอยู่ จึงยังตั้ง Limit ใหม่ไม่ได้'}
             </div>
           ) : (
             <table className="w-full text-left">
@@ -231,7 +208,7 @@ export default function PositionsTable({
                     {item.key === 'THB' ? `฿${formatNumber(item.total, 2)}` : formatNumber(item.total, 4)}
                   </td>
                   <td className="py-2.5 px-3 text-right font-bold text-slate-900 dark:text-white">
-                    ฿{formatNumber(item.valuationTHB, 2)}
+                    {item.valuationTHB === null ? 'N/A' : `฿${formatNumber(item.valuationTHB, 2)}`}
                   </td>
                   <td className="py-2.5 px-3 text-center">
                     {item.key !== 'THB' && onSelectSymbol && (
@@ -278,7 +255,7 @@ export default function PositionsTable({
                   return (
                     <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
                       <td className="py-2.5 px-3 text-slate-400 text-[11px]">
-                        {item.executedAt || item.closedAt || '12:00:00'}
+                        {item.executedAt || item.closedAt || '—'}
                       </td>
                       <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white">
                         {item.symbol}

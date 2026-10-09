@@ -1,0 +1,23 @@
+{
+  "syntheticOnly": true,
+  "externalMail": "NOT TESTED",
+  "cases": [
+    "isolated boundary",
+    "verified empty accounts",
+    "scanner/expiry/replay",
+    "Decimal ownership/retry",
+    "JSON restore",
+    "logout/restart persistence",
+    "enumeration",
+    "rollback",
+    "HTTP/WS revocation",
+    "session expiry",
+    "durable provider retry",
+    "lost-response deduplication",
+    "bounded limits"
+  ],
+  "websocketRevocationMs": {
+    "market": 4977,
+    "stocks": 4978
+  }
+}

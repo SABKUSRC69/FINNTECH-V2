@@ -1,0 +1,92 @@
+
+> finntech@1.0.0 tracker:test
+> npm run tracker:build:shared && npm --workspace packages/finance run test && npm --workspace packages/contracts run test && npm --workspace apps/api run test && npm --workspace apps/web run test && npm run tracker:web-smoke
+
+
+> finntech@1.0.0 tracker:build:shared
+> npm --workspace packages/finance run build && npm --workspace packages/contracts run build
+
+
+> @finntech/finance@0.1.0 build
+> tsc -p tsconfig.build.json
+
+
+> @finntech/contracts@0.1.0 build
+> tsc -p tsconfig.build.json
+
+
+> @finntech/finance@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.1 C:/Users/Admin/Downloads/FINNTECH/packages/finance
+
+
+ Test Files  3 passed (3)
+      Tests  21 passed (21)
+   Start at  23:03:06
+   Duration  555ms (transform 65%, import 21%, tests 10%, worker 3%)
+
+
+> @finntech/contracts@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.1 C:/Users/Admin/Downloads/FINNTECH/packages/contracts
+
+
+ Test Files  4 passed (4)
+      Tests  13 passed (13)
+   Start at  23:03:07
+   Duration  640ms (transform 68%, import 24%, tests 6%, worker 3%)
+
+
+> @finntech/api@0.1.0 pretest
+> npm run prisma:generate
+
+
+> @finntech/api@0.1.0 prisma:generate
+> prisma generate
+
+
+✔ Generated Prisma Client (7.10.0) to .\src\generated\prisma in 296ms
+
+
+> @finntech/api@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.1 C:/Users/Admin/Downloads/FINNTECH/apps/api
+
+
+ Test Files  14 passed (14)
+      Tests  125 passed (125)
+   Start at  23:03:11
+   Duration  7.94s (import 43%, tests 34%, transform 22%, worker 1%)
+
+
+> @finntech/web@0.1.0 test
+> vitest run --configLoader runner --config vitest.config.ts
+
+
+ RUN  v5.0.1 C:/Users/Admin/Downloads/FINNTECH/apps/web
+
+
+ Test Files  16 passed (16)
+      Tests  104 passed (104)
+   Start at  23:03:20
+   Duration  4.02s (environment 46%, tests 24%, import 16%, transform 13%)
+
+    Isolate  16 workers spawned · ~1.21s startup each (spawn + environment, per file)
+             at least ~280ms faster with isolate: false — reuses workers across files instead of one per file
+
+
+> finntech@1.0.0 tracker:web-smoke
+> node scripts/tracker-web-dev-smoke.mjs
+
+PASS: Vite --force served main.tsx with /@fs/C:/Users/Admin/Downloads/FINNTECH/node_modules/.vite-tracker-web/deps/react-dom_client.js?v=7f1fb98d
+PASS: optimized React DOM client returned text/javascript with an ESM export and no raw external require("react-dom")
+PASS: dev smoke server stopped and released 127.0.0.1:4175
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma\schema.prisma.

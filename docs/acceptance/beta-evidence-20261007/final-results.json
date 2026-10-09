@@ -1,0 +1,67 @@
+{
+  "checks": [
+    {
+      "name": "typecheck",
+      "command": "npm run tracker:typecheck",
+      "exitCode": 0
+    },
+    {
+      "name": "root-tests",
+      "command": "npm test",
+      "exitCode": 0
+    },
+    {
+      "name": "tracker-tests",
+      "command": "npm run tracker:test",
+      "exitCode": 0
+    },
+    {
+      "name": "tracker-build",
+      "command": "npm run tracker:build",
+      "exitCode": 0
+    },
+    {
+      "name": "legacy-build",
+      "command": "npm run build",
+      "exitCode": 0
+    },
+    {
+      "name": "package-smoke",
+      "command": "node --no-strip-types scripts/tracker-package-smoke.mjs",
+      "exitCode": 0
+    },
+    {
+      "name": "prisma",
+      "command": "npm run tracker:db:validate",
+      "exitCode": 0
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "tests": {
+    "root": 330,
+    "tracker": 201,
+    "postgres": 6,
+    "failed": 0,
+    "skippedPostgres": 0
+  },
+  "localLinuxImage": "sha256:3874887d9b87f27debfe8b1d09a547aa20d2557d09168936936b22002244bde0",
+  "productionRuntimePackages": 119,
+  "knownFlaggedToolingMatches": 0,
+  "originalAudit": {
+    "productionExit": 1,
+    "high": 5,
+    "fullExit": 1,
+    "fullHigh": 12,
+    "fullModerate": 2
+  },
+  "actualPublicHttps": "NOT TESTED",
+  "deploymentUrl": null,
+  "sourceCommit": null,
+  "evidenceSecretMatches": 0,
+  "fixtureStopExit": 0,
+  "volumeRetained": true
+}

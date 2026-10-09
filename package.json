@@ -3,13 +3,33 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "vite --configLoader runner",
     "build": "vite build --configLoader runner",
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
-    "test": "vitest run --configLoader runner"
+    "pretest": "npm run tracker:build:shared && npm --workspace apps/api run prisma:generate",
+    "test": "vitest run --configLoader runner",
+    "pretracker:dev": "npm run tracker:build:shared",
+    "tracker:dev": "node scripts/tracker-dev.mjs",
+    "tracker:dev:web": "npm run tracker:build:shared && npm --workspace apps/web run dev",
+    "tracker:dev:api": "npm run tracker:build:shared && npm --workspace apps/api run dev",
+    "tracker:web-smoke": "node scripts/tracker-web-dev-smoke.mjs",
+    "tracker:db:validate": "npm --workspace apps/api run prisma:validate",
+    "tracker:db:generate": "npm --workspace apps/api run prisma:generate",
+    "tracker:db:test": "npm run tracker:build:shared && npm --workspace apps/api run db:test",
+    "tracker:auth:test": "npm run tracker:build:shared && npm --workspace apps/api run auth:test",
+    "tracker:auth:smoke": "node --no-strip-types --env-file-if-exists=.env.auth.test scripts/tracker-auth-runtime-smoke.mjs",
+    "tracker:auth:local:prepare": "npm run tracker:build:shared && npm --workspace apps/api run build && node --no-strip-types --env-file=apps/api/.env scripts/tracker-auth-local-prepare.mjs",
+    "tracker:build:shared": "npm --workspace packages/finance run build && npm --workspace packages/contracts run build",
+    "tracker:build": "npm run tracker:build:shared && npm --workspace apps/api run build && npm --workspace apps/web run build",
+    "tracker:typecheck": "npm run tracker:build:shared && npm --workspace packages/finance run typecheck && npm --workspace packages/contracts run typecheck && npm --workspace apps/api run typecheck && npm --workspace apps/web run typecheck",
+    "tracker:test": "npm run tracker:build:shared && npm --workspace packages/finance run test && npm --workspace packages/contracts run test && npm --workspace apps/api run test && npm --workspace apps/web run test && npm run tracker:web-smoke"
   },
   "dependencies": {
     "clsx": "^2.1.1",

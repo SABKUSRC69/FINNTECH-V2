@@ -10,8 +10,6 @@ import SpotWithdrawModal from './SpotWithdrawModal'
 import ToastContainer from '../common/ToastContainer'
 import {
   TRADING_PAIRS,
-  generateCandleData,
-  generateOrderBook,
   INITIAL_SPOT_BALANCES,
   INITIAL_OPEN_ORDERS,
   INITIAL_TRADE_HISTORY,
@@ -22,10 +20,11 @@ import {
   applySpotOrder,
   applySpotWithdrawal,
   createSpotAccount,
-  calculateLockedBalances,
   isUsablePriceStatus,
   floorSpotAmount,
+  withSpotProviderRules,
 } from '../../services/spotTradingService'
+import { calculateSpotWalletValuation } from '../../utils/assetValuation'
 import { liveMarketService } from '../../services/liveMarketService'
 import tradingViewWebhookService from '../../services/tradingViewWebhookService'
 import { soundEffects } from '../../utils/soundEffects'
@@ -56,6 +55,7 @@ import {
 } from 'lucide-react'
 
 export default function TradingTerminal({
+  marketSnapshot: suppliedMarketSnapshot,
   tradingBalance = 500000,
   spotBalances: propSpotBalances,
   openOrders: propOpenOrders,
@@ -140,36 +140,27 @@ export default function TradingTerminal({
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }
 
-  const [pairPrices, setPairPrices] = useState(() => {
-    const initial = {}
-    TRADING_PAIRS.forEach((p) => {
-      initial[p.symbol] = p.price
-    })
-    return initial
-  })
-
+  const marketSnapshot = suppliedMarketSnapshot || liveMarketService.getSnapshot()
+  const pairPrices = marketSnapshot.prices || {}
   const [tickDirections, setTickDirections] = useState({})
-  const [marketStatus, setMarketStatus] = useState({ isConnected: false, latency: null })
-  const [candles, setCandles] = useState(() => generateCandleData(2682750, 30))
-  const [orderBook, setOrderBook] = useState(() => generateOrderBook(2682750))
-  const [recentTrades, setRecentTrades] = useState([])
 
-  const selectedPair = TRADING_PAIRS.find((p) => p.symbol === selectedSymbol) || TRADING_PAIRS[0]
-  const selectedPriceStatus = marketStatus.symbolStatuses?.[selectedSymbol] || liveMarketService.getSymbolStatus(selectedSymbol)
-  const currentPrice = pairPrices[selectedSymbol] ?? selectedPair.price
-  const priceAvailable = isUsablePriceStatus(selectedPriceStatus) && Number.isFinite(Number(currentPrice)) && Number(currentPrice) > 0
-
+  const selectedBasePair = TRADING_PAIRS.find((p) => p.symbol === selectedSymbol) || TRADING_PAIRS[0]
+  const selectedMarketRules = marketSnapshot.symbolMappings?.[selectedSymbol] || null
+  const selectedPair = withSpotProviderRules(selectedBasePair, selectedMarketRules)
+  const paperOrdersPaused = selectedMarketRules?.orderRulesVerified !== true
+  const paperOrderPauseReason = selectedMarketRules?.orderRulesReason || 'ยังยืนยันกฎคู่เทรดไม่ได้'
+  const selectedPriceStatus = marketSnapshot.symbolStatuses?.[selectedSymbol] || liveMarketService.getSymbolStatus(selectedSymbol)
+  const selectedTicker = marketSnapshot.tickers?.[selectedSymbol] || null
+  const currentPrice = pairPrices[selectedSymbol] ?? null
   // Calculate Net Worth & Available Balances in THB
   const availableTHB = spotBalances?.THB !== undefined ? spotBalances.THB : tradingBalance
-  const lockedBalances = calculateLockedBalances(openOrders)
-  const totalPortfolioTHB = [...new Set([...Object.keys(spotBalances || {}), ...Object.keys(lockedBalances)])].reduce((sum, key) => {
-    const qty = Number(spotBalances[key] || 0) + Number(lockedBalances[key] || 0)
-    if (key === 'THB') return sum + qty
-    const p = pairPrices[`${key}/THB`] || (key === 'USDT' ? pairPrices['USDT/THB'] : 0)
-    return sum + (qty * p)
-  }, 0)
+  const totalPortfolioTHB = calculateSpotWalletValuation(spotBalances, openOrders, marketSnapshot).totalValueTHB
+  const orderBook = marketSnapshot.orderBooks?.[selectedSymbol] || { asks: [], bids: [] }
+  const recentTrades = marketSnapshot.recentTrades?.[selectedSymbol] || []
+  const bookStatus = marketSnapshot.bookStatuses?.[selectedSymbol] || liveMarketService.getBookStatus(selectedSymbol)
+  const tradeStatus = marketSnapshot.tradeStatuses?.[selectedSymbol] || liveMarketService.getTradeStatus(selectedSymbol)
 
-  // Ref tracking for the local demo feed and user-scoped alerts
+  // Refs keep the market callback current while alerts remain user-scoped.
   const priceAlertsRef = useRef(priceAlerts)
   priceAlertsRef.current = priceAlerts
 
@@ -179,13 +170,13 @@ export default function TradingTerminal({
   const checkLimitOrders = (latestPrices, updateInfo) => {
     const symbol = updateInfo?.symbol
     const price = Number(latestPrices?.[symbol])
-    if (!symbol || !Number.isFinite(price) || price <= 0) return
+    if (!symbol || updateInfo?.kind !== 'ticker' || !Number.isFinite(price) || price <= 0) return
     const status = liveMarketService.getSymbolStatus(symbol)
     if (!isUsablePriceStatus(status)) return
 
     const result = onLimitPriceTick
       ? onLimitPriceTick(symbol, price, status)
-      : applyLimitPriceTick(localAccountRef.current, symbol, price, status)
+      : applyLimitPriceTick(localAccountRef.current, symbol, price, status, { pairRules: liveMarketService.getPairRules(symbol) })
 
     if (!result?.success || result.filledOrders.length === 0) return
     if (!onLimitPriceTick) {
@@ -223,7 +214,7 @@ export default function TradingTerminal({
       if (isHit) {
         soundEffects.playAlertChime()
         addToast(
-          `🔔 แจ้งเตือนราคาเป้าหมาย (DEMO)`,
+          `🔔 แจ้งเตือนราคา (Bitkub / PAPER)`,
           `${alt.symbol} ${alt.condition === 'GTE' ? 'ขึ้นถึง' : 'ลงถึง'} ${formatNumber(liveP, 2)} (${alt.note || ''})`,
           'info'
         )
@@ -237,22 +228,22 @@ export default function TradingTerminal({
     }
   }
 
-  // Initialize and subscribe to Live Market Service
+  // Subscribe to the shared market service; App owns its lifecycle.
   useEffect(() => {
-    liveMarketService.init()
-
     // Register TradingView Webhook Signal Execution Listener (Signal Simulator for Spot)
-    tradingViewWebhookService.onSignalReceived((signal) => {
+    const unsubscribeSignal = tradingViewWebhookService.onSignalReceived((signal) => {
       const action = signal.action
       if (action !== 'BUY' && action !== 'SELL') {
         return { success: false, reason: 'Spot Signal Simulator รองรับเฉพาะ BUY และ SELL' }
       }
 
       const pairInfo = TRADING_PAIRS.find((pair) => pair.symbol === signal.symbol)
+      const pairRules = liveMarketService.getPairRules(signal.symbol)
+      const validatedPair = withSpotProviderRules(pairInfo, pairRules)
       const curP = Number(pairPricesRef.current[signal.symbol])
       const priceStatus = liveMarketService.getSymbolStatus(signal.symbol)
       if (!pairInfo || !isUsablePriceStatus(priceStatus) || !Number.isFinite(curP) || curP <= 0) {
-        return { success: false, reason: 'ราคา Spot DEMO ไม่พร้อมใช้งาน จึงไม่ส่งคำสั่ง' }
+        return { success: false, reason: 'ราคา Bitkub ยังไม่ LIVE จึงไม่ส่งคำสั่ง PAPER' }
       }
 
       const requestedAmount = Number(signal.amount)
@@ -262,7 +253,7 @@ export default function TradingTerminal({
       const baseAsset = pairInfo.baseAsset
       const quoteAsset = pairInfo.quoteAsset
       const cryptoQty = action === 'BUY'
-        ? floorSpotAmount(pairInfo, requestedAmount / (curP * (1 + 0.0025)))
+        ? floorSpotAmount(validatedPair, requestedAmount / (curP * (1 + 0.0025)))
         : requestedAmount
       const total = curP * cryptoQty
       const spotOrder = {
@@ -277,6 +268,7 @@ export default function TradingTerminal({
         baseAsset,
         quoteAsset,
         priceStatus: priceStatus.status,
+        ...(pairRules?.providerSymbol ? { pairRules } : {}),
       }
 
       const result = onExecuteSpotOrder
@@ -284,13 +276,13 @@ export default function TradingTerminal({
         : handleOrderSubmit(spotOrder)
       if (!result?.success) {
         const reason = result?.error || 'ยอดคงเหลือไม่พอหรือคำสั่งไม่ผ่านการตรวจสอบ'
-        addToast('⚠️ Signal Simulator ปฏิเสธคำสั่ง (DEMO)', reason, 'error')
+        addToast('⚠️ Signal Simulator ปฏิเสธคำสั่ง PAPER', reason, 'error')
         return { success: false, reason }
       }
 
       soundEffects.playOrderFilled()
       addToast(
-        `⚡ Signal Simulator ${action} สำเร็จ (DEMO)`,
+        `⚡ Signal Simulator ${action} สำเร็จ (PAPER / DEMO)`,
         `${action === 'BUY' ? 'ซื้อ' : 'ขาย'} ${formatNumber(cryptoQty, 6)} ${baseAsset} @ ${formatNumber(curP, 2)} ${quoteAsset}`,
         'success'
       )
@@ -298,68 +290,19 @@ export default function TradingTerminal({
     })
 
     const unsubscribePrices = liveMarketService.subscribe((newPrices, updateInfo) => {
-      const nextPrices = { ...pairPricesRef.current, ...newPrices }
-      pairPricesRef.current = nextPrices
-      setPairPrices(nextPrices)
-      checkLimitOrders(nextPrices, updateInfo)
-      checkPriceAlerts(nextPrices)
-
-      if (updateInfo && updateInfo.symbol) {
-        setTickDirections((prev) => ({
-          ...prev,
-          [updateInfo.symbol]: updateInfo.direction,
-        }))
-
-        // Sync orderbook, live candle ticks & matched trade stream for active pair
-        if (updateInfo.symbol === selectedSymbol) {
-            const demoPrice = nextPrices[selectedSymbol]
-            if (demoPrice) {
-            setOrderBook(generateOrderBook(demoPrice))
-
-            // Realtime Forming Candle Tick Engine
-            setCandles((prevCandles) => {
-              if (!prevCandles || prevCandles.length === 0) return prevCandles
-              const lastIdx = prevCandles.length - 1
-              const last = { ...prevCandles[lastIdx] }
-              last.close = demoPrice
-              last.high = Math.max(last.high, demoPrice)
-              last.low = Math.min(last.low, demoPrice)
-              return [...prevCandles.slice(0, lastIdx), last]
-            })
-
-            const isBuy = updateInfo.direction === 'up'
-            const now = new Date()
-            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-            setRecentTrades((prevTrades) => [
-              {
-                id: Date.now(),
-                price: demoPrice,
-                size: parseFloat((Math.random() * 0.15 + 0.01).toFixed(4)),
-                time: timeStr,
-                isBuy,
-              },
-              ...prevTrades.slice(0, 15),
-            ])
-          }
-        }
+      const latestPrices = { ...pairPricesRef.current, ...newPrices }
+      pairPricesRef.current = latestPrices
+      checkLimitOrders(latestPrices, updateInfo)
+      checkPriceAlerts(latestPrices)
+      if (updateInfo?.symbol && updateInfo.kind === 'ticker') {
+        setTickDirections((prev) => ({ ...prev, [updateInfo.symbol]: updateInfo.direction }))
       }
-    })
-
-    const unsubscribeStatus = liveMarketService.subscribeStatus((status) => {
-      setMarketStatus(status)
     })
 
     return () => {
       unsubscribePrices()
-      unsubscribeStatus()
+      unsubscribeSignal?.()
     }
-  }, [selectedSymbol])
-
-  // When switching pairs, regenerate initial candle set & orderbook
-  useEffect(() => {
-    const p = pairPrices[selectedSymbol] || selectedPair.price
-    setCandles(generateCandleData(p, 30))
-    setOrderBook(generateOrderBook(p))
   }, [selectedSymbol])
 
   // Sound toggle handler
@@ -384,9 +327,9 @@ export default function TradingTerminal({
     const priceStatus = newOrder.priceStatus || liveMarketService.getSymbolStatus(newOrder.symbol).status
     const result = onExecuteSpotOrder
       ? onExecuteSpotOrder(newOrder)
-      : applySpotOrder(localAccountRef.current, newOrder, { priceStatus })
+      : applySpotOrder(localAccountRef.current, newOrder, { priceStatus, pairRules: newOrder.pairRules || liveMarketService.getPairRules(newOrder.symbol) })
     if (!result?.success) {
-      addToast('คำสั่งถูกปฏิเสธ (DEMO)', result?.error || 'คำสั่งไม่ผ่านการตรวจสอบ', 'error')
+      addToast('คำสั่ง PAPER ถูกปฏิเสธ', result?.error || 'คำสั่งไม่ผ่านการตรวจสอบ', 'error')
       return result || { success: false, error: 'คำสั่งไม่ผ่านการตรวจสอบ' }
     }
     if (!onExecuteSpotOrder) {
@@ -399,13 +342,13 @@ export default function TradingTerminal({
     soundEffects.playOrderFilled()
     if (newOrder.orderType === 'LIMIT') {
       addToast(
-        `⏳ ตั้งคำสั่ง Limit ${newOrder.side === 'BUY' ? 'ซื้อ' : 'ขาย'} (DEMO) สำเร็จ`,
+        `⏳ ตั้งคำสั่ง Limit ${newOrder.side === 'BUY' ? 'ซื้อ' : 'ขาย'} (PAPER / DEMO) สำเร็จ`,
         `${newOrder.symbol} รอที่ราคา ${formatNumber(newOrder.price, 2)} ${newOrder.quoteAsset} • ล็อกยอดแล้ว`,
         'info'
       )
     } else {
       addToast(
-        `🚀 จับคู่คำสั่ง ${newOrder.side === 'BUY' ? 'ซื้อ' : 'ขาย'} (DEMO) สำเร็จ`,
+        `🚀 จับคู่คำสั่ง ${newOrder.side === 'BUY' ? 'ซื้อ' : 'ขาย'} จำลองสำเร็จ`,
         `${newOrder.amount} ${newOrder.baseAsset} ที่ราคา ${formatNumber(newOrder.price, 2)} ${newOrder.quoteAsset} • ค่าธรรมเนียม 0.25% (${formatNumber(newOrder.fee, 2)} ${newOrder.quoteAsset})`,
         'success'
       )
@@ -418,7 +361,7 @@ export default function TradingTerminal({
       ? onCancelOpenOrder(orderId)
       : cancelSpotLimitOrder(localAccountRef.current, orderId)
     if (!result?.success) {
-      addToast('ยกเลิกคำสั่งไม่สำเร็จ (DEMO)', result?.error || 'ไม่พบยอดที่ล็อกไว้', 'error')
+      addToast('ยกเลิกคำสั่ง PAPER ไม่สำเร็จ', result?.error || 'ไม่พบยอดที่ล็อกไว้', 'error')
       return result
     }
     if (!onCancelOpenOrder) {
@@ -428,13 +371,13 @@ export default function TradingTerminal({
       setLocalTradeHistory(result.account.tradeHistory)
     }
     soundEffects.playOrderFilled()
-    addToast('🗑️ ยกเลิกคำสั่ง (DEMO) สำเร็จ', 'คืนเฉพาะยอดที่ล็อกไว้ในคำสั่งนี้', 'info')
+    addToast('🗑️ ยกเลิกคำสั่ง PAPER จำลองสำเร็จ', 'คืนเฉพาะยอดที่ล็อกไว้ในคำสั่งนี้', 'info')
     return result
   }
 
   const handleAddPriceAlert = (newAlert) => {
     setPriceAlerts((prev) => [newAlert, ...prev])
-    addToast('🔔 ตั้งเตือนราคา DEMO สำเร็จ', `${newAlert.symbol} ${newAlert.condition === 'GTE' ? '≥' : '≤'} ${formatNumber(newAlert.targetPrice, 2)}`, 'success')
+    addToast('🔔 ตั้งเตือนราคา Bitkub สำเร็จ', `${newAlert.symbol} ${newAlert.condition === 'GTE' ? '≥' : '≤'} ${formatNumber(newAlert.targetPrice, 2)}`, 'success')
   }
 
   const handleDeletePriceAlert = (alertId) => {
@@ -493,10 +436,10 @@ export default function TradingTerminal({
             <button
               onClick={() => setIsSignalModalOpen(true)}
               className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-medium transition-all text-xs cursor-pointer"
-              title="เปิดตัวจำลองคำสั่ง Spot DEMO ในเครื่อง"
+              title="เปิดตัวจำลองคำสั่ง Spot (PAPER / DEMO) ในเครื่อง"
             >
               <Zap className="w-3.5 h-3.5 fill-emerald-500 text-emerald-500" />
-              <span>Signal DEMO</span>
+              <span>Signal PAPER</span>
             </button>
 
             {/* Price Alert Button */}
@@ -514,7 +457,7 @@ export default function TradingTerminal({
               <button
                 onClick={onNavigateToNews}
                 className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/25 text-rose-600 dark:text-rose-400 font-medium transition-all text-xs cursor-pointer"
-                title="ดูปฏิทินข่าวเศรษฐกิจ Forex Factory"
+                title="ดูปฏิทินเศรษฐกิจและข่าวตามสถานะ feed"
               >
                 <Flame className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
                 <span>ข่าวเศรษฐกิจ</span>
@@ -542,7 +485,9 @@ export default function TradingTerminal({
           <div className="flex items-center space-x-2 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
             {filteredPairs.map((item) => {
               const isSelected = item.symbol === selectedSymbol
-              const demoPrice = pairPrices[item.symbol] ?? item.price
+              const ticker = marketSnapshot.tickers?.[item.symbol]
+              const tickerStatus = marketSnapshot.symbolStatuses?.[item.symbol]?.status || 'UNAVAILABLE'
+              const currentQuote = tickerStatus === 'LIVE' ? pairPrices[item.symbol] : null
               const tick = tickDirections[item.symbol]
 
               return (
@@ -560,8 +505,8 @@ export default function TradingTerminal({
                       <span className="font-bold text-xs text-slate-900 dark:text-white">
                         {item.symbol}
                       </span>
-                      <span className="text-[10px] font-semibold text-cyan-600 dark:text-cyan-400">
-                        {Number.isFinite(item.change24h) ? `${item.change24h > 0 ? '+' : ''}${item.change24h}%` : '24h —'}
+                        <span className="text-[10px] font-semibold text-cyan-600 dark:text-cyan-400">
+                        {tickerStatus === 'LIVE' && ticker?.change24h !== null && ticker?.change24h !== undefined && Number.isFinite(Number(ticker.change24h)) ? `${Number(ticker.change24h) > 0 ? '+' : ''}${Number(ticker.change24h)}%` : '24h —'}
                       </span>
                     </div>
                     <div className={`text-[11px] font-mono font-bold transition-colors ${
@@ -571,7 +516,7 @@ export default function TradingTerminal({
                         ? 'text-rose-500 dark:text-rose-400'
                         : 'text-slate-600 dark:text-slate-300'
                     }`}>
-                      {item.quoteAsset === 'THB' ? '฿' : item.quoteAsset}{formatNumber(demoPrice, item.precision || 2)}
+                      {currentQuote === null ? '—' : `${item.quoteAsset === 'THB' ? '฿' : `${item.quoteAsset} `}${formatNumber(currentQuote, item.precision || 2)}`}
                     </div>
                   </div>
                 </button>
@@ -583,41 +528,47 @@ export default function TradingTerminal({
           <div className="flex flex-wrap items-center justify-between lg:justify-end gap-3 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100 dark:border-slate-800/60">
             {/* Live / Demo feed badge */}
             {(() => {
-              const currentSymStatus = liveMarketService.getSymbolStatus(selectedSymbol)
+              const currentSymStatus = selectedPriceStatus
               const statusType = currentSymStatus.status || 'UNAVAILABLE'
-              const isDemo = statusType === 'DEMO'
+              const isLive = statusType === 'LIVE'
               const isStale = statusType === 'STALE'
 
-              const badgeStyle = isDemo
-                ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/25'
+              const badgeStyle = isLive
+                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25'
                 : isStale
                 ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25'
                 : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/25'
 
-              const dotColor = isDemo ? 'bg-cyan-500' : isStale ? 'bg-amber-500' : 'bg-rose-500'
+              const dotColor = isLive ? 'bg-emerald-500' : isStale ? 'bg-amber-500' : 'bg-rose-500'
 
               return (
                 <div
                   className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-mono transition-all ${badgeStyle}`}
-                  title={`Source: ${currentSymStatus.source}${currentSymStatus.lastUpdated ? ` • อัปเดตล่าสุด: ${new Date(currentSymStatus.lastUpdated).toLocaleTimeString()}` : ''}`}
+                  title={`Source: ${currentSymStatus.source}${currentSymStatus.lastUpdated ? ` • ${currentSymStatus.timestampType === 'provider' ? 'provider time' : 'received'}: ${new Date(currentSymStatus.lastUpdated).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}` : ''}`}
                 >
                   <span className="relative flex h-2 w-2">
                     <span className={`relative inline-flex rounded-full h-2 w-2 ${dotColor}`} />
                   </span>
                   <span className="text-[11px] font-semibold">
-                    {statusType}{isDemo ? ' • DEMO เท่านั้น' : ' • ใช้เทรดไม่ได้'}
+                    {'ฟีดราคา '}{statusType}
                   </span>
                 </div>
               )
             })()}
 
+            {paperOrdersPaused && (
+              <span className="flex items-center px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300">
+                คำสั่ง PAPER พักอยู่
+              </span>
+            )}
+
             {/* Total Portfolio Valuation (Bitkub Style) */}
             <div className="text-right border-l border-slate-200 dark:border-slate-800 pl-3">
               <div className="text-[9px] text-slate-400 uppercase tracking-wider font-semibold">
-                มูลค่ากระเป๋า Spot รวม (DEMO)
+                มูลค่า Spot รวม (PAPER)
               </div>
               <div className="text-sm sm:text-base font-mono font-extrabold text-slate-900 dark:text-white leading-none mt-0.5">
-                ฿{formatNumber(totalPortfolioTHB, 2)}
+                {totalPortfolioTHB === null ? 'N/A' : `฿${formatNumber(totalPortfolioTHB, 2)}`}
               </div>
             </div>
 
@@ -661,22 +612,29 @@ export default function TradingTerminal({
         {/* Left Column: Chart & Spot Positions (8 cols) */}
         <div className="xl:col-span-8 space-y-4 flex flex-col">
           
-          {/* DEMO chart; external chart feeds are disabled in this phase. */}
+          {/* Bitkub public market data; simulated Spot execution remains isolated. */}
           <div className="space-y-2">
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center space-x-2 text-xs">
-                <span className="px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/25 text-cyan-500 font-semibold">กราฟ DEMO</span>
+                <span className={`px-2.5 py-1 rounded-lg border font-semibold ${selectedPriceStatus.status === 'LIVE' ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-500' : selectedPriceStatus.status === 'STALE' ? 'bg-amber-500/10 border-amber-500/25 text-amber-400' : 'bg-slate-500/10 border-slate-500/25 text-slate-400'}`}>ฟีดราคา {selectedPriceStatus.status}</span>
+                {paperOrdersPaused && <span className="px-2.5 py-1 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-400 font-semibold">คำสั่ง PAPER พักอยู่</span>}
                 <span className="text-slate-500 font-mono">{selectedSymbol} • {selectedPair.quoteAsset}</span>
               </div>
             </div>
 
-            {/* Price scale and demo candles use the same pair quote unit as the order form. */}
+            {/* Historical OHLC is supplemented only with observed Bitkub matched trades. */}
             <div className="h-[460px] sm:h-[500px]">
               <TradingChart
                 pair={selectedPair}
-                candles={candles}
+                recentTrades={recentTrades}
                 currentPrice={currentPrice}
-                priceChangePercent={null}
+                ticker={selectedTicker}
+                dataStatus={selectedPriceStatus.status}
+                dataSource={selectedPriceStatus.source}
+                dataUpdatedAt={selectedPriceStatus.lastUpdated}
+                dataTimestampType={selectedPriceStatus.timestampType}
+                tradeStatus={tradeStatus}
+                providerSymbol={selectedMarketRules?.providerSymbol || null}
                 tickDirection={tickDirections[selectedSymbol] || 'none'}
                 limitOrders={openOrders}
                 onCancelLimitOrder={handleCancelOpenOrder}
@@ -691,6 +649,8 @@ export default function TradingTerminal({
               openOrders={openOrders}
               tradeHistory={tradeHistory}
               currentPrices={pairPrices}
+              marketSnapshot={marketSnapshot}
+              orderRulesVerified={selectedMarketRules?.orderRulesVerified === true}
               onCancelOpenOrder={handleCancelOpenOrder}
               onSelectSymbol={(sym) => setSelectedSymbol(sym)}
             />
@@ -705,13 +665,17 @@ export default function TradingTerminal({
               orderBook={orderBook}
               recentTrades={recentTrades}
               pair={selectedPair}
-              dataStatus="DEMO"
+              bookStatus={bookStatus}
+              tradeStatus={tradeStatus}
+              tickerStatus={selectedPriceStatus}
+              orderRulesVerified={selectedMarketRules?.orderRulesVerified === true}
             />
           </div>
 
           <div className="flex-1 hidden md:block">
             <OrderForm
               pair={selectedPair}
+              marketRules={selectedMarketRules}
               currentPrice={currentPrice}
               spotBalances={spotBalances}
               onSubmitOrder={handleOrderSubmit}
@@ -724,44 +688,64 @@ export default function TradingTerminal({
       </div>
 
       {/* Mobile Sticky Action Bar */}
-      <div className="md:hidden fixed bottom-14 left-0 right-0 z-30 px-3 py-2 bg-[#0b0e14]/95 backdrop-blur-xl border-t border-[#1e2638] flex items-center space-x-2">
-        <button
-          onClick={() => {
-            setMobileOrderSide('BUY')
-            setMobileDrawerOpen(true)
-          }}
-          className="flex-1 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center space-x-1.5 active:scale-95 transition-all"
-        >
-          <ArrowDownLeft className="w-4 h-4 stroke-[3]" />
-          <span>ซื้อ (Buy)</span>
-        </button>
+      <div className="md:hidden fixed bottom-14 left-0 right-0 z-30 px-3 py-2 bg-[#0b0e14]/95 backdrop-blur-xl border-t border-[#1e2638] flex flex-col gap-2">
+        <div className="flex items-center space-x-2">
+          <button
+            type="button"
+            aria-label="ซื้อ PAPER"
+            aria-describedby={paperOrdersPaused ? 'mobile-paper-order-pause-reason' : undefined}
+            disabled={paperOrdersPaused}
+            title={paperOrdersPaused ? paperOrderPauseReason : undefined}
+            onClick={() => {
+              setMobileOrderSide('BUY')
+              setMobileDrawerOpen(true)
+            }}
+            className="flex-1 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/25 flex items-center justify-center space-x-1.5 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:saturate-50"
+          >
+            <ArrowDownLeft className="w-4 h-4 stroke-[3]" />
+            <span>ซื้อ (Buy)</span>
+          </button>
 
-        <button
-          onClick={() => {
-            setMobileOrderSide('SELL')
-            setMobileDrawerOpen(true)
-          }}
-          className="flex-1 py-3 rounded-2xl bg-rose-500 hover:bg-rose-400 text-white font-extrabold text-xs shadow-lg shadow-rose-500/25 flex items-center justify-center space-x-1.5 active:scale-95 transition-all"
-        >
-          <ArrowUpRight className="w-4 h-4 stroke-[3]" />
-          <span>ขาย (Sell)</span>
-        </button>
+          <button
+            type="button"
+            aria-label="ขาย PAPER"
+            aria-describedby={paperOrdersPaused ? 'mobile-paper-order-pause-reason' : undefined}
+            disabled={paperOrdersPaused}
+            title={paperOrdersPaused ? paperOrderPauseReason : undefined}
+            onClick={() => {
+              setMobileOrderSide('SELL')
+              setMobileDrawerOpen(true)
+            }}
+            className="flex-1 py-3 rounded-2xl bg-rose-500 hover:bg-rose-400 text-white font-extrabold text-xs shadow-lg shadow-rose-500/25 flex items-center justify-center space-x-1.5 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:saturate-50"
+          >
+            <ArrowUpRight className="w-4 h-4 stroke-[3]" />
+            <span>ขาย (Sell)</span>
+          </button>
 
-        <button
-          onClick={() => setIsDepositModalOpen(true)}
-          className="p-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 active:scale-95 transition-all shrink-0"
-          title="ฝากเงิน QR"
-        >
-          <QrCode className="w-4 h-4" />
-        </button>
+          <button
+            type="button"
+            onClick={() => setIsDepositModalOpen(true)}
+            className="p-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 active:scale-95 transition-all shrink-0"
+            title="ฝากเงิน QR"
+          >
+            <QrCode className="w-4 h-4" />
+          </button>
 
-        <button
-          onClick={() => setIsAlertModalOpen(true)}
-          className="p-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 active:scale-95 transition-all shrink-0"
-          title="ตั้งเตือนราคา"
-        >
-          <Bell className="w-4 h-4" />
-        </button>
+          <button
+            type="button"
+            onClick={() => setIsAlertModalOpen(true)}
+            className="p-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 active:scale-95 transition-all shrink-0"
+            title="ตั้งเตือนราคา"
+          >
+            <Bell className="w-4 h-4" />
+          </button>
+        </div>
+
+        {paperOrdersPaused && (
+          <p id="mobile-paper-order-pause-reason" role="status" className="px-2 text-[11px] leading-relaxed text-amber-300">
+            คำสั่ง PAPER พักอยู่: {paperOrderPauseReason}
+          </p>
+        )}
       </div>
 
       {/* Mobile Order Drawer */}
@@ -769,7 +753,7 @@ export default function TradingTerminal({
         <div className="md:hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex flex-col justify-end animate-in fade-in duration-200">
           <div className="w-full max-h-[85vh] overflow-y-auto bg-[#121721] rounded-t-3xl border-t border-[#1e2638] p-4 shadow-2xl animate-slide-up">
             <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-xs font-bold text-slate-300">คำสั่ง Spot DEMO</span>
+              <span className="text-xs font-bold text-slate-300">คำสั่ง Spot PAPER / DEMO</span>
               <button
                 type="button"
                 onClick={() => setMobileDrawerOpen(false)}
@@ -781,6 +765,7 @@ export default function TradingTerminal({
             </div>
             <OrderForm
               pair={selectedPair}
+              marketRules={selectedMarketRules}
               currentPrice={currentPrice}
               spotBalances={spotBalances}
               priceStatus={selectedPriceStatus}
@@ -817,7 +802,7 @@ export default function TradingTerminal({
             setLocalSpotBalances(result.account.spotBalances)
           }
           soundEffects.playProfitClose()
-          addToast('เพิ่มยอด THB จำลองสำเร็จ', `+฿${formatNumber(amount, 2)} ใน Spot Wallet DEMO • ไม่มีการรับเงินจริง`, 'success')
+          addToast('เพิ่มยอด THB จำลองสำเร็จ', `+฿${formatNumber(amount, 2)} ใน Spot Wallet จำลอง • ไม่มีการรับเงินจริง`, 'success')
           return result
         }}
       />
@@ -855,6 +840,7 @@ export default function TradingTerminal({
         onClose={() => setIsAlertModalOpen(false)}
         selectedSymbol={selectedSymbol}
         currentPrice={currentPrice}
+        priceStatus={selectedPriceStatus.status}
         alerts={priceAlerts}
         onAddAlert={handleAddPriceAlert}
         onDeleteAlert={handleDeletePriceAlert}

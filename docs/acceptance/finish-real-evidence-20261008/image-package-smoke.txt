@@ -1,0 +1,1 @@
+Compiled finance/contracts imports, Decimal configuration, foreign-instance rejection, exact arithmetic, decimal-string validation and ledger accounting passed with Node type stripping disabled

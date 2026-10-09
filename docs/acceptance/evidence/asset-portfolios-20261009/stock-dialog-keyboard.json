@@ -1,0 +1,18 @@
+{
+  "initial": {
+    "inDialog": true,
+    "text": "ปิดยกเลิกประวัติหุ้น"
+  },
+  "backward": {
+    "inDialog": true,
+    "text": "ยืนยันยกเลิกหุ้น"
+  },
+  "forward": {
+    "inDialog": true,
+    "text": "ปิดยกเลิกประวัติหุ้น"
+  },
+  "afterEscape": {
+    "dialogOpen": false,
+    "text": "ยกเลิกประวัติหุ้น"
+  }
+}

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { configDefaults } from 'vitest/config'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -21,6 +22,8 @@ export default defineConfig({
     }
   },
   test: {
+    // Saved release/baseline copies are artifacts, not runnable source tests.
+    exclude: [...configDefaults.exclude, '**/*.local/**'],
     environment: 'happy-dom',
     globals: true,
   }

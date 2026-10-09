@@ -1,0 +1,1449 @@
+{
+  "screenshots": [
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 1440,
+      "name": "auth-1440-light"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 1440,
+      "name": "auth-1440-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 375,
+      "name": "auth-375-light"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 375,
+      "name": "auth-375-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 375,
+      "name": "signup-375-dark"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "สินทรัพย์รวม",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 1440,
+      "name": "assets-1440-light"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [
+        {
+          "client": 1058,
+          "scroll": 1058
+        }
+      ],
+      "theme": "light",
+      "width": 1440,
+      "name": "finance-1440-light"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "งบประมาณ",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 1440,
+      "name": "budget-1440-light"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "พอร์ตคริปโต",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 1440,
+      "name": "crypto-1440-light"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "ราคาหุ้นสหรัฐ",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 1440,
+      "name": "stocks-1440-light"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "สำรองข้อมูล",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 1440,
+      "name": "backup-1440-light"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "บัญชีและดูแลข้อมูล",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 1440,
+      "name": "account-1440-light"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "สินทรัพย์รวม",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 1440,
+      "name": "assets-1440-dark"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [
+        {
+          "client": 1058,
+          "scroll": 1058
+        }
+      ],
+      "theme": "dark",
+      "width": 1440,
+      "name": "finance-1440-dark"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "งบประมาณ",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 1440,
+      "name": "budget-1440-dark"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "พอร์ตคริปโต",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 1440,
+      "name": "crypto-1440-dark"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "ราคาหุ้นสหรัฐ",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 1440,
+      "name": "stocks-1440-dark"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "สำรองข้อมูล",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 1440,
+      "name": "backup-1440-dark"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "บัญชีและดูแลข้อมูล",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 1440,
+      "name": "account-1440-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "สินทรัพย์รวม",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 375,
+      "name": "assets-375-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [
+        {
+          "client": 289,
+          "scroll": 600
+        }
+      ],
+      "theme": "dark",
+      "width": 375,
+      "name": "finance-375-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "งบประมาณ",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 375,
+      "name": "budget-375-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "พอร์ตคริปโต",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 375,
+      "name": "crypto-375-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "ราคาหุ้นสหรัฐ",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 375,
+      "name": "stocks-375-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "สำรองข้อมูล",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 375,
+      "name": "backup-375-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "บัญชีและดูแลข้อมูล",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 375,
+      "name": "account-375-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "บัญชีและดูแลข้อมูล",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 375,
+      "name": "more-375-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "สินทรัพย์รวม",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 375,
+      "name": "assets-375-light"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [
+        {
+          "client": 289,
+          "scroll": 600
+        }
+      ],
+      "theme": "light",
+      "width": 375,
+      "name": "finance-375-light"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "งบประมาณ",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 375,
+      "name": "budget-375-light"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "พอร์ตคริปโต",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 375,
+      "name": "crypto-375-light"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "ราคาหุ้นสหรัฐ",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 375,
+      "name": "stocks-375-light"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "สำรองข้อมูล",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 375,
+      "name": "backup-375-light"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "บัญชีและดูแลข้อมูล",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 375,
+      "name": "account-375-light"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "บัญชีและดูแลข้อมูล",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 375,
+      "name": "more-375-light"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "พอร์ตคริปโต",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 1440,
+      "name": "crypto-selected-1440-light"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "พอร์ตคริปโต",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 1440,
+      "name": "crypto-selected-1440-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "พอร์ตคริปโต",
+      "height": 1000,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 375,
+      "name": "crypto-selected-375-light"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "พอร์ตคริปโต",
+      "height": 1000,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 375,
+      "name": "crypto-selected-375-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [
+        {
+          "client": 289,
+          "scroll": 600
+        }
+      ],
+      "theme": "light",
+      "width": 375,
+      "name": "pending-finance-375-light"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [
+        {
+          "client": 289,
+          "scroll": 600
+        }
+      ],
+      "theme": "light",
+      "width": 375,
+      "name": "pending-more-375-light"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "พอร์ตคริปโต",
+      "height": 900,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 320,
+      "name": "long-crypto-320-dark"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "พอร์ตคริปโต",
+      "height": 900,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 320,
+      "name": "privacy-crypto-320-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 375,
+      "name": "empty-finance-375-light"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "สำรองข้อมูล",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 375,
+      "name": "backup-preview-375-light"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "สำรองข้อมูล",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 375,
+      "name": "backup-receipt-375-light"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 1440,
+      "name": "signup-1440-light"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 1440,
+      "name": "signup-1440-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 375,
+      "name": "signup-375-light"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 375,
+      "name": "signup-375-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 375,
+      "name": "signup-validation-375-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 1000,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 375,
+      "name": "error-finance-375-light"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 1000,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 375,
+      "name": "loading-finance-375-light"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 1000,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [
+        {
+          "client": 289,
+          "scroll": 600
+        }
+      ],
+      "theme": "light",
+      "width": 375,
+      "name": "void-dialog-375-light"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [
+        {
+          "client": 1058,
+          "scroll": 1058
+        }
+      ],
+      "theme": "light",
+      "width": 1440,
+      "name": "final-finance-desktop-light"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [
+        {
+          "client": 289,
+          "scroll": 600
+        }
+      ],
+      "theme": "light",
+      "width": 375,
+      "name": "final-finance-mobile-light"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "บัญชีและดูแลข้อมูล",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 375,
+      "name": "account-keyboard-bottom-375-light"
+    },
+    {
+      "client": 1425,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 1000,
+      "scroll": 1425,
+      "smallControls": [],
+      "tables": [
+        {
+          "client": 1058,
+          "scroll": 1058
+        }
+      ],
+      "theme": "dark",
+      "width": 1440,
+      "name": "final-finance-desktop-dark"
+    },
+    {
+      "client": 360,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 900,
+      "scroll": 360,
+      "smallControls": [],
+      "tables": [
+        {
+          "client": 289,
+          "scroll": 600
+        }
+      ],
+      "theme": "dark",
+      "width": 375,
+      "name": "final-finance-mobile-dark"
+    }
+  ],
+  "matrix": [
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "สินทรัพย์รวม",
+      "height": 900,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 320,
+      "section": "assets"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 900,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [
+        {
+          "client": 234,
+          "scroll": 600
+        }
+      ],
+      "theme": "light",
+      "width": 320,
+      "section": "finance"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "งบประมาณ",
+      "height": 900,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 320,
+      "section": "budget"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "พอร์ตคริปโต",
+      "height": 900,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 320,
+      "section": "crypto"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "ราคาหุ้นสหรัฐ",
+      "height": 900,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 320,
+      "section": "stocks"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "สำรองข้อมูล",
+      "height": 900,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 320,
+      "section": "backup"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "บัญชีและดูแลข้อมูล",
+      "height": 900,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 320,
+      "section": "account"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "สินทรัพย์รวม",
+      "height": 900,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 320,
+      "section": "assets"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 900,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [
+        {
+          "client": 234,
+          "scroll": 600
+        }
+      ],
+      "theme": "dark",
+      "width": 320,
+      "section": "finance"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "งบประมาณ",
+      "height": 900,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 320,
+      "section": "budget"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "พอร์ตคริปโต",
+      "height": 900,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 320,
+      "section": "crypto"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "ราคาหุ้นสหรัฐ",
+      "height": 900,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 320,
+      "section": "stocks"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "สำรองข้อมูล",
+      "height": 900,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 320,
+      "section": "backup"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "บัญชีและดูแลข้อมูล",
+      "height": 900,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 320,
+      "section": "account"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "สินทรัพย์รวม",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 768,
+      "section": "assets"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [
+        {
+          "client": 448,
+          "scroll": 600
+        }
+      ],
+      "theme": "light",
+      "width": 768,
+      "section": "finance"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "งบประมาณ",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 768,
+      "section": "budget"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "พอร์ตคริปโต",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 768,
+      "section": "crypto"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "ราคาหุ้นสหรัฐ",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 768,
+      "section": "stocks"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "สำรองข้อมูล",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 768,
+      "section": "backup"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "บัญชีและดูแลข้อมูล",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 768,
+      "section": "account"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "สินทรัพย์รวม",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 768,
+      "section": "assets"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [
+        {
+          "client": 448,
+          "scroll": 600
+        }
+      ],
+      "theme": "dark",
+      "width": 768,
+      "section": "finance"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "งบประมาณ",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 768,
+      "section": "budget"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "พอร์ตคริปโต",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 768,
+      "section": "crypto"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "ราคาหุ้นสหรัฐ",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 768,
+      "section": "stocks"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "สำรองข้อมูล",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 768,
+      "section": "backup"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "บัญชีและดูแลข้อมูล",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 768,
+      "section": "account"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "สินทรัพย์รวม",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 1024,
+      "section": "assets"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [
+        {
+          "client": 676,
+          "scroll": 676
+        }
+      ],
+      "theme": "light",
+      "width": 1024,
+      "section": "finance"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "งบประมาณ",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 1024,
+      "section": "budget"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "พอร์ตคริปโต",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 1024,
+      "section": "crypto"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "ราคาหุ้นสหรัฐ",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 1024,
+      "section": "stocks"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "สำรองข้อมูล",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 1024,
+      "section": "backup"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "บัญชีและดูแลข้อมูล",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 1024,
+      "section": "account"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "สินทรัพย์รวม",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 1024,
+      "section": "assets"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "รายรับรายจ่าย",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [
+        {
+          "client": 676,
+          "scroll": 676
+        }
+      ],
+      "theme": "dark",
+      "width": 1024,
+      "section": "finance"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "งบประมาณ",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 1024,
+      "section": "budget"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "พอร์ตคริปโต",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 1024,
+      "section": "crypto"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "ราคาหุ้นสหรัฐ",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 1024,
+      "section": "stocks"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "สำรองข้อมูล",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 1024,
+      "section": "backup"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "บัญชีและดูแลข้อมูล",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 1024,
+      "section": "account"
+    }
+  ],
+  "authMatrix": [
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 320,
+      "section": "signup"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 320,
+      "section": "login"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 320,
+      "section": "signup"
+    },
+    {
+      "client": 305,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 305,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 320,
+      "section": "login"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 768,
+      "section": "signup"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 768,
+      "section": "login"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 768,
+      "section": "signup"
+    },
+    {
+      "client": 753,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 753,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 768,
+      "section": "login"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 1024,
+      "section": "signup"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [],
+      "theme": "light",
+      "width": 1024,
+      "section": "login"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 1024,
+      "section": "signup"
+    },
+    {
+      "client": 1009,
+      "fontLoaded": true,
+      "heading": "พื้นที่สำหรับการเงินของคุณ",
+      "height": 1000,
+      "scroll": 1009,
+      "smallControls": [],
+      "tables": [],
+      "theme": "dark",
+      "width": 1024,
+      "section": "login"
+    }
+  ]
+}

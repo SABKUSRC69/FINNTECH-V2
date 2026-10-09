@@ -1,0 +1,24 @@
+by 50 seconds or more.
+    - link "Upgrade now":
+      - /url: /web/srv-db3pcll9fdbs73enrmg0/plan
+  - button "Filter events 35":
+    - text: Filter events
+    - generic: "35"
+  - list:
+    - generic: Service restarted by you
+    - generic: October 9, 2026 at 2:43 AM
+    - link "Deploy":
+      - /url: /web/srv-db3pcll9fdbs73enrmg0/deploys/dep-db3v24bbc2fs73c2gmfg
+    - text: live
+    - text: for
+    - link "8cbb11a":
+      - /url: https://github.com/SABKUSRC69/finntech-beta/commit/8cbb11af2ce3579338fc3976088b9dd3ab1888e6
+    - text: ":"
+    - generic: Add owned asset ledgers and bounded public crypto valuations
+    - generic: October 9, 2026 at 2:39 AM
+    - link "Deploy":
+      - /url: /web/srv-db3pcll9fdbs73enrmg0/deploys/dep-db3v24bbc2fs73c2gmfg
+    - text: started
+    - text: for
+    - link "8cbb11a":
+      - /url: https://github.com/S

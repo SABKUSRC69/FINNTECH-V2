@@ -1,0 +1,14 @@
+{
+  "backward": {
+    "active": "ราคาหุ้นสหรัฐ",
+    "inDialog": true
+  },
+  "forward": {
+    "active": "ปิดเพิ่มเติม",
+    "inDialog": true
+  },
+  "escape": {
+    "dialogPresent": false,
+    "focus": "เพิ่มเติม"
+  }
+}

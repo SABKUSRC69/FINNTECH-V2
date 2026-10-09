@@ -1,0 +1,37 @@
+name: finntech-finish-real-20261008
+services:
+  postgres-finish:
+    image: postgres:18-alpine
+    pull_policy: never
+    environment:
+      POSTGRES_DB: finntech_finish_real
+      POSTGRES_USER: finish_rehearsal
+      POSTGRES_PASSWORD: ${FINISH_REHEARSAL_PASSWORD:?synthetic password required}
+    ports:
+      - "127.0.0.1:5446:5432"
+    volumes:
+      - finish_real_20261008:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finish_rehearsal -d finntech_finish_real"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  postgres-restore:
+    image: postgres:18-alpine
+    pull_policy: never
+    environment:
+      POSTGRES_DB: finntech_finish_restore
+      POSTGRES_USER: finish_rehearsal
+      POSTGRES_PASSWORD: ${FINISH_RESTORE_PASSWORD:?synthetic password required}
+    ports:
+      - "127.0.0.1:5447:5432"
+    volumes:
+      - finish_restore_20261008:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finish_rehearsal -d finntech_finish_restore"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+volumes:
+  finish_real_20261008:
+  finish_restore_20261008:

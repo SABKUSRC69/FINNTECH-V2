@@ -1,0 +1,198 @@
+[
+  {
+    "fixture": false,
+    "heading": "สินทรัพย์รวม",
+    "overflow": false,
+    "theme": "light",
+    "width": 1440
+  },
+  {
+    "fixture": false,
+    "heading": "สินทรัพย์รวม",
+    "overflow": false,
+    "theme": "light",
+    "width": 390
+  },
+  {
+    "fixture": false,
+    "heading": "รายรับรายจ่าย",
+    "overflow": false,
+    "theme": "light",
+    "width": 1440
+  },
+  {
+    "fixture": false,
+    "heading": "รายรับรายจ่าย",
+    "overflow": false,
+    "theme": "light",
+    "width": 390
+  },
+  {
+    "fixture": false,
+    "heading": "พอร์ตคริปโต",
+    "overflow": false,
+    "theme": "light",
+    "width": 1440
+  },
+  {
+    "fixture": false,
+    "heading": "พอร์ตคริปโต",
+    "overflow": false,
+    "theme": "light",
+    "width": 390
+  },
+  {
+    "fixture": false,
+    "heading": "งบประมาณ",
+    "overflow": false,
+    "theme": "light",
+    "width": 1440
+  },
+  {
+    "fixture": false,
+    "heading": "งบประมาณ",
+    "overflow": false,
+    "theme": "light",
+    "width": 390
+  },
+  {
+    "fixture": false,
+    "heading": "สำรองข้อมูล",
+    "overflow": false,
+    "theme": "light",
+    "width": 1440
+  },
+  {
+    "fixture": false,
+    "heading": "สำรองข้อมูล",
+    "overflow": false,
+    "theme": "light",
+    "width": 390
+  },
+  {
+    "fixture": false,
+    "heading": "บัญชีและดูแลข้อมูล",
+    "overflow": false,
+    "theme": "light",
+    "width": 1440
+  },
+  {
+    "fixture": false,
+    "heading": "บัญชีและดูแลข้อมูล",
+    "overflow": false,
+    "theme": "light",
+    "width": 390
+  },
+  {
+    "fixture": false,
+    "heading": "ราคาหุ้นสหรัฐ",
+    "overflow": false,
+    "theme": "light",
+    "width": 1440
+  },
+  {
+    "fixture": false,
+    "heading": "ราคาหุ้นสหรัฐ",
+    "overflow": false,
+    "theme": "light",
+    "width": 390
+  },
+  {
+    "fixture": false,
+    "heading": "สินทรัพย์รวม",
+    "overflow": false,
+    "theme": "dark",
+    "width": 1440
+  },
+  {
+    "fixture": false,
+    "heading": "สินทรัพย์รวม",
+    "overflow": false,
+    "theme": "dark",
+    "width": 390
+  },
+  {
+    "fixture": false,
+    "heading": "รายรับรายจ่าย",
+    "overflow": false,
+    "theme": "dark",
+    "width": 1440
+  },
+  {
+    "fixture": false,
+    "heading": "รายรับรายจ่าย",
+    "overflow": false,
+    "theme": "dark",
+    "width": 390
+  },
+  {
+    "fixture": false,
+    "heading": "พอร์ตคริปโต",
+    "overflow": false,
+    "theme": "dark",
+    "width": 1440
+  },
+  {
+    "fixture": false,
+    "heading": "พอร์ตคริปโต",
+    "overflow": false,
+    "theme": "dark",
+    "width": 390
+  },
+  {
+    "fixture": false,
+    "heading": "งบประมาณ",
+    "overflow": false,
+    "theme": "dark",
+    "width": 1440
+  },
+  {
+    "fixture": false,
+    "heading": "งบประมาณ",
+    "overflow": false,
+    "theme": "dark",
+    "width": 390
+  },
+  {
+    "fixture": false,
+    "heading": "สำรองข้อมูล",
+    "overflow": false,
+    "theme": "dark",
+    "width": 1440
+  },
+  {
+    "fixture": false,
+    "heading": "สำรองข้อมูล",
+    "overflow": false,
+    "theme": "dark",
+    "width": 390
+  },
+  {
+    "fixture": false,
+    "heading": "บัญชีและดูแลข้อมูล",
+    "overflow": false,
+    "theme": "dark",
+    "width": 1440
+  },
+  {
+    "fixture": false,
+    "heading": "บัญชีและดูแลข้อมูล",
+    "overflow": false,
+    "theme": "dark",
+    "width": 390
+  },
+  {
+    "fixture": false,
+    "heading": "ราคาหุ้นสหรัฐ",
+    "overflow": false,
+    "theme": "dark",
+    "width": 1440
+  },
+  {
+    "fixture": false,
+    "heading": "ราคาหุ้นสหรัฐ",
+    "overflow": false,
+    "theme": "dark",
+    "width": 390
+  }
+]

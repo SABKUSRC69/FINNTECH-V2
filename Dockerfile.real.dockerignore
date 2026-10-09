@@ -1,0 +1,23 @@
+# Explicit build context: no owner env, database, mailbox, backup, evidence or legacy src.
+**
+!package.json
+!package-lock.json
+!tsconfig.tracker.base.json
+!apps/
+!apps/api/
+!apps/api/**
+!apps/web/
+!apps/web/**
+!packages/
+!packages/**
+!scripts/
+!scripts/beta-runtime-dependencies.mjs
+**/node_modules
+**/dist
+**/coverage
+**/generated
+**/.env*
+**/*.local
+**/db-test
+**/test
+**/*.test.*

@@ -1,0 +1,47 @@
+
+> finntech@1.0.0 tracker:build
+> npm run tracker:build:shared && npm --workspace apps/api run build && npm --workspace apps/web run build
+
+
+> finntech@1.0.0 tracker:build:shared
+> npm --workspace packages/finance run build && npm --workspace packages/contracts run build
+
+
+> @finntech/finance@0.1.0 build
+> tsc -p tsconfig.build.json
+
+
+> @finntech/contracts@0.1.0 build
+> tsc -p tsconfig.build.json
+
+
+> @finntech/api@0.1.0 prebuild
+> npm run prisma:generate
+
+
+> @finntech/api@0.1.0 prisma:generate
+> prisma generate
+
+
+✔ Generated Prisma Client (7.10.0) to .\src\generated\prisma in 264ms
+
+
+> @finntech/api@0.1.0 build
+> tsc -p tsconfig.build.json
+
+
+> @finntech/web@0.1.0 build
+> tsc -p tsconfig.json --noEmit && vite build --configLoader runner
+
+vite v6.4.3 building for production...
+transforming...
+✓ 60 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.53 kB │ gzip:   0.36 kB
+dist/assets/index-Bzwt4KPM.css   31.56 kB │ gzip:   6.86 kB
+dist/assets/index-Cmq-otCK.js   356.90 kB │ gzip: 103.54 kB
+✓ built in 1.41s
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma\schema.prisma.

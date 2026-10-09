@@ -1,0 +1,26 @@
+[
+  {
+    "step": "open",
+    "dialog": true,
+    "inside": true,
+    "label": "ปิดเพิ่มเติม"
+  },
+  {
+    "step": "wrap-backward",
+    "dialog": true,
+    "inside": true,
+    "label": "ราคาหุ้นสหรัฐ"
+  },
+  {
+    "step": "wrap-forward",
+    "dialog": true,
+    "inside": true,
+    "label": "ปิดเพิ่มเติม"
+  },
+  {
+    "step": "escape",
+    "dialog": false,
+    "inside": false,
+    "label": "เพิ่มเติม"
+  }
+]

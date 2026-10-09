@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "origin": "https://finntech-personal.onrender.com",
+  "cases": [
+    {
+      "case": "Two independent existing synthetic accounts retain distinct owners and identical persisted finance/crypto/export arrays after asset portfolio deployment",
+      "status": "PASS"
+    },
+    {
+      "case": "Logout and genuine login preserve owner and Decimal finance values",
+      "status": "PASS"
+    }
+  ],
+  "noFinancialWrites": true
+}

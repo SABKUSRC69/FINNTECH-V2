@@ -1,0 +1,407 @@
+{
+  "source": "genuine public Binance aggTrade",
+  "syntheticQuantity": "2",
+  "syntheticCost": "201",
+  "observations": [
+    {
+      "asset": "SOL",
+      "price": "108.62",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:14:52.663Z",
+      "observedAt": "2026-10-08T19:14:52.626Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.63",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:14:55.720Z",
+      "observedAt": "2026-10-08T19:14:55.685Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.61",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:14:57.759Z",
+      "observedAt": "2026-10-08T19:14:57.716Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.63",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:00.236Z",
+      "observedAt": "2026-10-08T19:15:00.200Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.62",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:02.190Z",
+      "observedAt": "2026-10-08T19:15:02.156Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.61",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:05.058Z",
+      "observedAt": "2026-10-08T19:15:05.016Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.65",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:07.865Z",
+      "observedAt": "2026-10-08T19:15:07.830Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.67",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:10.180Z",
+      "observedAt": "2026-10-08T19:15:10.146Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.68",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:12.298Z",
+      "observedAt": "2026-10-08T19:15:12.262Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.69",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:15.119Z",
+      "observedAt": "2026-10-08T19:15:15.083Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.72",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:18.011Z",
+      "observedAt": "2026-10-08T19:15:17.975Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.74",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:19.859Z",
+      "observedAt": "2026-10-08T19:15:19.824Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.71",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:22.208Z",
+      "observedAt": "2026-10-08T19:15:22.170Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.7",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:23.848Z",
+      "observedAt": "2026-10-08T19:15:23.813Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.69",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:25.743Z",
+      "observedAt": "2026-10-08T19:15:25.709Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.7",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:27.577Z",
+      "observedAt": "2026-10-08T19:15:27.541Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.69",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:28.781Z",
+      "observedAt": "2026-10-08T19:15:28.745Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.67",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:34.318Z",
+      "observedAt": "2026-10-08T19:15:34.283Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.66",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:35.701Z",
+      "observedAt": "2026-10-08T19:15:35.573Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.63",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:37.967Z",
+      "observedAt": "2026-10-08T19:15:37.932Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.61",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:40.234Z",
+      "observedAt": "2026-10-08T19:15:40.196Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.57",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:44.143Z",
+      "observedAt": "2026-10-08T19:15:44.108Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.55",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:46.181Z",
+      "observedAt": "2026-10-08T19:15:46.146Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.54",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:48.041Z",
+      "observedAt": "2026-10-08T19:15:48.005Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.56",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:50.432Z",
+      "observedAt": "2026-10-08T19:15:50.396Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.59",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:52.091Z",
+      "observedAt": "2026-10-08T19:15:52.056Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.6",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:54.067Z",
+      "observedAt": "2026-10-08T19:15:54.031Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.58",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:56.035Z",
+      "observedAt": "2026-10-08T19:15:55.997Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.61",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:15:57.592Z",
+      "observedAt": "2026-10-08T19:15:57.555Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.6",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:16:01.071Z",
+      "observedAt": "2026-10-08T19:16:01.034Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.64",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:16:06.435Z",
+      "observedAt": "2026-10-08T19:16:06.396Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.67",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:16:08.405Z",
+      "observedAt": "2026-10-08T19:16:08.368Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.66",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:16:10.313Z",
+      "observedAt": "2026-10-08T19:16:10.276Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.65",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:16:11.419Z",
+      "observedAt": "2026-10-08T19:16:11.383Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.68",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:16:14.308Z",
+      "observedAt": "2026-10-08T19:16:14.271Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.71",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:16:18.332Z",
+      "observedAt": "2026-10-08T19:16:18.296Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.74",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:16:20.211Z",
+      "observedAt": "2026-10-08T19:16:20.176Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.73",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:16:21.584Z",
+      "observedAt": "2026-10-08T19:16:21.549Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.74",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:16:23.994Z",
+      "observedAt": "2026-10-08T19:16:23.959Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    },
+    {
+      "asset": "SOL",
+      "price": "108.75",
+      "status": "LIVE",
+      "receivedAt": "2026-10-08T19:16:26.077Z",
+      "observedAt": "2026-10-08T19:16:26.041Z",
+      "kind": "TRADE",
+      "quoteCurrency": "USDT",
+      "source": "Binance public"
+    }
+  ]
+}

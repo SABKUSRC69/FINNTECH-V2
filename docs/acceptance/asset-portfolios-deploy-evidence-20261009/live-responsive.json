@@ -1,0 +1,402 @@
+[
+  {
+    "page": "assets",
+    "width": 320,
+    "client": 305,
+    "heading": "สินทรัพย์รวม",
+    "scroll": 305,
+    "theme": "light",
+    "viewport": 320,
+    "pass": true
+  },
+  {
+    "page": "crypto",
+    "width": 320,
+    "client": 305,
+    "heading": "พอร์ตคริปโต",
+    "scroll": 305,
+    "theme": "light",
+    "viewport": 320,
+    "pass": true
+  },
+  {
+    "page": "stocks",
+    "width": 320,
+    "client": 305,
+    "heading": "ราคาหุ้นสหรัฐ",
+    "scroll": 305,
+    "theme": "light",
+    "viewport": 320,
+    "pass": true
+  },
+  {
+    "page": "backup",
+    "width": 320,
+    "client": 305,
+    "heading": "สำรองข้อมูล",
+    "scroll": 305,
+    "theme": "light",
+    "viewport": 320,
+    "pass": true
+  },
+  {
+    "page": "assets",
+    "width": 375,
+    "client": 360,
+    "heading": "สินทรัพย์รวม",
+    "scroll": 360,
+    "theme": "light",
+    "viewport": 375,
+    "pass": true
+  },
+  {
+    "page": "crypto",
+    "width": 375,
+    "client": 360,
+    "heading": "พอร์ตคริปโต",
+    "scroll": 360,
+    "theme": "light",
+    "viewport": 375,
+    "pass": true
+  },
+  {
+    "page": "stocks",
+    "width": 375,
+    "client": 360,
+    "heading": "ราคาหุ้นสหรัฐ",
+    "scroll": 360,
+    "theme": "light",
+    "viewport": 375,
+    "pass": true
+  },
+  {
+    "page": "backup",
+    "width": 375,
+    "client": 360,
+    "heading": "สำรองข้อมูล",
+    "scroll": 360,
+    "theme": "light",
+    "viewport": 375,
+    "pass": true
+  },
+  {
+    "page": "assets",
+    "width": 768,
+    "client": 753,
+    "heading": "สินทรัพย์รวม",
+    "scroll": 753,
+    "theme": "light",
+    "viewport": 768,
+    "pass": true
+  },
+  {
+    "page": "crypto",
+    "width": 768,
+    "client": 753,
+    "heading": "พอร์ตคริปโต",
+    "scroll": 753,
+    "theme": "light",
+    "viewport": 768,
+    "pass": true
+  },
+  {
+    "page": "stocks",
+    "width": 768,
+    "client": 753,
+    "heading": "ราคาหุ้นสหรัฐ",
+    "scroll": 753,
+    "theme": "light",
+    "viewport": 768,
+    "pass": true
+  },
+  {
+    "page": "backup",
+    "width": 768,
+    "client": 753,
+    "heading": "สำรองข้อมูล",
+    "scroll": 753,
+    "theme": "light",
+    "viewport": 768,
+    "pass": true
+  },
+  {
+    "page": "assets",
+    "width": 1024,
+    "client": 1009,
+    "heading": "สินทรัพย์รวม",
+    "scroll": 1009,
+    "theme": "light",
+    "viewport": 1024,
+    "pass": true
+  },
+  {
+    "page": "crypto",
+    "width": 1024,
+    "client": 1009,
+    "heading": "พอร์ตคริปโต",
+    "scroll": 1009,
+    "theme": "light",
+    "viewport": 1024,
+    "pass": true
+  },
+  {
+    "page": "stocks",
+    "width": 1024,
+    "client": 1009,
+    "heading": "ราคาหุ้นสหรัฐ",
+    "scroll": 1009,
+    "theme": "light",
+    "viewport": 1024,
+    "pass": true
+  },
+  {
+    "page": "backup",
+    "width": 1024,
+    "client": 1009,
+    "heading": "สำรองข้อมูล",
+    "scroll": 1009,
+    "theme": "light",
+    "viewport": 1024,
+    "pass": true
+  },
+  {
+    "page": "assets",
+    "width": 1440,
+    "client": 1425,
+    "heading": "สินทรัพย์รวม",
+    "scroll": 1425,
+    "theme": "light",
+    "viewport": 1440,
+    "pass": true
+  },
+  {
+    "page": "crypto",
+    "width": 1440,
+    "client": 1425,
+    "heading": "พอร์ตคริปโต",
+    "scroll": 1425,
+    "theme": "light",
+    "viewport": 1440,
+    "pass": true
+  },
+  {
+    "page": "stocks",
+    "width": 1440,
+    "client": 1425,
+    "heading": "ราคาหุ้นสหรัฐ",
+    "scroll": 1425,
+    "theme": "light",
+    "viewport": 1440,
+    "pass": true
+  },
+  {
+    "page": "backup",
+    "width": 1440,
+    "client": 1425,
+    "heading": "สำรองข้อมูล",
+    "scroll": 1425,
+    "theme": "light",
+    "viewport": 1440,
+    "pass": true
+  },
+  {
+    "page": "assets",
+    "width": 320,
+    "client": 305,
+    "heading": "สินทรัพย์รวม",
+    "scroll": 305,
+    "theme": "dark",
+    "viewport": 320,
+    "pass": true
+  },
+  {
+    "page": "crypto",
+    "width": 320,
+    "client": 305,
+    "heading": "พอร์ตคริปโต",
+    "scroll": 305,
+    "theme": "dark",
+    "viewport": 320,
+    "pass": true
+  },
+  {
+    "page": "stocks",
+    "width": 320,
+    "client": 305,
+    "heading": "ราคาหุ้นสหรัฐ",
+    "scroll": 305,
+    "theme": "dark",
+    "viewport": 320,
+    "pass": true
+  },
+  {
+    "page": "backup",
+    "width": 320,
+    "client": 305,
+    "heading": "สำรองข้อมูล",
+    "scroll": 305,
+    "theme": "dark",
+    "viewport": 320,
+    "pass": true
+  },
+  {
+    "page": "assets",
+    "width": 375,
+    "client": 360,
+    "heading": "สินทรัพย์รวม",
+    "scroll": 360,
+    "theme": "dark",
+    "viewport": 375,
+    "pass": true
+  },
+  {
+    "page": "crypto",
+    "width": 375,
+    "client": 360,
+    "heading": "พอร์ตคริปโต",
+    "scroll": 360,
+    "theme": "dark",
+    "viewport": 375,
+    "pass": true
+  },
+  {
+    "page": "stocks",
+    "width": 375,
+    "client": 360,
+    "heading": "ราคาหุ้นสหรัฐ",
+    "scroll": 360,
+    "theme": "dark",
+    "viewport": 375,
+    "pass": true
+  },
+  {
+    "page": "backup",
+    "width": 375,
+    "client": 360,
+    "heading": "สำรองข้อมูล",
+    "scroll": 360,
+    "theme": "dark",
+    "viewport": 375,
+    "pass": true
+  },
+  {
+    "page": "assets",
+    "width": 768,
+    "client": 753,
+    "heading": "สินทรัพย์รวม",
+    "scroll": 753,
+    "theme": "dark",
+    "viewport": 768,
+    "pass": true
+  },
+  {
+    "page": "crypto",
+    "width": 768,
+    "client": 753,
+    "heading": "พอร์ตคริปโต",
+    "scroll": 753,
+    "theme": "dark",
+    "viewport": 768,
+    "pass": true
+  },
+  {
+    "page": "stocks",
+    "width": 768,
+    "client": 753,
+    "heading": "ราคาหุ้นสหรัฐ",
+    "scroll": 753,
+    "theme": "dark",
+    "viewport": 768,
+    "pass": true
+  },
+  {
+    "page": "backup",
+    "width": 768,
+    "client": 753,
+    "heading": "สำรองข้อมูล",
+    "scroll": 753,
+    "theme": "dark",
+    "viewport": 768,
+    "pass": true
+  },
+  {
+    "page": "assets",
+    "width": 1024,
+    "client": 1009,
+    "heading": "สินทรัพย์รวม",
+    "scroll": 1009,
+    "theme": "dark",
+    "viewport": 1024,
+    "pass": true
+  },
+  {
+    "page": "crypto",
+    "width": 1024,
+    "client": 1009,
+    "heading": "พอร์ตคริปโต",
+    "scroll": 1009,
+    "theme": "dark",
+    "viewport": 1024,
+    "pass": true
+  },
+  {
+    "page": "stocks",
+    "width": 1024,
+    "client": 1009,
+    "heading": "ราคาหุ้นสหรัฐ",
+    "scroll": 1009,
+    "theme": "dark",
+    "viewport": 1024,
+    "pass": true
+  },
+  {
+    "page": "backup",
+    "width": 1024,
+    "client": 1009,
+    "heading": "สำรองข้อมูล",
+    "scroll": 1009,
+    "theme": "dark",
+    "viewport": 1024,
+    "pass": true
+  },
+  {
+    "page": "assets",
+    "width": 1440,
+    "client": 1425,
+    "heading": "สินทรัพย์รวม",
+    "scroll": 1425,
+    "theme": "dark",
+    "viewport": 1440,
+    "pass": true
+  },
+  {
+    "page": "crypto",
+    "width": 1440,
+    "client": 1425,
+    "heading": "พอร์ตคริปโต",
+    "scroll": 1425,
+    "theme": "dark",
+    "viewport": 1440,
+    "pass": true
+  },
+  {
+    "page": "stocks",
+    "width": 1440,
+    "client": 1425,
+    "heading": "ราคาหุ้นสหรัฐ",
+    "scroll": 1425,
+    "theme": "dark",
+    "viewport": 1440,
+    "pass": true
+  },
+  {
+    "page": "backup",
+    "width": 1440,
+    "client": 1425,
+    "heading": "สำรองข้อมูล",
+    "scroll": 1425,
+    "theme": "dark",
+    "viewport": 1440,
+    "pass": true
+  }
+]

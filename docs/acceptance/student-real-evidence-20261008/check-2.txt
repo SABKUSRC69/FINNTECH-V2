@@ -1,0 +1,97 @@
+
+> finntech@1.0.0 tracker:test
+> npm run tracker:build:shared && npm --workspace packages/finance run test && npm --workspace packages/contracts run test && npm --workspace apps/api run test && npm --workspace apps/web run test && npm run tracker:web-smoke
+
+
+> finntech@1.0.0 tracker:build:shared
+> npm --workspace packages/finance run build && npm --workspace packages/contracts run build
+
+
+> @finntech/finance@0.1.0 build
+> tsc -p tsconfig.build.json
+
+
+> @finntech/contracts@0.1.0 build
+> tsc -p tsconfig.build.json
+
+
+> @finntech/finance@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.1 C:/Users/Admin/Downloads/FINNTECH/packages/finance
+
+
+ Test Files  3 passed (3)
+      Tests  21 passed (21)
+   Start at  19:47:28
+   Duration  804ms (transform 65%, import 21%, tests 12%, worker 2%)
+
+
+> @finntech/contracts@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.1 C:/Users/Admin/Downloads/FINNTECH/packages/contracts
+
+
+ Test Files  4 passed (4)
+      Tests  13 passed (13)
+   Start at  19:47:29
+   Duration  654ms (transform 63%, import 27%, tests 7%, worker 3%)
+
+
+> @finntech/api@0.1.0 pretest
+> npm run prisma:generate
+
+
+> @finntech/api@0.1.0 prisma:generate
+> prisma generate
+
+
+✔ Generated Prisma Client (7.10.0) to .\src\generated\prisma in 254ms
+
+
+> @finntech/api@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.1 C:/Users/Admin/Downloads/FINNTECH/apps/api
+
+
+ Test Files  14 passed (14)
+      Tests  125 passed (125)
+   Start at  19:47:33
+   Duration  8.57s (import 46%, tests 28%, transform 26%, worker 1%)
+
+  Transform  transforming modules took 6.99s · 26% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+
+> @finntech/web@0.1.0 test
+> vitest run --configLoader runner --config vitest.config.ts
+
+
+ RUN  v5.0.1 C:/Users/Admin/Downloads/FINNTECH/apps/web
+
+
+ Test Files  16 passed (16)
+      Tests  104 passed (104)
+   Start at  19:47:43
+   Duration  4.94s (environment 43%, tests 24%, import 18%, transform 15%)
+
+Environment  happy-dom was created 16 times · 18.84s total, 43% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+
+
+> finntech@1.0.0 tracker:web-smoke
+> node scripts/tracker-web-dev-smoke.mjs
+
+PASS: Vite --force served main.tsx with /@fs/C:/Users/Admin/Downloads/FINNTECH/node_modules/.vite-tracker-web/deps/react-dom_client.js?v=7f1fb98d
+PASS: optimized React DOM client returned text/javascript with an ESM export and no raw external require("react-dom")
+PASS: dev smoke server stopped and released 127.0.0.1:4175
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma\schema.prisma.

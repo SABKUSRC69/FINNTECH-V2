@@ -1,0 +1,19 @@
+{
+  "status": "PASS",
+  "oldMigrations": 10,
+  "newMigrations": 3,
+  "retainedTables": [
+    "tracker_users",
+    "finance_categories",
+    "finance_transactions",
+    "cash_accounts",
+    "crypto_portfolios",
+    "crypto_assets",
+    "crypto_trades",
+    "portfolio_holdings"
+  ],
+  "retainedRowsUnchanged": true,
+  "method": "Exact migration SQL on a newly created isolated populated PostgreSQL database; Prisma migration metadata not rehearsed here",
+  "database": "finntech_portfolio_upgrade_test",
+  "deletion": false
+}

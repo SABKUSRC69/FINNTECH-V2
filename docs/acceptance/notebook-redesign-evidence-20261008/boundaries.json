@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "unchangedBackendSharedAndPackageFiles": 83,
+  "baselineFiles": 518,
+  "dependenciesAdded": 0,
+  "fontSha256": "5a1c559bb539583c8a1fd99d1c5b9491e5e14478c9cd2bd0970d5c3096cc9ef8",
+  "fontLicense": "SIL OFL 1.1, bundled public/fonts/OFL.txt",
+  "cloudChanges": false,
+  "realDatabaseAccess": false
+}

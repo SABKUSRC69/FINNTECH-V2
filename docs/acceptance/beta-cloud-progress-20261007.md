@@ -1,0 +1,26 @@
+# Public Beta cloud progress — 2026-10-07 (Asia/Bangkok)
+
+This supplements beta-deploy-preparation-20261007.md. The earlier report describes the state before provider accounts were available; its sourceCommit:null and not-provisioned statements are historical.
+
+## Actual completed actions
+
+- Owner created Neon project FINNTECH, project ID wild-king-79446653, branch br-weathered-queen-b4cdy42p. Console verified Free plan, AWS US East 2 (Ohio), PostgreSQL 18, 6-hour history retention. Owner created beta_app.
+- Created new database finntech_beta owned by beta_app. Verified the actual database list; existing neondb/neondb_owner remains. No schema migration, data deletion or database reuse occurred.
+- Created a new PRIVATE GitHub repository: https://github.com/SABKUSRC69/finntech-beta. The original repository and its dirty working tree were not committed or pushed.
+- Reverified all 130 allowlisted release files: hashes match the reviewed snapshot; private path count 0, known private env value matches 0. Git access check exit 0.
+- Committed/pushed ONLY that snapshot from .beta-20261007.local/release-source using an explicit file manifest, not git add . on the original checkout. Branch codex/beta-release; commit 9a183414f50b5fed3c365d75dd636b394ea07975. Push exit 0. Browser verified the private repository, branch, files and one commit.
+- Render console now has a connected Git credential and lists the new private repository. Draft Web Service selected finntech-beta, codex/beta-release, Dockerfile.beta, FREE $0/month, Ohio, /api/ready and auto-deploy Off.
+- Draft environment: production/cloud-beta/public/synthetic/recovery off/registrations false. BETTER_AUTH_SECRET key prepared with blank value for owner-controlled generation in Render. No secret is included in this report, source snapshot or repository.
+
+## Still pending / NOT TESTED
+
+- Render draft is NOT a deployed service. No successful cloud build, service URL or HTTPS acceptance is claimed.
+- Server secret-store values, exact HTTPS origin and selected direct Neon hostname still require configuration. Private migration connection is not present locally; no cloud migration has run.
+- Authentication secret generation/credential entry remains a browser handoff. No passwords/tokens/database URLs should be pasted in chat or screenshots.
+- All real HTTPS/WSS, cold connection, idle wake, restart/redeploy and cloud backup/restore checks from the deployment runbook remain NOT TESTED.
+- PostgreSQL 18 on this actual provider target is not yet driver/migration/runtime tested; local fixture evidence used PostgreSQL 16.
+- Dependency audit failures from the preparation report remain unresolved. No code or dependencies changed during this provisioning step; prior test/build results are not reruns against the cloud target.
+
+Image evidence is saved locally in the task visualization directory: neon-beta-database-created.jpg, github-beta-private-created.jpg and render-beta-secret-handoff.jpg. Raw credentials/screenshots containing passwords are excluded.
+
+Next: owner generates the signing secret directly in Render, supplies the scoped database connection only through provider/private stores, then forward migrations and the exact release are checked on the real service before opening registration. Data mode remains fictional only; recovery remains OFF.

@@ -1,0 +1,8 @@
+# PLANNING ONLY. Owner must choose a separate real-data target and credentials in 3B.
+# Not an approved live environment; values below are placeholders.
+DATABASE_URL=postgresql://<REAL_ROLE>:<LOCAL_SECRET>@127.0.0.1:<SEPARATE_PORT>/<REAL_DATABASE>
+BETTER_AUTH_SECRET=<SERVER_ONLY_SECRET_TO_BE_CREATED_LOCALLY>
+TRACKER_ORIGIN=<OWNER_SELECTED_EXACT_ORIGIN>
+TRACKER_RECOVERY_MODE=off
+# Do not copy synthetic-3a or test key/mailbox/confirmation into the owner environment.
+# Real delivery/key custody/rollout/token lifetimes remain unapproved.

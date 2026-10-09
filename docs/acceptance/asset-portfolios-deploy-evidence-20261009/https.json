@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "origin": "https://finntech-personal.onrender.com",
+  "at": "2026-10-08T19:39:44.876Z",
+  "cases": [
+    {
+      "case": "HTTPS readiness/database/public email-password mode unchanged; no DEMO/recovery enabled",
+      "status": "PASS"
+    },
+    {
+      "case": "Current compiled JS/CSS assets served over HTTPS with notebook styles",
+      "status": "PASS",
+      "assets": [
+        "/assets/index-8239Rq6X.js",
+        "/assets/index-DMR2Ran3.css"
+      ]
+    },
+    {
+      "case": "Local original SVG artwork and licensed Thai font served byte-identically",
+      "status": "PASS"
+    },
+    {
+      "case": "Anonymous account and backup reads remain denied",
+      "status": "PASS"
+    }
+  ]
+}

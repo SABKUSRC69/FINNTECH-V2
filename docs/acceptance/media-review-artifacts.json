@@ -1,0 +1,39 @@
+{
+  "changedFiles": 83,
+  "patchBytes": 20112310,
+  "patchSha256": "6f5b1d23cf4f54709788b449c2f2f09e1c1439c4a58628e674119db35fd00354",
+  "patchAppliesToBaselineExit": 0,
+  "patchWhitespaceExit": 0,
+  "whitespaceException": "CORE-LICENSE.txt is an unchanged copy of the upstream license, including its final blank line",
+  "commands": [
+    {
+      "name": "typecheck",
+      "completed": "2026-10-09T10:48:17.3387410Z",
+      "exitCode": 0
+    },
+    {
+      "name": "build",
+      "completed": "2026-10-09T10:48:31.0736807Z",
+      "exitCode": 0
+    },
+    {
+      "name": "root-tests",
+      "completed": "2026-10-09T10:48:49.2949783Z",
+      "exitCode": 0
+    },
+    {
+      "name": "tracker-tests",
+      "completed": "2026-10-09T10:49:13.0837770Z",
+      "exitCode": 0
+    },
+    {
+      "name": "legacy-build",
+      "completed": "2026-10-09T10:49:18.7274651Z",
+      "exitCode": 0
+    }
+  ],
+  "secretFilesIncluded": false,
+  "commitCreated": false,
+  "liveMigration": false,
+  "deployment": false
+}

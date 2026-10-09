@@ -1,0 +1,18 @@
+# Planning placeholders only. Do not paste credentials into chat or a release repository.
+NODE_ENV=production
+TRACKER_RUNTIME_MODE=cloud-beta
+PORT=10000
+WEB_DIST_DIR=/app/apps/web/dist
+TRACKER_ORIGIN=https://<assigned-service>.onrender.com
+TRACKER_BETA_ACCESS=public
+TRACKER_BETA_DATA_MODE=synthetic
+TRACKER_BETA_REGISTRATIONS_OPEN=false
+TRACKER_RECOVERY_MODE=off
+TRACKER_BETA_DATABASE_HOST=<selected-direct-endpoint>.neon.tech
+DATABASE_URL=postgresql://beta_app:<server-secret>@<selected-endpoint>.neon.tech/finntech_beta?sslmode=verify-full
+BETTER_AUTH_SECRET=<unique-generated-server-secret>
+# Private migration runner only; not needed by the deployed app:
+DIRECT_DATABASE_URL=postgresql://beta_app:<server-secret>@<selected-direct-endpoint>.neon.tech/finntech_beta?sslmode=verify-full
+TRACKER_BETA_MIGRATION_CONFIRM=fresh-beta-only
+# Only for an owner-selected future invited mode, never a frontend secret:
+# TRACKER_BETA_INVITED_EMAILS=<server-only-list>

@@ -1,0 +1,13 @@
+{
+  "version": 3,
+  "bytes": 2468,
+  "parse": true,
+  "counts": {
+    "stockPortfolios": 1,
+    "stockTrades": 1,
+    "manualAssets": 1,
+    "cashAccounts": 1
+  },
+  "credentialsPattern": false,
+  "rawFileExcluded": true
+}

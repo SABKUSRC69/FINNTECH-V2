@@ -1,0 +1,62 @@
+{
+  "status": "PASS",
+  "origin": "https://finntech-personal.onrender.com",
+  "at": "2026-10-08T19:41:37.781Z",
+  "cases": [
+    {
+      "case": "Two genuine existing synthetic accounts retain owners and original datasets; fractional USD ledger/manual valuation/export v3 work without operator stock credentials",
+      "status": "PASS"
+    },
+    {
+      "case": "Concurrent identical-key buy creates one visible trade per synthetic portfolio",
+      "status": "PASS"
+    },
+    {
+      "case": "Two-owner read/write isolation and exact Origin remain enforced",
+      "status": "PASS"
+    }
+  ],
+  "market": {
+    "region": "Render Ohio (US East)",
+    "authenticatedTransport": "PASS",
+    "genuineTradeObservations": 2,
+    "distinctTradePrices": 2,
+    "status": "PASS",
+    "observations": [
+      {
+        "asset": "SOL",
+        "price": null,
+        "status": "UNAVAILABLE",
+        "receivedAt": null,
+        "observedAt": null,
+        "kind": "REST_SNAPSHOT",
+        "quoteCurrency": "USDT",
+        "source": "Binance public"
+      },
+      {
+        "asset": "SOL",
+        "price": "109.18",
+        "status": "LIVE",
+        "receivedAt": "2026-10-08T19:41:32.295Z",
+        "observedAt": "2026-10-08T19:41:32.225Z",
+        "kind": "TRADE",
+        "quoteCurrency": "USDT",
+        "source": "Binance public"
+      },
+      {
+        "asset": "SOL",
+        "price": "109.17",
+        "status": "LIVE",
+        "receivedAt": "2026-10-08T19:41:37.237Z",
+        "observedAt": "2026-10-08T19:41:37.167Z",
+        "kind": "TRADE",
+        "quoteCurrency": "USDT",
+        "source": "Binance public"
+      }
+    ]
+  },
+  "stockRealtime": "INCOMPLETE",
+  "usdThb": "INCOMPLETE",
+  "syntheticFinancialWrites": true,
+  "ownerFinancialWrites": false
+}

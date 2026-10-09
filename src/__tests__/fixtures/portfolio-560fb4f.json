@@ -1,0 +1,57 @@
+[
+  {
+    "id": "port-1",
+    "name": "SET50 Index Fund (SSF/RMF)",
+    "symbol": "B-FUTURE",
+    "type": "fund",
+    "typeName": "กองทุนรวม",
+    "shares": 1250.5,
+    "avgBuyPrice": 24.5,
+    "currentPrice": 28.2,
+    "color": "#3b82f6"
+  },
+  {
+    "id": "port-2",
+    "name": "S&P 500 ETF",
+    "symbol": "SPY / VOO",
+    "type": "stock",
+    "typeName": "หุ้นสหรัฐฯ / ETF",
+    "shares": 45,
+    "avgBuyPrice": 420,
+    "currentPrice": 512.4,
+    "color": "#10b981"
+  },
+  {
+    "id": "port-3",
+    "name": "Bitcoin",
+    "symbol": "BTC",
+    "type": "crypto",
+    "typeName": "คริปโตเคอร์เรนซี",
+    "shares": 0.15,
+    "avgBuyPrice": 2100000,
+    "currentPrice": 2450000,
+    "color": "#f59e0b"
+  },
+  {
+    "id": "port-4",
+    "name": "ทองคำแท่ง 96.5%",
+    "symbol": "GOLD",
+    "type": "gold",
+    "typeName": "ทองคำ",
+    "shares": 2,
+    "avgBuyPrice": 38500,
+    "currentPrice": 42800,
+    "color": "#eab308"
+  },
+  {
+    "id": "port-5",
+    "name": "เงินฝากออมทรัพย์ดอกเบี้ยสูง",
+    "symbol": "E-SAVINGS",
+    "type": "cash",
+    "typeName": "เงินสด/เงินฝาก",
+    "shares": 1,
+    "avgBuyPrice": 150000,
+    "currentPrice": 152250,
+    "color": "#06b6d4"
+  }
+]

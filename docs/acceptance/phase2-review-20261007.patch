@@ -1,0 +1,650 @@
+diff --git a/README.md b/README.md
+index d4f7bad..b9a0adf 100644
+--- a/README.md
++++ b/README.md
+@@ -17,13 +17,18 @@ Prerequisites: Node.js **22.12+ ในสาย 22 หรือ 24.x**, npm แ
+ 
+ ```powershell
+ docker compose --env-file .env.auth.local -f compose.auth.local.yaml up -d --wait
+-npm run tracker:dev
+ ```
+ 
+-เปิด [เว็บ tracker](http://127.0.0.1:4173/) สมัคร/เข้าสู่บัญชีสังเคราะห์ของคุณ
+-ฐานใหม่ต้องเตรียมด้วย `npm run tracker:auth:local:prepare` **ครั้งแรกกับ empty DB เท่านั้น**
++ก่อน `npm run tracker:dev` ครั้งแรก ฐานใหม่ต้องเตรียมด้วย
++`npm run tracker:auth:local:prepare` **ครั้งแรกกับ empty synthetic DB ที่ตรวจ target แล้วเท่านั้น**
+ ฐานที่มีข้อมูลต้องตรวจ target และใช้ forward migrations ตาม decisions/007 และ 008
+ ไม่รัน prepare ซ้ำ ไม่ reset และไม่ลบ volume เพื่อให้เริ่มได้
++หลังเตรียมฐานแล้วเริ่ม Web/API ด้วย `npm run tracker:dev`
++จากนั้นเปิด [เว็บ tracker](http://127.0.0.1:4173/) สมัคร/เข้าสู่บัญชีสังเคราะห์ของคุณ
++
++Desktop ใช้ sidebar; mobile มี ภาพรวม, รายการ, พอร์ต, เพิ่มเติม
++ในเพิ่มเติมเลือกงบประมาณ สำรองข้อมูล บัญชีและดูแลข้อมูล หรือราคาหุ้นสหรัฐ
++หน้าบัญชีแสดงชื่อจาก session และใช้ logout/backup เดิม ยังไม่มี recovery หรือเปลี่ยนรหัสผ่าน
+ 
+ ตรวจ health ใน terminal อีกหน้าต่าง:
+ 
+diff --git a/apps/web/src/tracker/Dashboard.tsx b/apps/web/src/tracker/Dashboard.tsx
+index 27fb43f..959fa5a 100644
+--- a/apps/web/src/tracker/Dashboard.tsx
++++ b/apps/web/src/tracker/Dashboard.tsx
+@@ -13,9 +13,11 @@ import Assets from './Assets'
+ import ExpenseBreakdown from './ExpenseBreakdown'
+ import { CRYPTO_PRICE_MAX_AGE_MS, isFreshCryptoQuote } from './marketFreshness'
+ import { Icon, usePresentation } from '../presentation'
++import TrackerNavigation, { sectionTitle, type Section } from './TrackerNavigation'
++import Account from './Account'
++import ModalDialog from './ModalDialog'
+ 
+ type Pending = { path: string; body: unknown; key: string; method: string }
+-type Section = 'finance' | 'budget' | 'crypto' | 'stocks' | 'backup' | 'assets'
+ const today = () => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10)
+ const card = 'tracker-card rounded-2xl border border-slate-200 bg-white p-5 sm:p-6'
+ const input = 'auth-input'
+@@ -64,10 +66,13 @@ export default function Dashboard({ name, logout, expired, authBusy }: {
+   const voidForm = useRef<HTMLFormElement>(null)
+   const disabled = loading || busy || !!pending || !available || authBusy || backupLocked
+ 
+-  function navigate(next: Section): void {
+-    if (backupLocked || busy || pending || writing.current || next === section) return
++  const navigationLocked = backupLocked || busy || !!pending || authBusy
++  function navigate(next: Section): boolean {
++    if (backupLocked || busy || pending || writing.current || authBusy) return false
++    if (next === section) return true
+     setMessage('')
+     setSection(next)
++    return true
+   }
+ 
+   useEffect(() => {
+@@ -192,23 +197,22 @@ export default function Dashboard({ name, logout, expired, authBusy }: {
+   let totalText: string | null = null
+   try { if (completePrices) totalText = serializeCrypto(total) } catch { /* Display N/A on summary overflow. */ }
+ 
++  const feedback = <>
++    {message && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{message}</p>}
++    {pending && <div className={card}><p className="text-sm leading-6">ยังไม่ทราบผลการบันทึก ห้ามสร้างคำขอใหม่ ระบบจะส่งข้อมูลและ key เดิมเพื่อตรวจผลโดยไม่เพิ่มรายการซ้ำ</p><button className="auth-primary mt-3" disabled={busy} onClick={() => { void send(pending) }}>ลองส่งคำขอเดิมอีกครั้ง</button></div>}
++  </>
+   return <div className="tracker-layout">
+-    <nav aria-label="ส่วนการเงิน" className="tracker-nav">
+-      <p className="tracker-nav-heading">พื้นที่การเงิน</p>
+-      {([['assets', 'สินทรัพย์รวม'], ['finance', 'รายรับรายจ่าย'], ['budget', 'งบประมาณ'], ['crypto', 'พอร์ตคริปโต'], ['stocks', 'ราคาหุ้นสหรัฐ'], ['backup', 'สำรองข้อมูล']] as const).map(([value, label]) => <button key={value} type="button" disabled={backupLocked || busy || !!pending} onClick={() => navigate(value)} aria-pressed={section === value} aria-current={section === value ? 'page' : undefined} className={`tracker-nav-item ${section === value ? 'tracker-nav-active' : ''}`}><Icon name={value} /><span>{label}</span></button>)}
+-      <div className="tracker-nav-note"><Icon name="shield" /><p>บันทึกด้วยตัวเอง<br />THB และ USDT แยกกัน</p></div>
+-    </nav>
++    <TrackerNavigation section={section} locked={navigationLocked} navigate={navigate} />
+     <main id="tracker-content" tabIndex={-1} className="tracker-main space-y-6">
+     <div className="tracker-page-heading flex flex-wrap items-start justify-between gap-4">
+-      <div><p className="tracker-eyebrow">การเงินในมุมของคุณ</p><h1 className="mt-1 text-2xl font-semibold">สวัสดี {name}</h1><p className="mt-2 text-sm text-slate-500">เริ่มบันทึกจากข้อมูลของคุณ · THB และ USDT แสดงแยกกัน</p></div>
++      <div><p className="tracker-eyebrow">สวัสดี {name}</p><h1 className="mt-1 text-2xl font-semibold">{sectionTitle(section)}</h1><p className="mt-2 text-sm text-slate-500">บันทึกด้วยตัวเอง · THB และ USDT แสดงแยกกัน</p></div>
+       <div className="flex flex-wrap gap-2">{available && <button className="auth-secondary" disabled={disabled} onClick={() => { void load() }}>โหลดข้อมูลล่าสุด</button>}<button type="button" className="auth-secondary" disabled={busy || !!pending || authBusy || backupLocked} onClick={logout}>ออกจากระบบ</button></div>
+     </div>
+-    {message && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{message}</p>}
+-    {pending && <div className={card}><p className="text-sm leading-6">ยังไม่ทราบผลการบันทึก ห้ามสร้างคำขอใหม่ ระบบจะส่งข้อมูลและ key เดิมเพื่อตรวจผลโดยไม่เพิ่มรายการซ้ำ</p><button className="auth-primary mt-3" disabled={busy} onClick={() => { void send(pending) }}>ลองส่งคำขอเดิมอีกครั้ง</button></div>}
++    {!voiding && feedback}
+     {!available && !loading && <button className="auth-secondary" onClick={() => { void load() }}>โหลดข้อมูลอีกครั้ง</button>}
+     {loading && <p role="status">กำลังโหลดข้อมูล…</p>}
+-    {voiding && <section role="dialog" aria-label="ยืนยันยกเลิกรายการ" className={`${card} border-rose-200`}>
+-      <h2 className="font-semibold">ยกเลิกรายการ {money(voiding.label)}</h2>
++    {voiding && <ModalDialog title="ยืนยันยกเลิกรายการ" onDismiss={cancelCorrection} closeDisabled={busy || !!pending}>
++      <p className="mt-4 font-semibold">ยกเลิกรายการ {money(voiding.label)}</p>
+       <p className="mt-2 text-sm leading-7">รายการเดิมยังอยู่ในประวัติ แต่จะไม่รวมในยอด หากทำให้ประวัติคริปโตขายเกินจำนวน ระบบจะปฏิเสธและคงข้อมูลเดิม</p>
+       <form ref={voidForm} className="mt-4 space-y-3" onSubmit={e => submit(e,
+         `${voiding.kind === 'finance' ? 'finance/transactions' : 'crypto/trades'}/${voiding.id}/corrections`,
+@@ -217,7 +221,9 @@ export default function Dashboard({ name, logout, expired, authBusy }: {
+         <label className="auth-label">เหตุผลการยกเลิก<input className={input} required maxLength={500} value={correctionReason} disabled={disabled} onChange={e => setCorrectionReason(e.target.value)} /></label>
+         <div className="flex flex-wrap gap-3"><button className="auth-primary" disabled={disabled}>ยืนยันยกเลิกรายการ</button><button type="button" className="auth-secondary" disabled={disabled} onClick={cancelCorrection}>กลับโดยไม่ยกเลิก</button></div>
+       </form>
+-    </section>}
++      <div className="mt-4 space-y-3">{feedback}</div>
++    </ModalDialog>}
++    {section === 'account' && <Account name={name} locked={navigationLocked} logout={logout} backup={() => { navigate('backup') }} />}
+     {(section === 'finance' || section === 'budget') && <>
+       <div className="tracker-section-heading"><div><h2 className="text-xl font-semibold">ภาพรวมรายรับรายจ่าย</h2><p className="mt-1 text-sm text-slate-500">จากรายการที่บันทึก · ไม่ใช่ยอดบัญชีธนาคาร</p></div><label className="auth-label tracker-month">เดือนที่ดู<input className={input} type="month" value={month} disabled={busy || !!pending || loading} onChange={e => { if (e.target.value) setMonth(e.target.value) }} /></label></div>
+       {finance && <div className="tracker-summary grid gap-3 sm:grid-cols-3">{[['คงเหลือเดือนนี้', finance.balance], ['รายรับ', finance.income], ['รายจ่าย', finance.expense]].map(([label, value], index) => <div key={label} className={`${card} tracker-summary-card ${index === 0 ? 'tracker-balance-card' : ''}`}><div className="flex items-center justify-between"><p className="text-sm text-slate-500">{label}</p><span className="tracker-stat-icon"><Icon name={index === 0 ? 'budget' : 'finance'} /></span></div><p className="mt-3 break-all text-2xl font-semibold tabular-nums">{money(displayDecimal(value!))} <span className="text-xs text-slate-400">THB</span></p><p className="tracker-stat-caption">{index === 0 ? 'รายรับหักรายจ่ายในเดือนที่เลือก' : 'เฉพาะรายการที่ยังไม่ถูกยกเลิก'}</p></div>)}</div>}
+diff --git a/apps/web/src/index.css b/apps/web/src/index.css
+index c6eeb76..041a099 100644
+--- a/apps/web/src/index.css
++++ b/apps/web/src/index.css
+@@ -67,6 +67,13 @@
+ .tracker-nav-item { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 48px; margin: 6px 0; border-radius: 12px; padding: 12px; color: var(--muted); text-align: left; font-size: 14px; font-weight: 500; }
+ .tracker-nav-item:hover:not(:disabled), .tracker-nav-active { background: var(--accent-soft); color: var(--accent); }
+ .tracker-nav-item:disabled { opacity: .55; }
++.tracker-mobile-nav { display: none; }
++.tracker-main :is(h1, h2, h3, h4, p, label) { overflow-wrap: anywhere; }
++.tracker-main .auth-label { min-width: 0; }
++.tracker-dialog { width: min(560px, calc(100% - 32px)); max-height: calc(100dvh - 48px); margin: auto; padding: 24px; border: 1px solid var(--line); border-radius: 20px; color: var(--ink); background: var(--surface); overflow-y: auto; overflow-wrap: anywhere; }
++.tracker-dialog::backdrop { background: rgb(0 0 0 / .5); }
++.tracker-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
++.tracker-dialog button { min-height: 44px; }
+ .tracker-nav-note { display: flex; align-items: start; gap: 10px; margin: 36px 10px 0; padding-top: 22px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; line-height: 1.9; }
+ .tracker-main { min-width: 0; padding: 32px 32px 40px; }
+ .tracker-main > :is(p, button) { font-size: 13px; }
+@@ -79,6 +86,7 @@
+ .tracker-month { flex: 0 0 190px; font-size: 12px; }
+ .tracker-month .auth-input { margin-top: 4px; padding: 10px 12px; font-size: 14px; }
+ .tracker-summary-card { min-width: 0; }
++.tracker-summary-card .text-2xl > span { display: inline-block; white-space: nowrap; }
+ .tracker-summary .tracker-balance-card { background: #146f58; border-color: #146f58; color: #fff; }
+ .tracker-summary .tracker-balance-card :is(.text-slate-500, .text-slate-400, .tracker-stat-caption) { color: #d3ede1; }
+ .tracker-stat-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; color: var(--accent); background: var(--accent-soft); }
+@@ -103,10 +111,10 @@
+   .tracker-main { padding: 24px 16px 32px; }
+   .tracker-header-inner { padding: 12px 16px; }
+   .tracker-local-badge { display: none; }
+-  .tracker-header a { gap: 8px; }
+-  .tracker-header a > span:last-child { font-size: 15px; letter-spacing: .06em; }
++  .tracker-header .tracker-brand { gap: 8px; }
++  .tracker-header .tracker-brand > span:last-child { font-size: 15px; letter-spacing: .06em; }
+   .tracker-display-controls { gap: 6px; }
+-  .tracker-icon-button { width: 40px; height: 40px; }
++  .tracker-icon-button { width: 44px; height: 44px; }
+   .tracker-section-heading { align-items: start; flex-direction: column; gap: 14px; }
+   .tracker-month { flex: auto; width: 100%; max-width: 240px; }
+   .tracker-page-heading { margin-bottom: 24px; }
+@@ -116,24 +124,33 @@
+   .tracker-summary-card .text-2xl { font-size: 20px; }
+   .tracker-balance-card .text-2xl { font-size: 32px; }
+   .tracker-stat-caption { font-size: 10px; }
+-  .tracker-nav { position: fixed; top: auto; bottom: 0; left: 0; right: 0; z-index: 20; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; padding: 8px 6px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface); }
+-  .tracker-nav-item { margin: 0; padding: 7px 2px; display: flex; flex-direction: column; gap: 4px; font-size: 10px; text-align: center; line-height: 1.6; overflow-wrap: anywhere; }
+-  .tracker-nav-item .tracker-icon { height: 20px; }
++  .tracker-nav { display: none; }
++  .tracker-mobile-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 20; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 8px 6px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface); }
++  .tracker-mobile-nav .tracker-nav-item { margin: 0; padding: 7px 2px; display: flex; flex-direction: column; gap: 4px; font-size: 10px; text-align: center; line-height: 1.6; overflow-wrap: anywhere; }
++  .tracker-mobile-nav .tracker-nav-item .tracker-icon { height: 20px; }
+   .tracker-nav-heading, .tracker-nav-note { display: none; }
++  .tracker-sheet { width: 100%; max-width: 560px; max-height: calc(100dvh - 24px); margin: auto auto 0; border-radius: 20px 20px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); }
+   .tracker-footer { padding: 0 16px calc(108px + env(safe-area-inset-bottom)); }
+   .tracker-auth-main ~ .tracker-footer { padding-left: 16px; padding-bottom: 32px; }
+   .tracker-privacy-note { padding: 10px 16px; }
+-  .tracker-main :is(input, select) { font-size: 16px; }
++  .tracker-app :is(input, select) { font-size: 16px; }
++  .tracker-month .auth-input { font-size: 16px; }
+   .tracker-main [role="dialog"] { scroll-margin-top: 20px; }
+ }
+ 
++/* Reserve space for the fixed nav even for auth outcome messages after Dashboard. */
++@media (max-width: 767px) {
++  .tracker-app:has(.tracker-mobile-nav) { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
++  .tracker-app:has(.tracker-mobile-nav) .tracker-footer { padding-bottom: 32px; }
++}
++
+ @media (prefers-reduced-motion: reduce) {
+   .tracker-app *, .tracker-app *::before, .tracker-app *::after { scroll-behavior: auto !important; transition-duration: 0s !important; animation: none !important; }
+ }
+ 
+ body {
+   margin: 0;
+-  min-width: 320px;
++  min-width: 0;
+ }
+ 
+ .expense-bar { width: 100%; height: 8px; }
+diff --git a/apps/web/src/presentation.tsx b/apps/web/src/presentation.tsx
+index b17edf1..7c1f704 100644
+--- a/apps/web/src/presentation.tsx
++++ b/apps/web/src/presentation.tsx
+@@ -1,7 +1,7 @@
+ import { createContext, useContext, useState, type ReactNode } from 'react'
+ 
+ type Theme = 'light' | 'dark'
+-export type IconName = 'finance' | 'budget' | 'crypto' | 'stocks' | 'backup' | 'assets' | 'sun' | 'moon' | 'eye' | 'shield'
++export type IconName = 'finance' | 'budget' | 'crypto' | 'stocks' | 'backup' | 'assets' | 'account' | 'more' | 'sun' | 'moon' | 'eye' | 'shield'
+ type Presentation = {
+   theme: Theme
+   hidden: boolean
+@@ -27,6 +27,8 @@ export function PresentationProvider({ children }: { children: ReactNode }): JSX
+ export const usePresentation = (): Presentation => useContext(PresentationContext)
+ 
+ const paths: Record<IconName, ReactNode> = {
++  account: <><circle cx="12" cy="8" r="4" /><path d="M4 21v-2a8 8 0 0 1 16 0v2" /></>,
++  more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
+   assets: <><rect x="3" y="7" width="18" height="14" rx="3" /><path d="M7 7V4h10v3M15 12h6v5h-6z" /></>,
+   finance: <path d="M7 4v16m0 0-4-4m4 4 4-4M17 20V4m0 0-4 4m4-4 4 4" />,
+   budget: <><rect x="3" y="5" width="18" height="15" rx="3" /><path d="M3 10h18M7 3v4m10-4v4M7 14h3m4 0h3M7 17h3" /></>,
+diff --git a/apps/web/src/App.tsx b/apps/web/src/App.tsx
+index fb6b6ee..6a040b5 100644
+--- a/apps/web/src/App.tsx
++++ b/apps/web/src/App.tsx
+@@ -95,14 +95,16 @@ function AccountApp(): JSX.Element {
+       <a className="tracker-skip" href="#tracker-content">ข้ามไปยังเนื้อหา</a>
+       <header className="tracker-header border-b border-slate-200/80 bg-white">
+         <div className="tracker-header-inner flex items-center justify-between gap-3 px-5 py-4 sm:px-8">
+-          <a href="/" className="flex items-center gap-3 text-slate-900" aria-label="FINNTECH หน้าหลัก">
++          {view.status === 'signed-in' ? <div className="tracker-brand flex items-center gap-3 text-slate-900">
++            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-700 text-xl font-bold text-white">F</span><span className="text-lg font-bold tracking-[0.12em]">FINNTECH</span>
++          </div> : <a href="/" className="tracker-brand flex items-center gap-3 text-slate-900" aria-label="FINNTECH หน้าหลัก">
+             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-700 text-xl font-bold text-white">F</span>
+             <span className="text-lg font-bold tracking-[0.12em]">FINNTECH</span>
+-          </a>
++          </a>}
+           <div className="flex items-center gap-3"><span className="tracker-local-badge rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-medium text-teal-800">เวอร์ชันทดสอบในเครื่อง</span><PresentationControls /></div>
+         </div>
+       </header>
+-      {hidden && <p className="tracker-privacy-note">ซ่อนเฉพาะยอดแสดงผล ช่องกรอก บันทึกช่วยจำ และไฟล์สำรองยังแสดงข้อมูลเดิม</p>}
++      {hidden && <p className="tracker-privacy-note">ซ่อนเฉพาะยอดแสดงผล ช่องกรอก บันทึกช่วยจำ ไฟล์สำรอง และข้อมูลที่รับส่งยังเป็นข้อมูลเดิม ไม่ใช่การเข้ารหัส</p>}
+       {view.status === 'signed-in' ? <>
+         <Dashboard name={view.account.name} authBusy={disabled} logout={() => { void handleAuth() }} expired={() => setView({ status: 'signed-out' })} />
+         {message && <p role="alert" className="mx-auto max-w-6xl px-5 py-3 text-sm text-amber-900">{message}</p>}
+diff --git a/apps/web/src/tracker/ModalDialog.tsx b/apps/web/src/tracker/ModalDialog.tsx
+new file mode 100644
+index 0000000..468b4a7
+--- /dev/null
++++ b/apps/web/src/tracker/ModalDialog.tsx
+@@ -0,0 +1,32 @@
++import { useEffect, useRef, type ReactNode } from 'react'
++
++/** Native modal makes the background inert; explicit Tab handling also keeps focus inside. */
++export default function ModalDialog({ title, children, onDismiss, closeDisabled = false, sheet = false }: {
++  title: string; children: ReactNode; onDismiss: () => void; closeDisabled?: boolean; sheet?: boolean
++}): JSX.Element {
++  const dialog = useRef<HTMLDialogElement>(null)
++  useEffect(() => {
++    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
++    const element = dialog.current!
++    element.showModal()
++    element.querySelector<HTMLButtonElement>('button')?.focus()
++    return () => {
++      element.close()
++      if (opener?.isConnected && !opener.matches(':disabled')) opener.focus()
++      else document.getElementById('tracker-content')?.focus()
++    }
++  }, [])
++  return <dialog ref={dialog} aria-label={title} className={`tracker-dialog ${sheet ? 'tracker-sheet' : ''}`}
++    onCancel={event => { event.preventDefault(); if (!closeDisabled) onDismiss() }}
++    onKeyDown={event => {
++      if (event.key !== 'Tab') return
++      const items = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), a[href], [tabindex="0"]')]
++      const first = items[0], last = items[items.length - 1]
++      if (!first) { event.preventDefault(); event.currentTarget.focus(); return }
++      if (event.shiftKey && (document.activeElement === first || document.activeElement === event.currentTarget)) { event.preventDefault(); last?.focus() }
++      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
++    }}>
++    <div className="tracker-dialog-heading"><h2 className="text-lg font-semibold">{title}</h2><button type="button" className="tracker-icon-button" aria-label={`ปิด${title}`} disabled={closeDisabled} onClick={onDismiss}>×</button></div>
++    {children}
++  </dialog>
++}
+diff --git a/apps/web/src/tracker/TrackerNavigation.tsx b/apps/web/src/tracker/TrackerNavigation.tsx
+new file mode 100644
+index 0000000..195eb03
+--- /dev/null
++++ b/apps/web/src/tracker/TrackerNavigation.tsx
+@@ -0,0 +1,34 @@
++import { useState } from 'react'
++import { Icon } from '../presentation'
++import ModalDialog from './ModalDialog'
++
++export const sections = [
++  ['assets', 'สินทรัพย์รวม'], ['finance', 'รายรับรายจ่าย'], ['crypto', 'พอร์ตคริปโต'],
++  ['budget', 'งบประมาณ'], ['backup', 'สำรองข้อมูล'], ['account', 'บัญชีและดูแลข้อมูล'], ['stocks', 'ราคาหุ้นสหรัฐ'],
++] as const
++export type Section = typeof sections[number][0]
++export const sectionTitle = (section: Section): string => sections.find(([value]) => value === section)![1]
++const secondary = sections.slice(3)
++
++export default function TrackerNavigation({ section, locked, navigate }: {
++  section: Section; locked: boolean; navigate: (section: Section) => boolean
++}): JSX.Element {
++  const [moreOpen, setMoreOpen] = useState(false)
++  const moreActive = secondary.some(([value]) => value === section)
++  return <>
++    <nav aria-label="ส่วนการเงิน" className="tracker-nav">
++      <p className="tracker-nav-heading">พื้นที่การเงิน</p>
++      {sections.map(([value, label]) => <button key={value} type="button" disabled={locked} onClick={() => navigate(value)} aria-current={section === value ? 'page' : undefined} aria-pressed={section === value} className={`tracker-nav-item ${section === value ? 'tracker-nav-active' : ''}`}><Icon name={value} /><span>{label}</span></button>)}
++      <div className="tracker-nav-note"><Icon name="shield" /><p>บันทึกด้วยตัวเอง<br />THB และ USDT แยกกัน</p></div>
++    </nav>
++    <nav aria-label="เมนูมือถือ" className="tracker-mobile-nav">
++      {([['assets', 'ภาพรวม'], ['finance', 'รายการ'], ['crypto', 'พอร์ต']] as const).map(([value, label]) => <button key={value} type="button" disabled={locked} onClick={() => navigate(value)} aria-current={section === value ? 'page' : undefined} className={`tracker-nav-item ${section === value ? 'tracker-nav-active' : ''}`}><Icon name={value} /><span>{label}</span></button>)}
++      <button type="button" aria-expanded={moreOpen} aria-haspopup="dialog" className={`tracker-nav-item ${moreActive ? 'tracker-nav-active' : ''}`} aria-current={moreActive ? 'page' : undefined} onClick={() => setMoreOpen(true)}><Icon name="more" /><span>เพิ่มเติม</span></button>
++    </nav>
++    {moreOpen && <ModalDialog title="เพิ่มเติม" sheet onDismiss={() => setMoreOpen(false)}>
++      <p className="mt-2 text-sm text-slate-500">หน้าปัจจุบัน: {sectionTitle(section)}</p>
++      {locked && <p role="status" className="mt-3 text-sm">กำลังดำเนินการหรือยังไม่ทราบผล จึงยังเปลี่ยนหน้าไม่ได้ ปิดเมนูเพื่อตรวจผลคำขอเดิม</p>}
++      <div className="mt-4">{secondary.map(([value, label]) => <button key={value} type="button" disabled={locked} aria-current={section === value ? 'page' : undefined} className={`tracker-nav-item ${section === value ? 'tracker-nav-active' : ''}`} onClick={() => { if (navigate(value)) setMoreOpen(false) }}><Icon name={value} /><span>{label}</span></button>)}</div>
++    </ModalDialog>}
++  </>
++}
+diff --git a/apps/web/src/tracker/Account.tsx b/apps/web/src/tracker/Account.tsx
+new file mode 100644
+index 0000000..f229852
+--- /dev/null
++++ b/apps/web/src/tracker/Account.tsx
+@@ -0,0 +1,24 @@
++export default function Account({ name, locked, logout, backup }: {
++  name: string; locked: boolean; logout: () => void; backup: () => void
++}): JSX.Element {
++  return <section aria-label="บัญชีและดูแลข้อมูล" className="space-y-5">
++    <div className="tracker-card rounded-2xl border border-slate-200 p-5 sm:p-6">
++      <h2 className="text-xl font-semibold">บัญชีของคุณ</h2>
++      <p className="mt-3 text-sm text-slate-500">ชื่อจากบัญชีที่เข้าสู่ระบบอยู่</p><p className="mt-1 break-words text-lg font-semibold">{name}</p>
++      <button type="button" className="auth-secondary mt-5" disabled={locked} onClick={logout}>ออกจากระบบบัญชีนี้</button>
++      <p className="mt-4 text-sm leading-7 text-slate-500">การกู้คืนบัญชีและยืนยันอีเมลยังไม่เปิดในรุ่นที่ตรวจ อย่าใช้รุ่นทดลองนี้เป็นพื้นที่เดียวสำหรับข้อมูลสำคัญ</p>
++    </div>
++    <div className="tracker-card rounded-2xl border border-slate-200 p-5 sm:p-6">
++      <h2 className="text-xl font-semibold">ดูแลข้อมูลของคุณ</h2>
++      <p className="mt-3 text-sm leading-7 text-slate-500">ไฟล์สำรอง JSON เก็บรายการการเงิน เงินสด และประวัติคริปโตที่บันทึกเอง ไม่รวมบัญชีล็อกอินหรือการตั้งค่าระบบ ไฟล์ไม่เข้ารหัสและอาจมีบันทึกช่วยจำส่วนตัว เก็บไว้ในที่ส่วนตัวและตรวจว่าไฟล์ถูกบันทึกจริง</p>
++      <button type="button" className="auth-primary mt-4" disabled={locked} onClick={backup}>ไปสำรองและกู้คืนข้อมูล</button>
++      <p className="mt-4 text-sm leading-7 text-slate-500">JSON ไม่ใช่สำเนาฐานข้อมูลทั้งระบบและใช้กู้บัญชีล็อกอินไม่ได้ การสำรองฐานข้อมูลและการกู้เมื่อเครื่องเสียยังต้องเตรียมแยกต่างหาก</p>
++    </div>
++    <div className="tracker-card rounded-2xl border border-slate-200 p-5 sm:p-6">
++      <h2 className="text-xl font-semibold">ใช้งานในเครื่อง</h2>
++      <p className="mt-3 text-sm leading-7 text-slate-500">เปิดเว็บจากเครื่องที่เริ่มระบบไว้ บันทึกรายการด้วยตัวเอง ตรวจประวัติก่อนส่งรายการซ้ำเมื่อผลยังไม่แน่นอน และใช้ปุ่มตรวจผลคำขอเดิมก่อนปิดหน้า</p>
++      <p className="mt-3 text-sm leading-7 text-slate-500">เวอร์ชันทดลองในเครื่อง · ยังไม่รับรองความพร้อมสำหรับข้อมูลจริงหรือออนไลน์ · ไม่มีการส่งคำสั่งซื้อขาย ฝากถอน หรือเครดิตเริ่มต้น</p>
++      <p className="mt-3 text-sm text-slate-500">รายรับรายจ่ายและเงินสดใช้ THB · ต้นทุนและกำไรขาดทุนคริปโตใช้ USDT แยกพอร์ต</p>
++    </div>
++  </section>
++}
+diff --git a/apps/web/src/tracker/Dashboard.navigation.test.tsx b/apps/web/src/tracker/Dashboard.navigation.test.tsx
+new file mode 100644
+index 0000000..d6a6e60
+--- /dev/null
++++ b/apps/web/src/tracker/Dashboard.navigation.test.tsx
+@@ -0,0 +1,151 @@
++import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
++import { afterEach, expect, it, vi } from 'vitest'
++import App from '../App'
++import TrackerNavigation from './TrackerNavigation'
++import Account from './Account'
++const categoryId = '00000000-0000-4000-8000-000000000001'
++const transactionId = '00000000-0000-4000-8000-000000000002'
++const reply = (body: unknown) => ({ ok: true, status: 200, json: async () => body })
++afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
++function setup(lostPath?: string) {
++  vi.stubGlobal('WebSocket', undefined)
++  const writes: { path: string; options: RequestInit }[] = []
++  let signedIn = true, lost = false
++  vi.stubGlobal('fetch', vi.fn(async (path: string, options: RequestInit = {}) => {
++    if (options.method === 'POST') {
++      writes.push({ path, options })
++      if (path === lostPath && !lost) { lost = true; throw new Error('synthetic response loss') }
++      if (path === '/api/auth/sign-out') signedIn = false
++      return reply({ id: transactionId })
++    }
++    if (path === '/api/health') return reply({ status: 'ok', service: 'tracker-api', checks: { process: 'ok', database: 'ok', auth: 'not_checked' } })
++    if (path === '/api/auth/get-session') return reply(signedIn ? { user: { name: 'ชื่อจาก session สังเคราะห์' } } : null)
++    if (path === '/api/me') return reply({ ownerId: 'synthetic-owner' })
++    if (path.startsWith('/api/finance?')) return reply({ month: '2026-10', currency: 'THB', income: '0', expense: '1.25', balance: '-1.25', categories: [{ id: categoryId, type: 'expense', name: 'อาหาร' }], transactions: [{ id: transactionId, categoryId, type: 'expense', amount: '1.25', date: '2026-10-07', note: '' }], budgets: [] })
++    if (path === '/api/crypto') return reply({ quoteCurrency: 'USDT', portfolios: [], holdings: [], trades: [] })
++    if (path === '/api/cash') return reply({ accounts: [] })
++    if (path === '/api/reference-rate') return reply({ base: 'USDT', quote: 'THB', rate: null, receivedAt: null, status: 'UNAVAILABLE', source: 'Bitkub public', kind: 'LAST_PRICE_SNAPSHOT' })
++    if (path === '/api/stocks/market') return reply({ source: 'Alpaca IEX', currency: 'USD', connection: 'NOT_CONFIGURED', quotes: [] })
++    return reply({ quotes: [] })
++  }))
++  render(<App />)
++  return writes
++}
++async function ready() { await screen.findByRole('button', { name: 'แก้ไขรายการ' }) }
++function mobile() { return within(screen.getByRole('navigation', { name: 'เมนูมือถือ' })) }
++async function more() {
++  fireEvent.click(mobile().getByRole('button', { name: 'เพิ่มเติม' }))
++  return within(await screen.findByRole('dialog', { name: 'เพิ่มเติม' }))
++}
++async function fillFinance(value: string) {
++  await ready()
++  fireEvent.change(screen.getByLabelText('หมวดหมู่'), { target: { value: categoryId } })
++  fireEvent.change(screen.getByLabelText('จำนวนเงิน THB'), { target: { value } })
++  return screen.getByRole('form', { name: 'บันทึกรายรับรายจ่าย' })
++}
++
++it.each(['งบประมาณ', 'สำรองข้อมูล', 'บัญชีและดูแลข้อมูล', 'ราคาหุ้นสหรัฐ'])('reaches %s through More and marks the secondary page active without writing', async label => {
++  const writes = setup(); await ready()
++  expect(mobile().getAllByRole('button')).toHaveLength(4)
++  fireEvent.click((await more()).getByRole('button', { name: label }))
++  expect(screen.getByRole('heading', { level: 1, name: label })).toBeTruthy()
++  expect(screen.queryByRole('dialog')).toBeNull()
++  expect(mobile().getByRole('button', { name: 'เพิ่มเติม' }).getAttribute('aria-current')).toBe('page')
++  expect(mobile().getByRole('button', { name: 'เพิ่มเติม' }).getAttribute('aria-expanded')).toBe('false')
++  expect(writes).toHaveLength(0)
++})
++it('keeps validation on sheet close, clears it on real navigation, and retains finance draft/month', async () => {
++  const writes = setup()
++  fireEvent.submit(await fillFinance('1.001'))
++  const text = screen.getByRole('alert').textContent
++  fireEvent.click((await more()).getByRole('button', { name: 'ปิดเพิ่มเติม' }))
++  expect(screen.getByRole('alert').textContent).toBe(text)
++  fireEvent.click(mobile().getByRole('button', { name: 'รายการ' }))
++  expect(screen.getByRole('alert').textContent).toBe(text)
++  fireEvent.click((await more()).getByRole('button', { name: 'งบประมาณ' }))
++  expect(screen.queryByRole('alert')).toBeNull()
++  fireEvent.click(mobile().getByRole('button', { name: 'รายการ' }))
++  expect((screen.getByLabelText('จำนวนเงิน THB') as HTMLInputElement).value).toBe('1.001')
++  expect((screen.getByLabelText('เดือนที่ดู') as HTMLInputElement).value).toBe('2026-10')
++  expect(writes).toHaveLength(0)
++})
++it('keeps all new navigation entries locked on unknown writes and presentation does not change the retry', async () => {
++  const writes = setup('/api/finance/transactions')
++  fireEvent.submit(await fillFinance('999999999999999999.99'))
++  const retry = await screen.findByRole('button', { name: 'ลองส่งคำขอเดิมอีกครั้ง' })
++  fireEvent.click(screen.getByRole('button', { name: 'เปิดโหมดมืด' }))
++  fireEvent.click(screen.getByRole('button', { name: 'ซ่อนยอดเงิน' }))
++  expect((screen.getByLabelText('จำนวนเงิน THB') as HTMLInputElement).value).toBe('999999999999999999.99')
++  for (const label of ['ภาพรวม', 'รายการ', 'พอร์ต']) expect(mobile().getByRole('button', { name: label }).hasAttribute('disabled')).toBe(true)
++  const sheet = await more()
++  for (const label of ['งบประมาณ', 'สำรองข้อมูล', 'บัญชีและดูแลข้อมูล', 'ราคาหุ้นสหรัฐ']) {
++    const button = sheet.getByRole('button', { name: label })
++    expect(button.hasAttribute('disabled')).toBe(true); fireEvent.click(button)
++  }
++  fireEvent.click(sheet.getByRole('button', { name: 'ปิดเพิ่มเติม' }))
++  expect(screen.getByRole('button', { name: 'ออกจากระบบ' }).hasAttribute('disabled')).toBe(true)
++  expect(writes).toHaveLength(1)
++  fireEvent.click(retry); await screen.findByText('บันทึกสำเร็จ')
++  expect(writes).toHaveLength(2)
++  expect(writes[1]!.options.body).toBe(writes[0]!.options.body)
++  expect(writes[1]!.options.headers).toEqual(writes[0]!.options.headers)
++})
++it('preserves the cash pending request when More is opened and closed', async () => {
++  const writes = setup('/api/cash'); await ready()
++  fireEvent.click(mobile().getByRole('button', { name: 'ภาพรวม' }))
++  const save = await screen.findByRole('button', { name: 'เพิ่มยอดเงินสด' })
++  await waitFor(() => expect(save.hasAttribute('disabled')).toBe(false))
++  fireEvent.change(screen.getByLabelText('ชื่อเงินสดหรือบัญชี'), { target: { value: 'สังเคราะห์' } })
++  fireEvent.change(screen.getByLabelText('ยอดคงเหลือ THB'), { target: { value: '0.10' } })
++  fireEvent.click(save)
++  const retry = await screen.findByRole('button', { name: 'ตรวจผลบันทึกเงินสดด้วยคำขอเดิม' })
++  const sheet = await more()
++  expect(sheet.getByRole('button', { name: 'บัญชีและดูแลข้อมูล' }).hasAttribute('disabled')).toBe(true)
++  fireEvent.click(sheet.getByRole('button', { name: 'ปิดเพิ่มเติม' }))
++  fireEvent.click(retry); await screen.findByText('บันทึกยอดเงินสดสำเร็จ')
++  expect(writes).toHaveLength(2); expect(writes[1]!.options.body).toBe(writes[0]!.options.body); expect(writes[1]!.options.headers).toEqual(writes[0]!.options.headers)
++})
++it('keeps a void request and its retry inside the modal and does not dismiss unknown outcome', async () => {
++  const writes = setup(`/api/finance/transactions/${transactionId}/corrections`); await ready()
++  fireEvent.click(screen.getByRole('button', { name: 'ยกเลิกรายการ' }))
++  const dialog = screen.getByRole('dialog', { name: 'ยืนยันยกเลิกรายการ' })
++  fireEvent.change(within(dialog).getByLabelText('เหตุผลการยกเลิก'), { target: { value: 'ทดสอบ' } })
++  fireEvent.click(within(dialog).getByRole('button', { name: 'ยืนยันยกเลิกรายการ' }))
++  const retry = await within(dialog).findByRole('button', { name: 'ลองส่งคำขอเดิมอีกครั้ง' })
++  fireEvent(dialog, new Event('cancel', { bubbles: false, cancelable: true }))
++  expect(dialog.isConnected).toBe(true)
++  expect(within(dialog).getByRole('button', { name: 'ปิดยืนยันยกเลิกรายการ' }).hasAttribute('disabled')).toBe(true)
++  fireEvent.click(retry); await screen.findByText('บันทึกสำเร็จ')
++  expect(screen.queryByRole('dialog')).toBeNull()
++  expect(writes).toHaveLength(2); expect(writes[1]!.options.body).toBe(writes[0]!.options.body); expect(writes[1]!.options.headers).toEqual(writes[0]!.options.headers)
++})
++it('uses the session name, links to backup and invokes the existing logout without unsupported actions', async () => {
++  const writes = setup(); await ready()
++  fireEvent.click((await more()).getByRole('button', { name: 'บัญชีและดูแลข้อมูล' }))
++  expect(screen.getByText('ชื่อจาก session สังเคราะห์', { exact: true })).toBeTruthy()
++  expect(screen.queryByRole('button', { name: /เปลี่ยนรหัสผ่าน|ลบบัญชี|กู้คืนบัญชี/ })).toBeNull()
++  fireEvent.click(screen.getByRole('button', { name: 'ไปสำรองและกู้คืนข้อมูล' }))
++  expect(screen.getByRole('heading', { level: 1, name: 'สำรองข้อมูล' })).toBeTruthy()
++  fireEvent.click((await more()).getByRole('button', { name: 'บัญชีและดูแลข้อมูล' }))
++  fireEvent.click(screen.getByRole('button', { name: 'ออกจากระบบบัญชีนี้' }))
++  await screen.findByRole('form', { name: 'ฟอร์มเข้าสู่ระบบ' })
++  expect(writes.map(row => row.path)).toEqual(['/api/auth/sign-out'])
++})
++it('keeps an already open sheet dismissible when its navigation becomes locked', () => {
++  const navigate = vi.fn(() => true)
++  const props = { section: 'finance' as const, locked: false, navigate }
++  const view = render(<TrackerNavigation {...props} />)
++  fireEvent.click(mobile().getByRole('button', { name: 'เพิ่มเติม' }))
++  view.rerender(<TrackerNavigation {...props} locked />)
++  const dialog = screen.getByRole('dialog', { name: 'เพิ่มเติม' })
++  fireEvent.click(within(dialog).getByRole('button', { name: 'บัญชีและดูแลข้อมูล' }))
++  expect(navigate).not.toHaveBeenCalled()
++  fireEvent(dialog, new Event('cancel', { cancelable: true }))
++  expect(screen.queryByRole('dialog')).toBeNull()
++})
++it('locks account logout and backup actions when the shared navigation lock is set', () => {
++  const logout = vi.fn(), backup = vi.fn()
++  render(<Account name="session fixture" locked logout={logout} backup={backup} />)
++  for (const button of screen.getAllByRole('button')) { expect(button.hasAttribute('disabled')).toBe(true); fireEvent.click(button) }
++  expect(logout).not.toHaveBeenCalled(); expect(backup).not.toHaveBeenCalled()
++})
+diff --git a/docs/acceptance/phase2-review-20261007.md b/docs/acceptance/phase2-review-20261007.md
+new file mode 100644
+index 0000000..8f12c2c
+--- /dev/null
++++ b/docs/acceptance/phase2-review-20261007.md
+@@ -0,0 +1,151 @@
++# FINNTECH ช่วง 2 — ส่ง review วันที่ 2026-10-07 (Asia/Bangkok)
++
++สถานะ: ทำ UX/navigation ตามขอบเขตช่วง 2 แล้ว รอ independent review ยังไม่เริ่มช่วง 3
++ผลนี้เป็น frontend/UI acceptance ด้วยข้อมูลสังเคราะห์ ไม่ใช่การรับรอง DB/Auth/provider หรือพร้อมเก็บข้อมูลจริง/ออนไลน์
++
++## Baseline และไฟล์ที่เปลี่ยน
++
++Repository เดิม HEAD `bd1ba14a743853b19e0e8c9a3e51a60eed335c16` มี tracked/untracked ของเจ้าของอยู่ก่อน
++เก็บ initial-status.txt/head.txt และ baseline ของห้าไฟล์ก่อนแก้ใน `.phase2-review-20261007.local/before/`
++ชื่อสำเนาลงท้าย `.baseline.txt` จึงไม่เข้า test discovery ไม่ใช้ git diff HEAD เป็น patch ของช่วงนี้
++incremental patch คือ [phase2-review-20261007.patch](phase2-review-20261007.patch)
++
++| ไฟล์ | การเปลี่ยนช่วงนี้ |
++| --- | --- |
++| apps/web/src/tracker/Dashboard.tsx | nav ใหม่ผ่าน guard เดิม, title ตามหน้า, account, native void dialog; retry อยู่ใน dialog ระหว่าง pending |
++| apps/web/src/App.tsx | brand หลัง login ไม่ reload ข้าม guard; อธิบาย hide อย่างตรงขอบเขต |
++| apps/web/src/index.css | responsive nav/dialog, wrapping/min-width:0, target44px/inputมือถือ16px, safe-area และพื้นที่ท้ายหน้า |
++| apps/web/src/presentation.tsx | เพิ่ม icon บัญชีและเพิ่มเติม ใช้ provider/theme/hide เดิม |
++| README.md | แผนที่เมนูและข้อจำกัดบัญชี; ลำดับ prepare ฐานใหม่ก่อนเริ่ม runner |
++| apps/web/src/tracker/TrackerNavigation.tsx (ใหม่) | sidebar7หน้า/mobile4จุด/More พร้อม active และ shared guard |
++| apps/web/src/tracker/ModalDialog.tsx (ใหม่) | native modal, background inert, Tab trap, Escape/close, focus restoration |
++| apps/web/src/tracker/Account.tsx (ใหม่) | authenticated name, logout เดิม, backup ผ่าน guard, ขอบเขตการดูแลข้อมูล |
++| apps/web/src/tracker/Dashboard.navigation.test.tsx (ใหม่) | regression11tests ของทางเข้าใหม่/messages/locks/retry/account |
++| docs/acceptance/phase2-review-20261007.md (ใหม่) | รายงานนี้ |
++
++ไฟล์ใหม่ข้างต้นรวมเต็มใน patch; local logs/screenshots/harness เป็นหลักฐานเสริมที่ ignored ตาม .gitignore เดิม
++ไม่แก้ .gitignore, package.json/lockfile, backend/contracts/schema/migrations, legacy src หรือ ADR ในช่วงนี้
++ไม่มี dependency/commit/push/deploy และไม่ได้เชื่อม DB เจ้าของ ไม่มี reset/delete/volume operation
++
++## ก่อน/หลัง และแผนที่เมนู
++
++ก่อน: sidebar เดียวทุกขนาด ไม่มีหน้าบัญชี ไม่มี bottom nav หรือ keyboard modal ที่ครบ
++หลัง: ตั้งแต่768px ใช้ sidebarเดิมเพิ่มบัญชี ต่ำกว่า768px ใช้ bottom nav4จุด
++
++| Mobile | หน้า/ทางเข้า desktop |
++| --- | --- |
++| ภาพรวม | สินทรัพย์รวม (assets) |
++| รายการ | รายรับรายจ่าย (finance) |
++| พอร์ต | พอร์ตคริปโต (crypto) |
++| เพิ่มเติม | งบประมาณ, สำรองข้อมูล, บัญชีและดูแลข้อมูล, ราคาหุ้นสหรัฐ |
++
++หน้าเริ่มต้นยัง finance หน้ารองทำให้เพิ่มเติมเป็น active และ sheet ระบุหน้าปัจจุบัน
++nav ที่ซ่อนใช้ display:none จึงไม่อยู่ใน keyboard/AX tree ส่วนที่แสดงมี accessible names
++ปุ่มและหัวเรื่องใช้ teal/light/dark เดิม ไม่มี font/chart/dependency ใหม่
++
++ทุก destination รวม account→backup ผ่าน navigate ที่ป้องกัน backupLocked/busy/pending/writing.current/authBusy
++same-page ไม่ล้างข้อความ การเปลี่ยนหน้าจริงล้าง resolved message; sheet close ไม่เปลี่ยน section หรือ pending
++More เปิดดูและปิดได้ระหว่าง lock แต่เลือกปลายทางไม่ได้ logout และ account actions ใช้ lock เดิม
++theme/hide ยัง memory-only ไม่เปลี่ยน request; header brand หลัง login ไม่มี reload link
++ฟอร์ม เดือน พอร์ต และ draft คงพฤติกรรม state เดิม ไม่สร้าง writes ตอน navigation
++ไม่ได้เพิ่ม draft persistence ให้ component ที่เดิม unmount แล้วสูญ draft
++
++void confirmation ใช้ native modal เช่นเดียวกับ sheet ระหว่าง busy/pending ปิดไม่ได้
++ย้าย feedback/retry เดิมเข้า modal เพราะพื้นหลัง native dialog เป็น inert หากยังอยู่นอก dialog จะ retry ด้วย keyboard ไม่ได้
++หลังผลชัดเจน dialog ปิดและคืน focus ให้ opener หรือเนื้อหาหลักเมื่อ opener ถูก disabled/ถอดออก
++request body/idempotency key/send/retry ไม่เปลี่ยน
++
++บัญชีแสดง name จาก session จริงที่ App ส่งให้ ไม่มี email/verification/owner ID แต่งขึ้น
++logout ใช้ callback เดิม ลิงก์ backup ใช้ guard เดิม ไม่มีปุ่ม recovery/change-password/delete
++อธิบาย JSON ไม่รวม login ไม่ใช่ full database backup ไม่เข้ารหัส และรุ่นทดลองยังไม่รับรองข้อมูลจริง
++ค่าการเงินยัง Decimal strings และหน่วยเดิม THB/USDT แยกพอร์ต ราคา/FX stale30s ไม่เปลี่ยน
++long decimal wrap โดยไม่แปลง Number/ตัดตัวเลข N/A ยังใช้เมื่อราคาเก่า ข้อมูลไม่พร้อมไม่เติมยอด0
++
++## Tests และคำสั่ง — ผลสุดท้ายจริง
++
++Logs และ manifests อยู่ใน `.phase2-review-20261007.local/`
++final-results.json เป็นรอบสุดท้าย; batch-results.json เก็บผล batch เดิมก่อน CSS responsive rerun
++
++| คำสั่ง | ผล | Exit code | Log |
++| --- | --- | --- | --- |
++| npm test | 34 files / 313 passed / 0 failed | 0 | final-1.log |
++| npm run build | legacy Vite build ผ่าน | 0 | final-2.log |
++| npm run tracker:typecheck | shared/API/Web ผ่าน | 0 | final-3.log |
++| npm run tracker:test | Finance21 + Contracts13 + API83 + Web67 = 184 passed; cold Vite smoke ผ่านและคืน4175 | 0 | final-4.log |
++| npm run tracker:build | shared/API/Web ผ่าน หลังจำกัด CSS sheet รุ่นสุดท้าย | 0 | tracker-build-sheet-rerun.log |
++| node --no-strip-types scripts/tracker-package-smoke.mjs | compiled package smoke ผ่าน | 0 | final-6.log |
++| git diff --check | tracked diff ผ่าน | 0 | diff-check-final.log |
++| git apply --check --reverse docs/acceptance/phase2-review-20261007.patch | incremental patch ตรง working tree (check เท่านั้น) | 0 | patch-check.log |
++
++11testsใหม่ครอบคลุม4หน้ารอง active state/no-write, validation lifetime/draft/month, finance/cash unknown retries,
++theme/hide กับ payload/key เดิม, void pending retry ใน modal, session name/logout/backup,
++sheet ที่เปิดก่อน lock และ account actions disabled ไม่มี skip หรือลด assertions การเงิน/ownership/idempotency
++
++Attempts แยกจากผลสุดท้าย: focused existing3files23tests exit0; navigation รอบแรก10tests exit0
++จากนั้น web typecheck พบ test ใช้ Testing Library getByRole option `exact` ที่ชนิดนี้ไม่รองรับ (tsc exit2 / npm exit1)
++แก้ test query options แล้ว final typecheck exit0 ไม่ได้แก้ schema/assertion เพื่อกลบปัญหา
++checks ใช้ execution นอก sandbox เพื่อรองรับ Vite/process spawning ตามข้อจำกัดเครื่องเดิม ไม่มี dependency install
++ไม่พบ environment failure ใน final checks; การวัด DOM รอบแรกมีข้อจำกัด evaluate runtime (`parseFloat` unavailable)
++แก้เครื่องมือวัดเป็นอ่าน computed fontSize strings ไม่ใช่ product code bug
++
++## Browser evidence (compiled frontend + synthetic HTTP fixture)
++
++ใช้ Codex in-app browser ที่127.0.0.1:4295 ด้วย `browser-fixture.mjs` ใน local artifacts
++serve apps/web/dist จริง fixtures validate ผ่าน compiled contracts ใช้ memory-only ไม่อ่าน env/credentials/DB
++FX/crypto quotes เก่า60s, ชื่อไทย/decimalยาว, budgetเกิน, stocks NOT_CONFIGURED ไม่มี provider จริง
++หลักฐานไม่มี HAR/raw backup/request body/key/ข้อมูลจริง
++
++`browser/matrix.json` มี70cells = 7หน้า × 5widths × light/dark
++ทุก cell scrollWidth เท่ากับ clientWidth (320pxมี scrollbar จึง clientWidth305px), smallTargets=[]
++mobileมี4ปุ่ม nav desktopมี0 mobilebuttons; visible inputs320/390px computed16px
++mobile footer clearanceประมาณ88px มากกว่า nav70.8px และ CSSเพิ่ม safe-area-inset-bottom
++ภาพเต็มหน้า fixed nav อาจอยู่ตำแหน่ง viewport แรก; ท้ายหน้า/ปุ่มเลื่อนเข้าถึงได้และมีพื้นที่สำรอง
++รอบแรก320px overflow เพราะ body min-width320 รวม scrollbar; เปลี่ยน min-width0 แล้ว rerunครบ70cells
++เก็บ matrix-attempt1.json แยก ไม่อ้างผลรอบนั้นผ่าน
++
++หลัง matrix70cells ตรวจภาพพบว่า mobile nav CSS ใช้กับรายการ sheet ด้วย จึงจำกัด selector ให้เฉพาะ bottom nav
++sheet กลับเป็นแถว13px (เดิม10pxแบบคอลัมน์) ตรวจรุ่นสุดท้าย320/390px × light/dark4cells:
++no overflow, ทุก destination targetสูง44.8px, focusอยู่ปุ่มปิด; sheet-final.json และ sheet-<width>-<theme>.png
++การรัน matrix70cellsซ้ำแบบรวมหลังเปลี่ยน selector ใช้เกิน60sจน browser tool timeout ไม่อ้างรอบที่ไม่จบผ่าน
++matrix.json ใช้รอบ70cellsที่จบก่อนการจำกัด selector นี้; CSSส่วน page/bottom navคงเดิม
++ภาพบางไฟล์ถูกถ่ายซ้ำก่อน timeout ส่วน final sheet/pendingแยกชื่อชัดเจน
++
++ภาพ finance และ account ครบทุกwidth/theme: `browser/<width>-<light|dark>-<finance|account>.png` (20ภาพ)
++ตัวอย่าง [desktop dark account](../../.phase2-review-20261007.local/browser/1280-dark-account.png),
++[desktop light finance](../../.phase2-review-20261007.local/browser/1440-light-finance.png),
++[mobile light account](../../.phase2-review-20261007.local/browser/390-light-account.png),
++[mobile dark finance320](../../.phase2-review-20261007.local/browser/320-dark-finance.png)
++
++ตรวจ keyboard ใน browser จริง ไม่อ้าง happy-dom พิสูจน์ focus trap:
++- More: native background inert; Shift+Tabจาก close→หุ้น, Tabจากหุ้น→close, Escape→focusเพิ่มเติม; keyboard.json
++- More ระหว่าง unknown:4ปลายทาง disabled closeยังได้ Escapeคืนfocus โดย pendingยังอยู่
++- Void idle: Shift+Tabจากclose→กลับ, Tabกลับ→close, Escapeปิดและคืนfocusยกเลิกรายการ
++- Void unknown: Escapeยังเปิด close disabled retryอยู่ในmodalและใช้งานได้; void-keyboard.json
++- Financeและvoid retry ผล fixture writes2 payloadSame=true keySame=true; pending.json/void-pending.json
++
++[pending sheet รุ่นสุดท้าย](../../.phase2-review-20261007.local/browser/pending-sheet-390-light-final.png),
++[pending full page](../../.phase2-review-20261007.local/browser/pending-390-light.png),
++[void unknown](../../.phase2-review-20261007.local/browser/void-pending-390-light.png),
++[loading](../../.phase2-review-20261007.local/browser/loading-390-light.png),
++[unavailable](../../.phase2-review-20261007.local/browser/unavailable-390-light.png)
++loadingแสดงจริงระหว่าง delay2s; unavailable503ไม่เติมยอดและ write controls disabled; successเห็นหลังretry
++console error entries ที่ browser API รายงานระหว่าง flow ตรวจ =0; ไม่ใช่การรับรองว่าไม่มี network failures (fixtureจงใจ503/500)
++final sheet retry: pending-final.json writes2/payloadSame/keySame=true, console-summary-final.json=[]
++stock emptyและstaleแสดงจาก fixtures ตาม behaviorเดิมใน matrix; session-expiredมี coverageเดิม ไม่ทำ browser401ใหม่
++
++## ข้อจำกัด งานค้าง และ gates
++
++- NOT TESTED: physical mobile/iOS safe-area/virtual keyboard, screen reader, OS high contrast, browser enginesอื่น
++- NOT TESTED รอบนี้: PostgreSQL/Authจริง/session expiryในbrowser, real-provider/FX soak, downloadไฟล์จริง/credential scan,
++  full database restore/off-device/scheduler/key custody, configured runner lifecycle และ Nodeขั้นต่ำ22.12
++- UI fixture lifecycle: agentเริ่มเฉพาะ4295 แล้วตรวจ command line/PIDก่อนหยุดและตรวจคืนport ทั้งสองรอบ; lifecycle.json/lifecycle-final.json
++  tracker:test cold Vite4175 start/stopผ่านเอง ไม่อ้างว่า configured DB/Auth runnerผ่านจาก fixture
++- UXbugที่พบ320overflow/mobilemonth14px/sheetตัวอักษรเล็กแก้และตรวจซ้ำแล้ว ไม่พบ UXbugค้างในเคสที่ตรวจ
++- environment limitation: viewport emulationไม่ใช่physical device; ช่วง1 saved-file/real-provider/configured lifecycleยังค้าง
++- owner decision: recovery/storage/provider/online targetตาม decisionsเดิม ไม่ตัดสินใจหรือเปลี่ยน target ในช่วงนี้
++- optional feature: draft persistenceข้าม unmount ยังไม่เพิ่ม (คงเดิม), router/deep-link/search/paginationไม่อยู่scope
++- L1 ยังไม่ครบ runtime/data/restore gates; L2/O1 ยังไม่ผ่าน ไม่เรียกเว็บไซต์ทั้งหมด complete
++- หลัง review ค่อยอนุมัติช่วง3เรื่อง recoveryและแยกพื้นที่จริง/ทดสอบ งานFX instrumentation/saved-file acceptance
++  ยังควรแยกตรวจตามผลช่วง1 ไม่เปลี่ยน stale threshold เพื่อกลบปัญหา
++
++หยุดส่ง review ไม่มีการส่งข้อความไป AI ผู้ตรวจภายนอกหรือเริ่มช่วง3โดยอัตโนมัติ

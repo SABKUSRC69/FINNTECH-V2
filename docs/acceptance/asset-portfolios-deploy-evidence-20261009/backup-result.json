@@ -1,0 +1,25 @@
+{
+  "status": "PASS",
+  "database": "finntech_personal",
+  "role": "personal_app",
+  "encryptedArchiveBytes": 108306,
+  "dumpBytes": 108260,
+  "dumpSha256": "99a95b1802e195f31fd0005474d46fa45e15a46b25f3a9356717334b7d38fe9c",
+  "decryptionRoundTrip": true,
+  "pgRestoreList": true,
+  "fullRestore": "NOT_TESTED",
+  "offDeviceCopy": "NOT_TESTED",
+  "priorMigrations": [
+    "20261001000000_tracker_foundation",
+    "20261001000001_tracker_invariants",
+    "20261001000002_category_type_restrict",
+    "20261004000000_database_auth",
+    "20261004000001_history_corrections",
+    "20261005000000_cash_accounts",
+    "20261007000000_isolated_recovery",
+    "20261008000000_demo_workspaces",
+    "20261008090000_real_runtime_boundary",
+    "20261008100000_owner_deletion"
+  ],
+  "demoUntouched": true
+}

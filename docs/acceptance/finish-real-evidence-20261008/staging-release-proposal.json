@@ -1,0 +1,27 @@
+{
+  "status": "REVIEW_REQUIRED_NOT_DEPLOYED",
+  "sourceSha256": "5428616345ba15f024e78df6c2e0ec5a52a855736622aad164ea6f287483c30d",
+  "image": "sha256:508aed54e722783203199a7bfcec6f93e38c22870ae40b9e1923c2e66bdc04fb",
+  "imageTag": "finntech-real-review:finish-20261008",
+  "resources": {
+    "render": {
+      "proposedName": "finntech-real-staging",
+      "plan": "Free",
+      "actualId": null,
+      "actualOrigin": null
+    },
+    "neon": {
+      "proposedProject": "finntech-real-staging",
+      "proposedDatabase": "finntech_personal",
+      "proposedAppRole": "personal_app",
+      "actualId": null,
+      "actualHost": null
+    }
+  },
+  "registrationsOpen": false,
+  "enrollmentMode": "staging",
+  "allowlist": "PRIVATE_NOT_CONFIGURED",
+  "data": "EMPTY_NEW_REAL_BOUNDARY_ONLY",
+  "approval": "SEPARATE_STAGING_APPROVAL_REQUIRED",
+  "budget": 0
+}

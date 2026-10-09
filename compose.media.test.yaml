@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: finntech_media_test
+      POSTGRES_USER: media_fixture
+      POSTGRES_PASSWORD: ${MEDIA_TEST_PASSWORD:?synthetic local password required}
+    ports:
+      - "127.0.0.1:5449:5432"
+    volumes:
+      - media-test-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U media_fixture -d finntech_media_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+volumes:
+  media-test-data:

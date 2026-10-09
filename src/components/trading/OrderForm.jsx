@@ -6,16 +6,17 @@ import { SPOT_FEE_RATE, validateSpotOrder, isUsablePriceStatus, floorSpotAmount,
 
 export default function OrderForm({
   pair,
+  marketRules = null,
   currentPrice,
   spotBalances = {},
   onSubmitOrder,
   initialSide = 'BUY',
   onOpenDeposit,
-  priceStatus = 'DEMO',
+  priceStatus = 'UNAVAILABLE',
 }) {
   const [side, setSide] = useState(initialSide) // 'BUY' | 'SELL'
   const [orderType, setOrderType] = useState('MARKET') // 'MARKET' | 'LIMIT'
-  const [limitPrice, setLimitPrice] = useState(currentPrice)
+  const [limitPrice, setLimitPrice] = useState(currentPrice ?? '')
   const [cryptoAmount, setCryptoAmount] = useState('')
   const [totalTHB, setTotalTHB] = useState('')
   const [inputMode, setInputMode] = useState('amount')
@@ -26,6 +27,10 @@ export default function OrderForm({
   const amountPrecision = getSpotAmountPrecision(pair)
   const quantityStep = 10 ** -amountPrecision
   const feeRate = SPOT_FEE_RATE
+  const orderRulesVerified = marketRules?.orderRulesVerified === true
+  const orderRulesReason = orderRulesVerified
+    ? ''
+    : marketRules?.orderRulesReason || 'ยังยืนยันกฎ precision/step ของ Bitkub สำหรับคู่นี้ไม่ได้ จึงพักการส่งคำสั่ง PAPER'
   const executionPrice = Number(orderType === 'MARKET' ? currentPrice : limitPrice)
 
   const availableQuote = Number(spotBalances[quoteAsset] || 0)
@@ -35,7 +40,7 @@ export default function OrderForm({
   // Update limitPrice when currentPrice changes if user hasn't typed a custom limit
   useEffect(() => {
     if (orderType === 'MARKET' || !limitPrice) {
-      setLimitPrice(currentPrice)
+      setLimitPrice(currentPrice ?? '')
     }
   }, [currentPrice, orderType])
 
@@ -114,6 +119,10 @@ export default function OrderForm({
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (!orderRulesVerified) {
+      alert(orderRulesReason)
+      return
+    }
     const numCrypto = Number(cryptoAmount)
     const numTotal = executionPrice * numCrypto
 
@@ -140,8 +149,9 @@ export default function OrderForm({
       quoteAsset,
       targetPrice: orderType === 'LIMIT' ? executionPrice : undefined,
       priceStatus,
+      ...(marketRules?.providerSymbol ? { pairRules: marketRules } : {}),
     }
-    const validation = validateSpotOrder(orderPayload)
+    const validation = validateSpotOrder(orderPayload, marketRules)
     if (!validation.success) {
       alert(validation.error)
       return
@@ -244,7 +254,9 @@ export default function OrderForm({
           <button
             type="button"
             onClick={() => setOrderType('LIMIT')}
-            className={`flex-1 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+            disabled={!orderRulesVerified}
+            title={!orderRulesVerified ? orderRulesReason : undefined}
+            className={`flex-1 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
               orderType === 'LIMIT'
                 ? 'bg-slate-200 dark:bg-slate-800 border-slate-400 dark:border-slate-600 text-slate-900 dark:text-white'
                 : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
@@ -255,7 +267,8 @@ export default function OrderForm({
           <button
             type="button"
             onClick={() => setOrderType('MARKET')}
-            disabled={!priceAvailable}
+            disabled={!priceAvailable || !orderRulesVerified}
+            title={!orderRulesVerified ? orderRulesReason : undefined}
             className={`flex-1 py-1.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
               orderType === 'MARKET'
                 ? 'bg-slate-200 dark:bg-slate-800 border-slate-400 dark:border-slate-600 text-slate-900 dark:text-white'
@@ -265,6 +278,11 @@ export default function OrderForm({
             ราคาตลาด (Market)
           </button>
         </div>
+        {!orderRulesVerified && (
+          <p role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">
+            {orderRulesReason}
+          </p>
+        )}
 
         {/* Price Input */}
         <div>
@@ -274,10 +292,10 @@ export default function OrderForm({
           <div className="relative">
             <input
               type="number"
-              step={10 ** -precision}
+              step={pair.priceStep || 10 ** -precision}
               min="0"
               disabled={orderType === 'MARKET'}
-              value={orderType === 'MARKET' ? currentPrice : limitPrice}
+              value={orderType === 'MARKET' ? (currentPrice ?? '') : limitPrice}
               onChange={(e) => setLimitPrice(e.target.value)}
               placeholder="0.00"
               className={`w-full bg-slate-50 dark:bg-[#111622] border rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none transition-all ${
@@ -301,7 +319,7 @@ export default function OrderForm({
             <input
               type="number"
               step={quantityStep}
-              min={pair.minQty}
+              min={pair.minQty ?? quantityStep}
               value={cryptoAmount}
               onChange={(e) => handleAmountChange(e.target.value)}
               placeholder={`0.0000`}
@@ -374,8 +392,9 @@ export default function OrderForm({
         {/* Action Button */}
         <button
           type="submit"
-          disabled={orderType === 'MARKET' && !priceAvailable}
-          className={`w-full py-3 px-4 rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center space-x-2 cursor-pointer active:scale-[0.98] ${
+          disabled={!orderRulesVerified || (orderType === 'MARKET' && !priceAvailable)}
+          title={!orderRulesVerified ? orderRulesReason : undefined}
+          className={`w-full py-3 px-4 rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center space-x-2 cursor-pointer active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed ${
             side === 'BUY'
               ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-emerald-500/20'
               : 'bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-400 hover:to-red-500 text-white shadow-rose-500/20'

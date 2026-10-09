@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80" fill="none">
+  <!-- Original decorative star and stitched heart; no text or controls. -->
+  <path d="m26 9 5 13 14 1-11 10 3 14-12-7-12 7 3-14L5 23l15-1Z" fill="#b9d9ea" stroke="#795044" stroke-width="2"/>
+  <path d="M81 29c-21-20-36 3-9 27l9 8 9-8c27-24 12-47-9-27Z" fill="#f2bdd0" stroke="#795044" stroke-width="2"/>
+  <path d="M80 36c-17-17-26 2-6 20l7 6 7-6c20-18 11-37-8-20Z" stroke="#795044" stroke-dasharray="2 4"/>
+  <circle cx="53" cy="59" r="4" fill="#b9d9ea"/>
+</svg>

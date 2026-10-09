@@ -1,0 +1,591 @@
+{
+  "baseline": "task start 2026-10-09, before this increment; no HEAD comparison",
+  "changed": [
+    {
+      "path": "README.md",
+      "status": "modified",
+      "bytes": 54049,
+      "sha256": "34a9befb4ff5099d834114914b85acdd863990e0427fba2eaaeeb2d8fdb6678a",
+      "baselineSha256": "962cf704e31afecd80eb1aacf57138a530f5bf78eb68e63ecb738db24ead6e74"
+    },
+    {
+      "path": "apps/api/package.json",
+      "status": "modified",
+      "bytes": 1499,
+      "sha256": "1e9d522ed927138f1136ab99879015f2189e7c175dd16d5ece271d9c4cc5576c",
+      "baselineSha256": "509fdedf8ed3728fc8c37407134886051c65c260cafeaa86511bb6046a2175a8"
+    },
+    {
+      "path": "apps/api/prisma/migrations/20261009000003_private_media/migration.sql",
+      "status": "new",
+      "bytes": 7059,
+      "sha256": "5691083f00ad23743211d95ca3a372347258cb32211b649a49048b675285a21c",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/api/prisma/schema.prisma",
+      "status": "modified",
+      "bytes": 23528,
+      "sha256": "897f278130aebb7497bfaccc633f15037f5b09efcc877bf402802fc4efa52305",
+      "baselineSha256": "3057040621f00925559c0c88d32cf3ed6e0d4173e868526c888f5cf8fb85eba5"
+    },
+    {
+      "path": "apps/api/src/app.ts",
+      "status": "modified",
+      "bytes": 11302,
+      "sha256": "c7a0532753e7c076e39e8aa4dcecf8675b957ed433c1f939485d165169674f98",
+      "baselineSha256": "473fc5204ceb637a4a559f4e3b67e6ac6350ca19806a226607392fda1472bbc8"
+    },
+    {
+      "path": "apps/api/src/media/image.ts",
+      "status": "new",
+      "bytes": 2079,
+      "sha256": "c037f3fd180c11c01cb9054f05b563e641e2d5dd745e7a53deee4f02331d137f",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/api/src/media/routes.ts",
+      "status": "new",
+      "bytes": 4482,
+      "sha256": "38f593246f6861dc7fb10eaecb76bbd588723595df57d98bed70f73779e85949",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/api/src/media/store.ts",
+      "status": "new",
+      "bytes": 6323,
+      "sha256": "0db7f72dddd06c79100b157b5d78b3f9cfc1d586a97a7fb0713f3476ac3d34bc",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/api/src/tracker/service.ts",
+      "status": "modified",
+      "bytes": 17931,
+      "sha256": "5aa245ece41b4cd37d0827782eb6ae9b3199448d000a0b5bc846136848d5ec1b",
+      "baselineSha256": "1bd7d9faaf1cd6599fe887a5ce3fc8d7a0b0a6137428722bf7c46fb870236dce"
+    },
+    {
+      "path": "apps/api/src/tracker/stock-ledger.ts",
+      "status": "modified",
+      "bytes": 5683,
+      "sha256": "734b68c607287206348334888722708a038ddb85e9053fa7aa9521048ef588cb",
+      "baselineSha256": "b1f9d1d7885c7132a67f464ef732bc6b1e31f4bfb2934540be7391dba2ec5cc1"
+    },
+    {
+      "path": "apps/api/test/media-image.test.ts",
+      "status": "new",
+      "bytes": 1549,
+      "sha256": "cae96af9885a50c8f9b833f866de61ba1ca205af573146ad4b72603fd02303b3",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/package.json",
+      "status": "modified",
+      "bytes": 922,
+      "sha256": "bc02783d6fd044951a5d0213029769915e610e1c43e4c7ce028d6a832e0bf54f",
+      "baselineSha256": "a6d16f6f3bb59ab8b18e4011020198026e7e34a54f6aa28b0c4a76419b736946"
+    },
+    {
+      "path": "apps/web/public/ocr/CORE-LICENSE.txt",
+      "status": "new",
+      "bytes": 11358,
+      "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/public/ocr/TESSDATA-LICENSE.txt",
+      "status": "new",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/public/ocr/TESSERACT-LICENSE.txt",
+      "status": "new",
+      "bytes": 11357,
+      "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/public/ocr/eng.traineddata",
+      "status": "new",
+      "bytes": 4113088,
+      "sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/public/ocr/provenance.json",
+      "status": "new",
+      "bytes": 2078,
+      "sha256": "ab3349c22d61a64229aa141a081df1f450c5eaa7db72706468760ea106af8640",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/public/ocr/runner.js",
+      "status": "new",
+      "bytes": 805,
+      "sha256": "4a67837552888fd2c4ea65567fce12b670b121ae74094f66e3cda5fab8bb3571",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/public/ocr/tesseract-core-lstm.wasm.js",
+      "status": "new",
+      "bytes": 3896484,
+      "sha256": "eef5f8b2f8e20e150680b20adaec4a60babafee3adbe8a94583c81fee46e8680",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/public/ocr/tesseract-core-relaxedsimd-lstm.wasm.js",
+      "status": "new",
+      "bytes": 3905767,
+      "sha256": "861a536cf9ef8e63cb644d57bab39c388f37f7d6b6f60024b741c5f6b39a59b3",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/public/ocr/tesseract-core-simd-lstm.wasm.js",
+      "status": "new",
+      "bytes": 3899472,
+      "sha256": "c58b46a4c796c0b8afccf77591d5b875b6896b45d402bbce8caa6f5362447b38",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/public/ocr/tesseract.min.js",
+      "status": "new",
+      "bytes": 62961,
+      "sha256": "000c27d9cd0def655f77b36c72a389c0ab13793aa31cb4d7aab56d09c0afbc7e",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/public/ocr/tha.traineddata",
+      "status": "new",
+      "bytes": 1072600,
+      "sha256": "294227cc2d1292b0acb28d61d4115c88252b96d466ca90b417cf4cf0c67bf07c",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/public/ocr/worker.min.js",
+      "status": "new",
+      "bytes": 111307,
+      "sha256": "576b7df7e3393e137e51849357c9adb53fe7ac1bb69bfa06cf3d61520f182c6d",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/src/App.tsx",
+      "status": "modified",
+      "bytes": 22315,
+      "sha256": "270eb6bd698dd8f065522fd60de6465851930c817ef8787f6e7b04814fad2060",
+      "baselineSha256": "6f97a4e4f44465f9b9e4ad1f9835a74930a41072943d1cdd2c17ca1baad900db"
+    },
+    {
+      "path": "apps/web/src/journal.css",
+      "status": "modified",
+      "bytes": 23351,
+      "sha256": "42959252b4debbc8836c8bd2affad227308ad4ebb87a0d140baede693733b046",
+      "baselineSha256": "2d4807391d33cc4327ccecc9c52c1bc23d515fdb1cdc0f524b19615a6419eb54"
+    },
+    {
+      "path": "apps/web/src/media/Attachment.tsx",
+      "status": "new",
+      "bytes": 4243,
+      "sha256": "bbe865ece4dd3bb4d6387f292580fa6b22cde5d63997a1d79bffaf1c93963d1b",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/src/media/ImageEditor.tsx",
+      "status": "new",
+      "bytes": 3839,
+      "sha256": "b9d9a972059253af5e9ad7c6c6678e8a6bc25b7569d8a5cbb0d8476f42a9ff42",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/src/media/Locks.tsx",
+      "status": "new",
+      "bytes": 778,
+      "sha256": "65791a86fdb29d850de4939fbbf492538db6ee43b49ecc4a7dab0fefff0b2d33",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/src/media/MediaNavigation.test.tsx",
+      "status": "new",
+      "bytes": 2181,
+      "sha256": "679a0f7caf36a3dbf439bb7b86d1a16b7b046927475d3df6a0fb97e70164f5f3",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/src/media/Profile.test.tsx",
+      "status": "new",
+      "bytes": 4476,
+      "sha256": "e18711f032d69f2f5430d3b04033421291cf216ac25e37f4203ebadec068b3bd",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/src/media/Profile.tsx",
+      "status": "new",
+      "bytes": 7119,
+      "sha256": "fc55e25d28000545ee05a35e1aff4f207a57637aba6763469ec3a30d6b9918d7",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/src/media/ReceiptAssist.test.tsx",
+      "status": "new",
+      "bytes": 5054,
+      "sha256": "3eb2486d1781b376b9645cf1d17e265c3c1a99d30c8be4f100d90ea084fb1118",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/src/media/ReceiptAssist.tsx",
+      "status": "new",
+      "bytes": 7719,
+      "sha256": "be720d8008945300fbc8909929ff2169581c81b1c721217b0323a47331040cca",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/src/media/extract.test.ts",
+      "status": "new",
+      "bytes": 2726,
+      "sha256": "48415f8aca4a5c5229e05ab8acfb9d1319362010eb96331e0e3792d6f68f2239",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/src/media/extract.ts",
+      "status": "new",
+      "bytes": 6241,
+      "sha256": "00ebd40c379ed7bc59d1cdc243a498af7d1ab52d3ee501c4a5ab39749a73e724",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/src/media/image.ts",
+      "status": "new",
+      "bytes": 2168,
+      "sha256": "6a328b0aa7cff29dba9ec9fc7f99575a1e1aa7bcf0ddad4b9f4900dd4309f2f0",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/src/media/ocr.ts",
+      "status": "new",
+      "bytes": 1354,
+      "sha256": "59eb00b1d01401cbb80e7c253bbf29519c1cd88bc3ea848bc29086fc177bebaa",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/src/media/useMediaWrite.ts",
+      "status": "new",
+      "bytes": 2730,
+      "sha256": "7de51f409cf0d103da771ca9b9a85a302b47957b224189fe4c4c39f75111c623",
+      "baselineSha256": null
+    },
+    {
+      "path": "apps/web/src/tracker/Account.tsx",
+      "status": "modified",
+      "bytes": 7199,
+      "sha256": "629b5919726605687805d55e9aa475f4b5b3989baaa0eae934fb033cd3cda3a5",
+      "baselineSha256": "c5900df7ce7075695a9fd8bd0a54daa12a9b99c8a23e5093124a3e17841da203"
+    },
+    {
+      "path": "apps/web/src/tracker/Dashboard.tsx",
+      "status": "modified",
+      "bytes": 36820,
+      "sha256": "640f10842ba0a52a3ccf5cfe3b3ad5eb3b63b074f566573b17c73e9b13e5d925",
+      "baselineSha256": "f349b25f4c7bb0be2ae1de2a19c91f226f385b61dc9b9758bc20b2eec30d2aa2"
+    },
+    {
+      "path": "apps/web/src/tracker/FinanceHistory.tsx",
+      "status": "modified",
+      "bytes": 3257,
+      "sha256": "65b1cfab52fc6e195fc5bec7b9fff68cc9bc46e2f96513aed0c6b452e0a83d1e",
+      "baselineSha256": "37f943c773436606cd4c668e754e90f12fa87b898646fd46e5d056b453f829f5"
+    },
+    {
+      "path": "apps/web/src/tracker/StockHoldings.tsx",
+      "status": "modified",
+      "bytes": 15150,
+      "sha256": "ac6a91ca7d002a7063dc526ba44344419c1d15777de603c47e5c6f864d68e709",
+      "baselineSha256": "a068296d427d07953ebbede9ffcc6dc91f2ad147c2fd6d77d8be971d20f341ee"
+    },
+    {
+      "path": "apps/web/src/tracker/StockPrices.tsx",
+      "status": "modified",
+      "bytes": 7119,
+      "sha256": "e53d78d8b428c70c9f73eb8eae2ecf41792f1863e0b13fcb4fcb2ea63ff45ec7",
+      "baselineSha256": "cb0b0b36e01766e7edaad64b96f2615599d7f08ab50f572095b962ec528a644f"
+    },
+    {
+      "path": "apps/web/src/tracker/StockUpdates.test.tsx",
+      "status": "modified",
+      "bytes": 6611,
+      "sha256": "e79180f4cd9f116960f8448a48d702dcd9ff78aa63f7cda991b33c985028f27e",
+      "baselineSha256": "53621bc565d252075bdbd38937680ebcaba9639a313fd580a606dd264e80ca24"
+    },
+    {
+      "path": "apps/web/src/tracker/client.ts",
+      "status": "modified",
+      "bytes": 5520,
+      "sha256": "f974f43e02e531c7b6fbbbf762fa33ab11f455d9662e4890aae8938d86fdb760",
+      "baselineSha256": "a109abae067e36dc0e3230456c45a378f8a2cfbbed829bba058003ac2f36bf2b"
+    },
+    {
+      "path": "compose.media.test.yaml",
+      "status": "new",
+      "bytes": 504,
+      "sha256": "00c7e376c64e365f4b55a9b9b2d9f83874f25d8830a64addab90afcaac046415",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/avatar-crop-light-1440.png",
+      "status": "new",
+      "bytes": 270256,
+      "sha256": "2b151d4910b73651dcca5dcb4a335bf08d418f9a6111af1e5714c68cb9aef927",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/avatar-crop-light-320.png",
+      "status": "new",
+      "bytes": 165586,
+      "sha256": "412273b001221c753253864b1009f56836a506962582b57e9b10c5954a33465a",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/avatar-final-viewport.png",
+      "status": "new",
+      "bytes": 90121,
+      "sha256": "bde406cd7c8b102da9989f666ccd5fc8b422efe675afd7caf4c4acca0f2135c9",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/avatar-saved-dark-1440.png",
+      "status": "new",
+      "bytes": 228091,
+      "sha256": "0c6225ae5c81dbf4289676ba9fde4c5f2ecabee18086f0c68fa63f078c7953e0",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/avatar-saved-dark-320.png",
+      "status": "new",
+      "bytes": 147965,
+      "sha256": "82f2526419e71e3bee16902b6ed41dac12213f3d5beca2503a1bdddeba4c3424",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/avatar-saved.png",
+      "status": "new",
+      "bytes": 161222,
+      "sha256": "c99dadc5276bd44d0151fc81c6e1395df87dedfad3ca5576e5aac68e50cf629b",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/english-review-375.png",
+      "status": "new",
+      "bytes": 206916,
+      "sha256": "ae7ad8f1d26d1bdb7f786e2ad7bff6b2a1eb99e756f7d8776f2ea3cc45e65d3e",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/finance-dark-1024.png",
+      "status": "new",
+      "bytes": 327217,
+      "sha256": "54a206e96c4b76617a3d39e2e4ee3d4567dd08f881131372727e7d4b250d0f24",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/finance-dark-1440.png",
+      "status": "new",
+      "bytes": 362448,
+      "sha256": "4b50d3327796d9c9cb7b6e50aa0b0e038c20cb971e7f1613f7acde58f90c5d6a",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/finance-dark-320.png",
+      "status": "new",
+      "bytes": 206225,
+      "sha256": "abae689279205f8c1f951f3a29d1b0343e384f354a9ae8527ebe4e6442410128",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/finance-dark-375.png",
+      "status": "new",
+      "bytes": 219036,
+      "sha256": "ec7c2888b7070831eda78523d87bd783b1338823768e2a804db37d5445bacc3e",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/finance-dark-768.png",
+      "status": "new",
+      "bytes": 288630,
+      "sha256": "7b62409489cf1d74553ae3655036ddb77087dd5c4e8f827cc88ac27d3cce2f37",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/finance-light-1024.png",
+      "status": "new",
+      "bytes": 235718,
+      "sha256": "1474e6a87b2c409d549dcbe4758e8cf027e4e7e60a226528738d37a80a989a1f",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/finance-light-1440.png",
+      "status": "new",
+      "bytes": 252446,
+      "sha256": "b335b57ba414eb67d33b403217988dab122378a407a3feb68cf4e5abcbb44830",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/finance-light-320.png",
+      "status": "new",
+      "bytes": 143176,
+      "sha256": "4bc41031dacfb6288f944f6886a592a2e98cdc174420ffaa3bed3303c0fcc3f0",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/finance-light-375.png",
+      "status": "new",
+      "bytes": 151801,
+      "sha256": "47c21998cdc646015dcd38a597e92916d5ef077029ace401e7a63d3c9619937f",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/finance-light-768.png",
+      "status": "new",
+      "bytes": 204920,
+      "sha256": "f7f9540b9c0de0fbbb49b7d62a1c432807786ea6cb908db71faddc87ed67e09a",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/receipt-modal.png",
+      "status": "new",
+      "bytes": 39810,
+      "sha256": "a8ba39cdb2a7d3c9ddb9aa1407e5c8a790cb27714dfd490001b2c8dbd05306a5",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/thai-review-dark-375.png",
+      "status": "new",
+      "bytes": 215035,
+      "sha256": "78627cd333dcb3ea1eb1b94d594e45e15470eb01b0479e1df9a39db0df2fa5da",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-evidence-20261009/thai-review.png",
+      "status": "new",
+      "bytes": 247652,
+      "sha256": "aba99c2acf72f4c49d9b647cdc2f451f2c9f4dd83ec3e693e354751a9d8cb176",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-review-20261009.md",
+      "status": "new",
+      "bytes": 8761,
+      "sha256": "505d25caf9ecb04061f75cf6babd17af477f202cebb2c6da88cf6faa1c6ba48c",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/acceptance/media-review-measurements.json",
+      "status": "new",
+      "bytes": 7113,
+      "sha256": "32b090e54c49229e2692765c4ee5d248900a99e6d6f7ddf0e98653d2fcce2ff0",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/operations/finish-real-operator-runbook.md",
+      "status": "modified",
+      "bytes": 12747,
+      "sha256": "4b076ef34711983db7bbe935a13eb55b90d0d3f054951651b9ba2786165f3736",
+      "baselineSha256": "ec93b309d8f73e94f0f3e6146573b92bcf15251ff95c0a1faaa617f6e49c7033"
+    },
+    {
+      "path": "docs/operations/private-media.md",
+      "status": "new",
+      "bytes": 12801,
+      "sha256": "69a4cfd2236060889c081b03057ceb670bc1f94c9c736c73149a964ae2662847",
+      "baselineSha256": null
+    },
+    {
+      "path": "docs/operations/real-use-backup.md",
+      "status": "modified",
+      "bytes": 11778,
+      "sha256": "c2d6248fe17c38a222d6f8741a5909f076f28a083fbe65415f560dc8aeec9cad",
+      "baselineSha256": "61452dd0e4f400a8953f20f212fcc289aa626e226e37b126342bfd37fbb18516"
+    },
+    {
+      "path": "package-lock.json",
+      "status": "modified",
+      "bytes": 300738,
+      "sha256": "f42781d3dcb648f6be711cc432a403df560bc205e2a875ae96a39888e68ccf68",
+      "baselineSha256": "18426118f9c81c3f4ee48630a8e7b49a7f839a49670672dc8c6b05c6f0173f89"
+    },
+    {
+      "path": "packages/contracts/src/index.ts",
+      "status": "modified",
+      "bytes": 20176,
+      "sha256": "7e296e396fa897982631989730db1d7fdbf47cacf77258d1dbd11dbd6b8eaa1b",
+      "baselineSha256": "f5d12a91c56bc40065b3e19497475270c402019efc0e3c78d78bc6f8c6f5e416"
+    },
+    {
+      "path": "scripts/beta-runtime-dependencies.mjs",
+      "status": "modified",
+      "bytes": 2812,
+      "sha256": "f763d61dc6e026092b4222c65af0e9e3af0c40122248bb9a57968b31d358f029",
+      "baselineSha256": "6f9e96d54d0ce34274da04acf7cf420daa5914fd9c01e1e3073ea303b59417d4"
+    },
+    {
+      "path": "scripts/media-lifecycle-smoke.mjs",
+      "status": "new",
+      "bytes": 7798,
+      "sha256": "c1d56540a90caac4a111c8706b2fa9627baef8c54b1df556bb0d1f53cec5092f",
+      "baselineSha256": null
+    },
+    {
+      "path": "scripts/media-local-preview.mjs",
+      "status": "new",
+      "bytes": 1117,
+      "sha256": "fe2255cd4e66a663c1b82a0f73fcab857bfdf96dcaf8f8845dfa7c73c2916da3",
+      "baselineSha256": null
+    },
+    {
+      "path": "scripts/media-ocr-smoke.mjs",
+      "status": "new",
+      "bytes": 1611,
+      "sha256": "864ff400371ebe90bc38d3484293df819ba2d192fad35fc7bbc2ec6d06c4f549",
+      "baselineSha256": null
+    },
+    {
+      "path": "scripts/media-review-package.mjs",
+      "status": "new",
+      "bytes": 4650,
+      "sha256": "23df3a7bce67a88dead7316508871a6e9a0feafb083f25e820f5545f74a3500d",
+      "baselineSha256": null
+    },
+    {
+      "path": "scripts/media-review-setup.mjs",
+      "status": "new",
+      "bytes": 1728,
+      "sha256": "788eb49d417c8ea92413ab5a52c44163a009604d03373a2794958b2fc2a6a8aa",
+      "baselineSha256": null
+    },
+    {
+      "path": "scripts/media-runtime-smoke.mjs",
+      "status": "new",
+      "bytes": 13520,
+      "sha256": "dcc72a49cbf8f08dc8036dd8b3683806557c27e01c360c4449c84822d362d345",
+      "baselineSha256": null
+    },
+    {
+      "path": "scripts/prepare-ocr-assets.mjs",
+      "status": "new",
+      "bytes": 2572,
+      "sha256": "7c773d8a50aa569a870ee757ca86c870bb810ad1b54b94afaef5ab6a64323bc7",
+      "baselineSha256": null
+    },
+    {
+      "path": "scripts/sql/real-restore-evidence.sql",
+      "status": "modified",
+      "bytes": 8017,
+      "sha256": "4837cbd90573d05e4c206234175ff4807dcfd42f9948aaa600872085972755df",
+      "baselineSha256": "5986332067eed51fe9605b2f24f329b63b8c580c812fa85e7723f1d8ecea333b"
+    }
+  ],
+  "deliveryArtifacts": [
+    "media-review-changed-files.json",
+    "media-review-artifacts.json",
+    "media-review-20261009.patch"
+  ]
+}

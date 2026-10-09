@@ -1,0 +1,1 @@
+PASS: synthetic scheduled trigger and cross-process overlap mutex; no backup activated

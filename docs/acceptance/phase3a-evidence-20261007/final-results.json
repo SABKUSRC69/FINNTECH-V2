@@ -1,0 +1,176 @@
+{
+  "scope": "synthetic-only; default recovery off",
+  "commands": [
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "files": 37,
+      "passed": 322,
+      "failed": 0,
+      "log": "root-tests-final.log"
+    },
+    {
+      "name": "build",
+      "command": "npm run build",
+      "exitCode": 0,
+      "started": "2026-10-07T17:35:18.2243480+07:00",
+      "ended": "2026-10-07T17:35:30.2715546+07:00"
+    },
+    {
+      "name": "tracker-typecheck",
+      "command": "npm run tracker:typecheck",
+      "exitCode": 0,
+      "started": "2026-10-07T17:35:30.3879837+07:00",
+      "ended": "2026-10-07T17:35:46.9616984+07:00"
+    },
+    {
+      "name": "tracker-test",
+      "command": "npm run tracker:test",
+      "exitCode": 0,
+      "started": "2026-10-07T17:35:47.0083914+07:00",
+      "ended": "2026-10-07T17:36:05.0019700+07:00"
+    },
+    {
+      "name": "tracker-build",
+      "command": "npm run tracker:build",
+      "exitCode": 0,
+      "started": "2026-10-07T17:36:05.0059789+07:00",
+      "ended": "2026-10-07T17:36:19.5254192+07:00"
+    },
+    {
+      "name": "package-smoke",
+      "command": "node --no-strip-types scripts/tracker-package-smoke.mjs",
+      "exitCode": 0,
+      "started": "2026-10-07T17:36:19.5298029+07:00",
+      "ended": "2026-10-07T17:36:19.6562212+07:00"
+    },
+    {
+      "name": "prisma-validate",
+      "command": "npm run tracker:db:validate",
+      "exitCode": 0,
+      "started": "2026-10-07T17:36:19.6583294+07:00",
+      "ended": "2026-10-07T17:36:21.6503290+07:00"
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "exitCode": 0,
+      "started": "2026-10-07T17:36:21.6525425+07:00",
+      "ended": "2026-10-07T17:36:21.7703480+07:00"
+    },
+    {
+      "command": "npm --workspace apps/api run typecheck",
+      "exitCode": 0,
+      "log": "api-typecheck-final.log"
+    },
+    {
+      "command": "node --no-strip-types --import tsx --env-file=.phase3a-20261007.local/runtime.env --test apps/api/db-test/recovery.integration.ts",
+      "exitCode": 0,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "log": "integration-final.log"
+    },
+    {
+      "command": "node --no-strip-types --import tsx --env-file=.phase3a-20261007.local/runtime.env --test apps/api/db-test/recovery-rate.integration.ts",
+      "exitCode": 0,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "log": "rate-final.log"
+    },
+    {
+      "command": "node --no-strip-types --env-file=.phase3a-20261007.local/runtime.env scripts/recovery-3a-prepare.mjs (nonempty target)",
+      "exitCode": 2,
+      "expected": "refused without mutation",
+      "log": "nonempty-target-guard.log"
+    }
+  ],
+  "attempts": [
+    {
+      "name": "initial typecheck",
+      "exitCode": 2,
+      "cause": "exactOptional and test typing; fixed"
+    },
+    {
+      "name": "PG attempt 1",
+      "exitCode": 1,
+      "passed": 6,
+      "failed": 5,
+      "cause": "harness signin rate / fixed-minute boundary; preserved policy"
+    },
+    {
+      "name": "PG attempt 2",
+      "exitCode": 0,
+      "passed": 11
+    },
+    {
+      "name": "PG attempt 3",
+      "exitCode": 0,
+      "passed": 13
+    },
+    {
+      "name": "PG attempt 4",
+      "exitCode": 0,
+      "passed": 13
+    },
+    {
+      "name": "PG attempt 5",
+      "exitCode": 1,
+      "passed": 13,
+      "failed": 1,
+      "cause": "harness ephemeral authority rejected"
+    },
+    {
+      "name": "PG attempt 6",
+      "exitCode": 1,
+      "passed": 12,
+      "failed": 2,
+      "cause": "harness headers vs complete body and unflushed notice job"
+    },
+    {
+      "name": "PG final attempt 7",
+      "exitCode": 0,
+      "passed": 14,
+      "failed": 0
+    },
+    {
+      "name": "peer rate final",
+      "exitCode": 0,
+      "passed": 1,
+      "failed": 0
+    }
+  ],
+  "extraDiagnostic": {
+    "command": "git -c core.autocrlf=false diff --check",
+    "exitCode": 1,
+    "cause": "CRLF in owner legacy files outside phase patch: PriceAlertModal.jsx:201 and tradingData.js:130; preserved"
+  },
+  "evidenceAudit": {
+    "generatedSecretMatches": 0,
+    "privateFilesIncluded": false
+  },
+  "environment": {
+    "initialDockerDaemonUnavailable": true,
+    "resolvedUsingAlreadyInstalledDockerDesktop": true,
+    "installedOrPulledDependencies": false
+  },
+  "trackerTests": {
+    "finance": 21,
+    "contracts": 13,
+    "api": 85,
+    "web": 74,
+    "total": 193
+  },
+  "browser": {
+    "cases": 40,
+    "overflow": 0,
+    "credentialEntry": false
+  },
+  "patch": {
+    "reverseApplyCheckExit": 0,
+    "addedTrailingWhitespaceLines": 0,
+    "includesBinaryScreenshots": true,
+    "changedFiles": 64
+  }
+}

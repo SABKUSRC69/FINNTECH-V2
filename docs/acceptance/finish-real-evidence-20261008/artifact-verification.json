@@ -1,0 +1,23 @@
+{
+  "incrementalAgainstCapturedWorkingTree": true,
+  "baselineFiles": 418,
+  "knownSyntheticSecretsFound": 0,
+  "privateEnvKeyOrBackupPathsFound": 0,
+  "reverseApplyCheck": "PASS",
+  "rootPackageJsonAndLockPreserved": true,
+  "existingLegacySrcPreserved": true,
+  "noCommitPushDeploy": true,
+  "cleanup": {
+    "syntheticContainers": "STOPPED",
+    "fixtureVolumes": "RETAINED",
+    "ports4199_5446_5447": "NO_LISTENERS",
+    "temporaryScheduledTasks": 0,
+    "dockerDesktop": "LEFT_RUNNING_SHARED_DAEMON"
+  },
+  "limitations": [
+    "No universal secret-detection guarantee",
+    "Actual provider logs not available"
+  ],
+  "evidenceWhitespace": "Trailing spaces and empty EOF lines normalized; original logs retained privately",
+  "forwardApplyCheckAgainstIsolatedBaseline": "PASS"
+}

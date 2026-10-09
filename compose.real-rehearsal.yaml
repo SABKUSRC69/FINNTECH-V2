@@ -1,0 +1,59 @@
+name: finntech-real-rehearsal-20261008
+services:
+  postgres-real-rehearsal:
+    image: postgres:18-alpine
+    pull_policy: never
+    environment:
+      POSTGRES_DB: finntech_real_rehearsal
+      POSTGRES_USER: real_rehearsal
+      POSTGRES_PASSWORD: ${REAL_REHEARSAL_PASSWORD:?synthetic password required}
+    ports:
+      - "127.0.0.1:5444:5432"
+    volumes:
+      - real_rehearsal_20261008:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U real_rehearsal -d finntech_real_rehearsal"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+  postgres-real-restore:
+    image: postgres:18-alpine
+    pull_policy: never
+    network_mode: none
+    environment:
+      POSTGRES_DB: finntech_real_restore
+      POSTGRES_USER: real_restore
+      POSTGRES_PASSWORD: ${REAL_RESTORE_PASSWORD:?synthetic password required}
+    volumes:
+      - real_restore_20261008:/var/lib/postgresql
+  postgres-real-restore-verified:
+    image: postgres:18-alpine
+    pull_policy: never
+    network_mode: none
+    environment:
+      POSTGRES_DB: finntech_real_restore_verified
+      POSTGRES_USER: real_restore
+      POSTGRES_PASSWORD: ${REAL_RESTORE_PASSWORD:?synthetic password required}
+    volumes:
+      - real_restore_verified_20261008:/var/lib/postgresql
+  postgres-real-fresh-schema:
+    image: postgres:18-alpine
+    pull_policy: never
+    environment:
+      POSTGRES_DB: finntech_real_fresh_schema
+      POSTGRES_USER: real_rehearsal
+      POSTGRES_PASSWORD: ${REAL_REHEARSAL_PASSWORD:?synthetic password required}
+    ports:
+      - "127.0.0.1:5445:5432"
+    volumes:
+      - real_fresh_schema_20261008:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U real_rehearsal -d finntech_real_fresh_schema"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+volumes:
+  real_fresh_schema_20261008:
+  real_restore_verified_20261008:
+  real_rehearsal_20261008:
+  real_restore_20261008:

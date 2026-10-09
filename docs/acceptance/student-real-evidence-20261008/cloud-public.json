@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "origin": "https://finntech-personal.onrender.com",
+  "cases": [
+    {
+      "case": "Public signup outside former allowlist creates a distinct genuine account, emailVerified=false, empty THB/USDT/cash dataset",
+      "status": "PASS"
+    },
+    {
+      "case": "Public login/logout persists owner mapping; unavailable recovery endpoint remains absent",
+      "status": "PASS"
+    }
+  ]
+}

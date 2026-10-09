@@ -1,0 +1,17 @@
+[
+  {
+    "command": "node --check design/previews/preview.js",
+    "exitCode": 0,
+    "output": ""
+  },
+  {
+    "command": "node --check scripts/design-preview-server.mjs",
+    "exitCode": 0,
+    "output": ""
+  },
+  {
+    "command": "git diff --check",
+    "exitCode": 0,
+    "output": ""
+  }
+]

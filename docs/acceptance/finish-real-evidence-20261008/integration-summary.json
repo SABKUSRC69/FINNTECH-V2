@@ -1,0 +1,42 @@
+{
+  "syntheticOnly": true,
+  "externalMail": "NOT TESTED",
+  "cases": [
+    "isolated boundary",
+    "verified empty accounts",
+    "scanner/expiry/replay",
+    "Decimal ownership/retry",
+    "JSON restore",
+    "logout/restart persistence",
+    "enumeration",
+    "rollback",
+    "HTTP/WS revocation",
+    "session expiry",
+    "durable provider retry",
+    "lost-response deduplication",
+    "bounded limits"
+  ],
+  "websocketRevocationMs": {
+    "market": 4980,
+    "stocks": 4980
+  },
+  "fullRestore": {
+    "status": "PASS",
+    "syntheticOnly": true,
+    "allPublicTablesAndConstraintsMatched": true,
+    "tableCount": 30,
+    "evidenceSha256": "07058eb83cd5ee78d45507fee65495121121fde6b2393fb6392eaf32471e618f",
+    "restoreMs": 9973,
+    "machineLoss": "NOT_TESTED",
+    "actualDrive": "NOT_TESTED"
+  },
+  "deletion": {
+    "status": "PASS",
+    "ownerReauth": true,
+    "pendingWriteLock": true,
+    "scopeRollback": true,
+    "otherOwnerUnchanged": true,
+    "oldBackupReplay": true,
+    "actualDrive": "NOT_TESTED"
+  }
+}

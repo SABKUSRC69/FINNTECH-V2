@@ -21,16 +21,18 @@ import { formatCurrency, formatPercent, formatNumber } from '../../utils/formatt
 import {
   calculatePortfolioValuation,
   calculateSpotWalletValuation,
-  getDemoSpotPriceTHB,
+  getMarketSpotPriceTHB,
 } from '../../utils/assetValuation'
 
 export default function PortfolioView({
   portfolio = [],
   onAddAsset,
+  onUpdateAsset,
   onDeleteAsset,
   onClearAllPortfolio,
   spotBalances = {},
   openOrders = [],
+  marketSnapshot,
 }) {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const viewTab = 'holdings'
@@ -43,15 +45,18 @@ export default function PortfolioView({
   const [avgBuyPrice, setAvgBuyPrice] = useState('')
   const [currentPrice, setCurrentPrice] = useState('')
   const [currency, setCurrency] = useState('THB')
+  const [formError, setFormError] = useState('')
+  const [currencyTarget, setCurrencyTarget] = useState(null)
+  const [assignedCurrency, setAssignedCurrency] = useState('')
 
-  const portfolioValuation = calculatePortfolioValuation(portfolio)
+  const portfolioValuation = calculatePortfolioValuation(portfolio, marketSnapshot)
   const liveHoldings = portfolioValuation.assets.map((item) => {
     const valuation = item.valuation
     return {
       ...item,
       livePrice: valuation.unitPrice,
       currency: valuation.currency,
-      isDemo: valuation.priceSource === 'DEMO',
+      isLive: valuation.priceSource === 'LIVE',
       feed: valuation.priceSourceText,
       flash: 'none',
       currentValue: valuation.currentValueTHB,
@@ -65,7 +70,7 @@ export default function PortfolioView({
   const holdingsProfitLoss = portfolioValuation.profitLossTHB
   const holdingsProfitLossPercent = portfolioValuation.profitLossPercent
 
-  const spotValuation = calculateSpotWalletValuation(spotBalances, openOrders)
+  const spotValuation = calculateSpotWalletValuation(spotBalances, openOrders, marketSnapshot)
   const spotWalletRows = spotValuation.rows
   const spotAvailableValue = spotValuation.availableValueTHB
   const spotLockedValue = spotValuation.lockedValueTHB
@@ -77,6 +82,12 @@ export default function PortfolioView({
   const displayTHB = (value) => value === null || !Number.isFinite(value)
     ? 'N/A'
     : formatCurrency(value, false)
+  const btcThb = getMarketSpotPriceTHB('BTC', marketSnapshot)
+  const usdtThb = getMarketSpotPriceTHB('USDT', marketSnapshot)
+  const btcFeedStatus = marketSnapshot?.symbolStatuses?.['BTC/THB']
+  const marketTime = btcFeedStatus?.lastUpdated
+    ? `${btcFeedStatus.timestampType === 'provider' ? 'provider time' : 'รับข้อมูล'} ${new Date(btcFeedStatus.lastUpdated).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })} ICT`
+    : 'ไม่มีเวลาอัปเดต'
 
   // Chart data
   const chartData = holdingsValue === null ? [] : liveHoldings.map((item) => ({
@@ -87,8 +98,34 @@ export default function PortfolioView({
 
   const handleAddSubmit = (e) => {
     e.preventDefault()
-    if (!name || !shares || !avgBuyPrice || !currentPrice) {
-      alert('กรุณากรอกข้อมูลสินทรัพย์ให้ครบถ้วน')
+    const cleanName = name.trim()
+    const parseFiniteInput = (value) => {
+      if (typeof value !== 'string' || value.trim() === '') return null
+      const parsed = Number(value)
+      return Number.isFinite(parsed) ? parsed : null
+    }
+    const parsedShares = parseFiniteInput(shares)
+    const parsedAvgBuyPrice = parseFiniteInput(avgBuyPrice)
+    const parsedCurrentPrice = parseFiniteInput(currentPrice)
+
+    if (!cleanName) {
+      setFormError('ตรวจข้อมูลที่กรอก: กรุณาระบุชื่อสินทรัพย์หลังตัดช่องว่าง')
+      return
+    }
+    if (parsedShares === null || parsedShares <= 0) {
+      setFormError('ตรวจข้อมูลที่กรอก: จำนวนหน่วยต้องเป็นตัวเลข finite ที่มากกว่า 0')
+      return
+    }
+    if (parsedAvgBuyPrice === null || parsedAvgBuyPrice < 0) {
+      setFormError('ตรวจข้อมูลที่กรอก: ต้นทุนเฉลี่ยต้องเป็นตัวเลข finite ที่ไม่ติดลบ')
+      return
+    }
+    if (parsedCurrentPrice === null || parsedCurrentPrice < 0) {
+      setFormError('ตรวจข้อมูลที่กรอก: ราคาปัจจุบันต้องเป็นตัวเลข finite ที่ไม่ติดลบ')
+      return
+    }
+    if (!['THB', 'USD', 'EUR', 'USDT'].includes(currency)) {
+      setFormError('ตรวจข้อมูลที่กรอก: กรุณาระบุสกุลเงินของสินทรัพย์')
       return
     }
 
@@ -110,18 +147,19 @@ export default function PortfolioView({
 
     const newAsset = {
       id: 'port-' + Date.now(),
-      name: name.trim(),
-      symbol: (symbol.trim() || name.trim()).toUpperCase(),
+      name: cleanName,
+      symbol: (symbol.trim() || cleanName).toUpperCase(),
       type,
       typeName: typeNames[type] || 'สินทรัพย์',
-      shares: parseFloat(shares),
-      avgBuyPrice: parseFloat(avgBuyPrice),
-      currentPrice: parseFloat(currentPrice),
+      shares: parsedShares,
+      avgBuyPrice: parsedAvgBuyPrice,
+      currentPrice: parsedCurrentPrice,
       currency,
       color: colors[type] || '#8b5cf6',
     }
 
     onAddAsset(newAsset)
+    setFormError('')
     setName('')
     setSymbol('')
     setShares('')
@@ -129,6 +167,14 @@ export default function PortfolioView({
     setCurrentPrice('')
     setCurrency('THB')
     setIsAddModalOpen(false)
+  }
+
+  const handleAssignLegacyCurrency = (e) => {
+    e.preventDefault()
+    if (!currencyTarget || !['THB', 'USD', 'EUR', 'USDT'].includes(assignedCurrency)) return
+    onUpdateAsset?.({ ...currencyTarget, currency: assignedCurrency })
+    setCurrencyTarget(null)
+    setAssignedCurrency('')
   }
 
   return (
@@ -144,11 +190,11 @@ export default function PortfolioView({
             </h1>
             <span className="flex items-center space-x-1 px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[11px] font-mono font-medium">
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-              <span>DEMO</span>
+            <span>PAPER</span>
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            สรุปสินทรัพย์ที่บันทึกและ Spot Wallet จากราคาอ้างอิง DEMO
+            สรุปสินทรัพย์ที่บันทึกและ Spot Wallet; คำสั่งซื้อขายจำลอง
           </p>
         </div>
 
@@ -178,23 +224,23 @@ export default function PortfolioView({
         </div>
       </div>
 
-      {/* DEMO reference prices */}
+      {/* Verified public market references; wallet transactions remain paper/demo. */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 text-xs font-mono">
         <div className="flex flex-wrap items-center gap-2.5">
           <span className="text-slate-500 dark:text-slate-400 flex items-center space-x-1 text-[11px]">
             <Activity className="w-3 h-3 text-cyan-400" />
-            <span>ราคาอ้างอิง DEMO:</span>
+            <span>ราคาอ้างอิง Bitkub:</span>
           </span>
           <span className="text-slate-700 dark:text-slate-300">
-            BTC/THB: <strong className="text-amber-400 font-medium">฿{formatNumber(getDemoSpotPriceTHB('BTC') || 0, 2)}</strong>
+            BTC/THB: <strong className="text-cyan-400 font-medium">{btcThb === null ? 'ยังไม่มีข้อมูล' : `฿${formatNumber(btcThb, 2)}`}</strong>
           </span>
           <span className="text-slate-500">•</span>
           <span className="text-slate-700 dark:text-slate-300">
-            USDT/THB: <strong className="text-amber-400 font-medium">฿{formatNumber(getDemoSpotPriceTHB('USDT') || 0, 2)}</strong>
+            USDT/THB: <strong className="text-cyan-400 font-medium">{usdtThb === null ? 'ยังไม่มีข้อมูล' : `฿${formatNumber(usdtThb, 2)}`}</strong>
           </span>
         </div>
         <div className="text-[11px] text-cyan-400 font-mono">
-          ไม่ใช่ราคาตลาด LIVE
+          {btcFeedStatus?.status || 'UNAVAILABLE'} • {btcFeedStatus?.source || 'ยังไม่มี Bitkub feed'} • {marketTime} • PAPER / DEMO
         </div>
       </div>
 
@@ -205,7 +251,7 @@ export default function PortfolioView({
           <div className="flex items-center justify-between">
             <div className="text-xs text-slate-400 font-medium">มูลค่าสินทรัพย์สุทธิรวม</div>
             <span className="px-1.5 py-0.2 rounded bg-cyan-500/10 text-cyan-400 text-[10px] font-mono font-medium">
-              DEMO
+              PAPER
             </span>
           </div>
           <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono mt-1">
@@ -236,7 +282,7 @@ export default function PortfolioView({
         {/* Card 3: Spot Wallet including locked balances */}
         <div className="p-4 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-xs text-slate-400 font-medium">Spot Wallet รวมยอดล็อก (DEMO)</div>
+            <div className="text-xs text-slate-400 font-medium">Spot Wallet รวมยอดล็อก (PAPER)</div>
             <div className="text-2xl font-bold text-slate-900 dark:text-white font-mono mt-1">
               {displayTHB(spotWalletValue)}
             </div>
@@ -255,7 +301,7 @@ export default function PortfolioView({
       <section className="rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Spot Wallet (DEMO)</h2>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Spot Wallet (PAPER)</h2>
             <p className="text-[11px] text-slate-500 mt-0.5">ยอดที่ใช้ได้และยอดที่ล็อกใน Limit order แสดงแยกกัน</p>
           </div>
           <div className="text-right text-[11px] font-mono text-slate-400">
@@ -273,7 +319,7 @@ export default function PortfolioView({
                   <th className="text-right px-4 py-2.5">ใช้ได้</th>
                   <th className="text-right px-4 py-2.5">ล็อก</th>
                   <th className="text-right px-4 py-2.5">รวม</th>
-                  <th className="text-right px-4 py-2.5">มูลค่า THB DEMO</th>
+                  <th className="text-right px-4 py-2.5">มูลค่าอ้างอิง THB</th>
                 </tr>
               </thead>
               <tbody>
@@ -303,7 +349,7 @@ export default function PortfolioView({
               ยังไม่มีสินทรัพย์ในพอร์ตโฟลิโอ
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto leading-relaxed">
-              เพิ่มสินทรัพย์ที่ต้องการบันทึกด้วยตนเอง มูลค่าอ้างอิงจากราคา DEMO เฉพาะคู่ Spot ที่รองรับ
+              เพิ่มสินทรัพย์ด้วยสกุลเงินให้ครบ; คริปโตคู่ THB ใช้ราคา Bitkub เมื่อข้อมูล LIVE เท่านั้น
             </p>
             <button
               onClick={() => setIsAddModalOpen(true)}
@@ -379,7 +425,7 @@ export default function PortfolioView({
               <h3 className="font-semibold text-slate-900 dark:text-white text-xs flex items-center space-x-2">
                 <span>รายการสินทรัพย์</span>
                 <span className="text-[10px] text-emerald-400 font-mono font-medium bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
-                  ราคาอ้างอิง DEMO / ผู้ใช้กรอก
+                  ราคา Bitkub เมื่อ feed ระบุ LIVE / ผู้ใช้กรอก
                 </span>
               </h3>
               <span className="text-xs text-slate-400 font-mono">THB</span>
@@ -413,11 +459,28 @@ export default function PortfolioView({
                             <span>•</span>
                             <span>{item.typeName}</span>
                             <span>• {item.currency || 'ไม่ระบุสกุลเงิน'}</span>
-                            {item.isDemo && (
+                            {!item.currency && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const sourceAsset = portfolio.find((asset) => asset.id === item.id)
+                                  if (sourceAsset) {
+                                    setCurrencyTarget(sourceAsset)
+                                    setAssignedCurrency('')
+                                  }
+                                }}
+                                aria-label={`ระบุสกุลเงินให้ ${item.name}`}
+                                className="px-1.5 py-0.5 rounded border border-cyan-500/30 text-cyan-600 dark:text-cyan-300 hover:bg-cyan-500/10"
+                              >
+                                ระบุสกุลเงิน
+                              </button>
+                            )}
+                            {item.isLive && (
                               <span className="px-1.5 py-0.2 rounded bg-cyan-500/15 text-cyan-400 font-bold">
                                 {item.feed}
                               </span>
                             )}
+                            {item.priceSource === 'UNAVAILABLE' && <span className="px-1.5 py-0.2 rounded bg-slate-700 text-slate-300">ราคาไม่พร้อม</span>}
                           </div>
                         </td>
 
@@ -431,7 +494,7 @@ export default function PortfolioView({
 
                         <td className="py-3 px-3 text-right font-semibold text-slate-800 dark:text-slate-200 font-mono">
                           <div className="flex items-center justify-end space-x-1">
-                            {item.isDemo && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />}
+                            {item.isLive && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />}
                             <span>{item.currency && Number.isFinite(item.livePrice) ? `${formatNumber(item.livePrice, 2)} ${item.currency}` : 'N/A'}</span>
                           </div>
                         </td>
@@ -504,12 +567,11 @@ export default function PortfolioView({
 
               <div>
                 <label className="block font-medium text-slate-600 dark:text-slate-400 mb-1">ชื่อสินทรัพย์ *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="เช่น Apple Inc., SET50, ทองคำแท่ง"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  <input
+                    type="text"
+                    placeholder="เช่น Apple Inc., SET50, ทองคำแท่ง"
+                    value={name}
+                    onChange={(e) => { setName(e.target.value); setFormError('') }}
                   className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white focus:outline-none placeholder-slate-500"
                 />
               </div>
@@ -538,7 +600,7 @@ export default function PortfolioView({
                   <option value="EUR">EUR</option>
                   <option value="USDT">USDT</option>
                 </select>
-                <p className="mt-1 text-[10px] text-slate-500">ตอนนี้ประเมินเป็น THB ได้เฉพาะรายการ THB และ Spot DEMO ที่รองรับ</p>
+                <p className="mt-1 text-[10px] text-slate-500">สกุลเงินที่ไม่มีอัตรา Spot/THB LIVE จะแสดง N/A; ราคา crypto ใช้ Bitkub เมื่อ LIVE</p>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
@@ -547,10 +609,9 @@ export default function PortfolioView({
                   <input
                     type="number"
                     step="any"
-                    required
                     placeholder="10"
                     value={shares}
-                    onChange={(e) => setShares(e.target.value)}
+                    onChange={(e) => { setShares(e.target.value); setFormError('') }}
                     className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white focus:outline-none placeholder-slate-500"
                   />
                 </div>
@@ -559,10 +620,9 @@ export default function PortfolioView({
                   <input
                     type="number"
                     step="any"
-                    required
                     placeholder="100"
                     value={avgBuyPrice}
-                    onChange={(e) => setAvgBuyPrice(e.target.value)}
+                    onChange={(e) => { setAvgBuyPrice(e.target.value); setFormError('') }}
                     className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white focus:outline-none placeholder-slate-500"
                   />
                 </div>
@@ -571,14 +631,19 @@ export default function PortfolioView({
                   <input
                     type="number"
                     step="any"
-                    required
                     placeholder="120"
                     value={currentPrice}
-                    onChange={(e) => setCurrentPrice(e.target.value)}
+                    onChange={(e) => { setCurrentPrice(e.target.value); setFormError('') }}
                     className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-white focus:outline-none placeholder-slate-500"
                   />
                 </div>
               </div>
+
+              {formError && (
+                <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[11px] text-rose-600 dark:text-rose-300">
+                  {formError}
+                </p>
+              )}
 
               <div className="pt-2">
                 <button
@@ -591,6 +656,42 @@ export default function PortfolioView({
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {currencyTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="legacy-currency-title"
+            onSubmit={handleAssignLegacyCurrency}
+            className="w-full max-w-sm space-y-4 rounded-2xl border border-slate-700 bg-white p-5 shadow-2xl dark:bg-[#0e131f]"
+          >
+            <div>
+              <h3 id="legacy-currency-title" className="font-semibold text-slate-900 dark:text-white">ระบุสกุลเงินของ {currencyTarget.name}</h3>
+              <p className="mt-1 text-xs text-slate-500">ค่าที่เลือกจะใช้กับต้นทุนและราคาที่บันทึกไว้เดิม ไม่มีการแปลงหรือแก้ยอดให้อัตโนมัติ</p>
+            </div>
+            <label className="block text-xs text-slate-600 dark:text-slate-300" htmlFor="legacy-asset-currency">สกุลเงิน</label>
+            <select
+              id="legacy-asset-currency"
+              aria-label="สกุลเงินที่ต้องการระบุ"
+              required
+              value={assignedCurrency}
+              onChange={(e) => setAssignedCurrency(e.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-slate-50 p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+            >
+              <option value="" disabled>เลือกสกุลเงินด้วยตนเอง</option>
+              <option value="THB">THB</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="USDT">USDT</option>
+            </select>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setCurrencyTarget(null)} className="flex-1 rounded-xl border border-slate-300 py-2 text-xs dark:border-slate-700">ยกเลิก</button>
+              <button type="submit" disabled={!assignedCurrency} className="flex-1 rounded-xl bg-emerald-500 py-2 text-xs font-semibold text-slate-950 disabled:opacity-40">ยืนยันสกุลเงิน</button>
+            </div>
+          </form>
         </div>
       )}
 

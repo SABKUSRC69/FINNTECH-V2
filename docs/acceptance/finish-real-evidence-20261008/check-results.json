@@ -1,0 +1,75 @@
+{
+  "date": "2026-10-08",
+  "timezone": "Asia/Bangkok",
+  "overlappingSuitesMustNotBeAdded": true,
+  "checks": [
+    {
+      "command": "npm run build",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run tracker:build",
+      "exitCode": 0
+    },
+    {
+      "command": "node --no-strip-types scripts/tracker-package-smoke.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    {
+      "command": "npm audit --json",
+      "exitCode": 1
+    },
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "passed": 406
+    },
+    {
+      "command": "npm run tracker:typecheck",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run tracker:test",
+      "exitCode": 0,
+      "passed": 261,
+      "parts": {
+        "finance": 21,
+        "contracts": 13,
+        "api": 124,
+        "web": 103
+      }
+    },
+    {
+      "command": "node --no-strip-types --env-file=.finish-real-20261008.local/rehearsal.env --import tsx --test apps/api/db-test/real-use.integration.ts",
+      "exitCode": 0,
+      "passed": 18,
+      "syntheticOnly": true
+    },
+    {
+      "command": "powershell.exe -NoProfile -NonInteractive -File scripts/finish-scheduler-smoke.ps1",
+      "exitCode": 0
+    },
+    {
+      "command": "docker build -f Dockerfile.real -t finntech-real-review:finish-20261008 .",
+      "exitCode": 0
+    },
+    {
+      "command": "docker run --rm --network none --read-only --mount type=bind,source=<repository>/scripts/tracker-package-smoke.mjs,target=/app/smoke.mjs,readonly --entrypoint node finntech-real-review:finish-20261008 --no-experimental-strip-types /app/smoke.mjs",
+      "exitCode": 0
+    },
+    {
+      "command": "node --no-strip-types scripts/real-private-setup-check.mjs inventory",
+      "exitCode": 1,
+      "status": "BLOCKED: private owner configuration not set"
+    },
+    {
+      "command": "docker compose --env-file .finish-real-20261008.local/rehearsal.env -f compose.finish-real.yaml stop",
+      "exitCode": 0,
+      "volumesRetained": true
+    }
+  ]
+}

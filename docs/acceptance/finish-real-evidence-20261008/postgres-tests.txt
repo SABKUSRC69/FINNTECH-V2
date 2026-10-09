@@ -1,0 +1,27 @@
+✔ real boundary refuses mismatched marker/role and anonymous HTTP/WS APIs (231.3146ms)
+✔ registration stays closed unless explicitly enabled; code gate cannot create a real account (43.1426ms)
+✔ two individual accounts require genuine verification and start empty; no synthetic auto-enrollment or cookies on signup (435.3351ms)
+✔ scanner GET never verifies; tampered/expired/replayed challenges reject without a session (2615.4728ms)
+✔ genuine sessions isolate owners; Decimal ledger write retries keep the same receipt and payload (11591.0033ms)
+✔ THB/USDT remain separate and crypto cost uses exact Decimal strings (173.4483ms)
+✔ JSON attachment is credential-free; preview/consent/idempotent restore remaps only into empty owner (274.713ms)
+✔ logout, browser change and restarted database client retain records and owner mapping (22322.4775ms)
+✔ recovery responses resist enumeration; links and tokens never returned to caller (1051.4242ms)
+✔ atomic failure after password update preserves token, hash, sessions and ledger (123.8912ms)
+Auth warn: details withheld
+✔ concurrent reset consumes once, immediately rejects HTTP/new WS, revokes existing market/stocks WS and preserves data (5214.4398ms)
+✔ expiration rejects sessions without deleting personal records (20.1985ms)
+✔ provider failure/restart retry retains original encrypted envelope/id and first attempt; does not extend challenge life (639.5334ms)
+✔ late/lost provider responses cannot trigger duplicate send beyond provider deduplication lifetime (534.5479ms)
+✔ origin/body limits and account creation ceiling fail closed; rates persist across workers in bounded buckets (61.4182ms)
+✔ storage pause preserves existing receipt reconciliation, rejects new writes, and changes no financial rows (11214.9203ms)
+✔ private staging enrollment blocks nonmembers and removes HTTP/recovery access without touching their data (599.7702ms)
+✔ owner deletion reauth/consent, scoped purge, rollback and restored-old-backup suppression preserve other owners (17051.1337ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 75146.2675

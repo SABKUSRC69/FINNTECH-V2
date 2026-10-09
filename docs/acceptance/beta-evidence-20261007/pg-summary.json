@@ -1,0 +1,14 @@
+{
+  "target": "new synthetic PostgreSQL:5442",
+  "actualPublicHTTPS": "NOT TESTED",
+  "cookieAttributes": "Secure/HttpOnly/SameSite=Lax (local HTTP harness, not TLS transport proof)",
+  "samePayloadKeyReceipt": true,
+  "ownerIsolation": true,
+  "savedBackupSchemaAndCredentialScan": true,
+  "restoreReceiptAfterRuntimeRecreation": true,
+  "invitationRevocationWsMs": {
+    "market": 4980,
+    "stocks": 4980
+  },
+  "actualDatabaseStopRestart": true
+}

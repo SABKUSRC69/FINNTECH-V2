@@ -1,0 +1,510 @@
+{
+  "baselineFiles": 418,
+  "changedFiles": 84,
+  "files": [
+    {
+      "path": "apps/api/db-test/real-use.integration.ts",
+      "status": "modified",
+      "before": "b87d9e0cb2e2584020f73271f1e1fda94991148e461a7da971d1ff254f745d85",
+      "after": "0c50bcdeee8c6a33803101ddfca6d39198ca47bc18b82124fbc2c4af35b683c7"
+    },
+    {
+      "path": "apps/api/prisma/migrations/20261008100000_owner_deletion/migration.sql",
+      "status": "added",
+      "before": null,
+      "after": "97edd1fcf9b4210223c143fb6b00e36ffd6fcf1af50dc727d485260dba64ac81"
+    },
+    {
+      "path": "apps/api/prisma/schema.prisma",
+      "status": "modified",
+      "before": "647ac4b7cb168339ed1246af924d7d574c8788aca55029197685603544c9307f",
+      "after": "2de1497ac9f3df744defcaa6d19750bcd6dab9556957d771be2b01d6e4870818"
+    },
+    {
+      "path": "apps/api/src/app.ts",
+      "status": "modified",
+      "before": "c764ab45cd1f08b4b76e9e594de7d85a2df12ec20f6eaa1050e60d9936d2adf1",
+      "after": "d2437b100e12758777272c15278eff268c81eaab6996b68e8bcb601a08663cc0"
+    },
+    {
+      "path": "apps/api/src/auth/authorization.ts",
+      "status": "modified",
+      "before": "b53cf86bd9a4223040908502af6315a081785b546318e0930201fc3d4fc56c78",
+      "after": "656a7e4b660dcbdb4b2021745b9ad5438e06bccf73ef388e605fb0ace829b490"
+    },
+    {
+      "path": "apps/api/src/auth/config.ts",
+      "status": "modified",
+      "before": "bf02989d65e9bebe2de3dd12efd76ead34fe4ee9c37e80a57ee04e4bb6fdbb2b",
+      "after": "a8cadba32cd622cd9480dcb8a164dbc7a8b32dae1de68c23df55de151a99a5d4"
+    },
+    {
+      "path": "apps/api/src/auth/deletion.ts",
+      "status": "added",
+      "before": null,
+      "after": "1d6538b0a4795da69363f7f9f93b5845e7d7fc21deb3c50bed978f26c1d4d8ed"
+    },
+    {
+      "path": "apps/api/src/auth/delivery.ts",
+      "status": "modified",
+      "before": "8154d5863758dd1a9b9d0035e69145040386844f3d52cc59cc923e430467c9bf",
+      "after": "5a211e630f13de2929ffcbfc01a98a208a365716a69637b29dd772d5d98fbdff"
+    },
+    {
+      "path": "apps/api/src/auth/real.ts",
+      "status": "modified",
+      "before": "2589776287e561790834e63995ee568ff471d26bbdec79af6350586b256c13e5",
+      "after": "618be31f5063ddf7cfe1633bb0ab483593ebb5fefb41f10658f9f6963132b3e9"
+    },
+    {
+      "path": "apps/api/src/auth/recovery.ts",
+      "status": "modified",
+      "before": "32f62daa56622d0054bcabaa0157793ccbcf2d5b8cdc0bb09e6b7834a4f0ea97",
+      "after": "506c3e9799e86510e1531b0670e181862de0e774f73a7597cc476cbc18fb1d0a"
+    },
+    {
+      "path": "apps/api/src/runtime-config.ts",
+      "status": "modified",
+      "before": "7c84c4c3dd337d32762819be2177fcc76e4296d5de062a5338a6ea10a6c4bd2a",
+      "after": "29e0d892eacbf2eafd78a439f727c927bf89177a850470dac515650ebb3c14e7"
+    },
+    {
+      "path": "apps/api/src/tracker/service.ts",
+      "status": "modified",
+      "before": "ef7f64bf61148179296463f08bf6c9a61af89b033f8f07ad82328d66899a2cd7",
+      "after": "1bd7d9faaf1cd6599fe887a5ce3fc8d7a0b0a6137428722bf7c46fb870236dce"
+    },
+    {
+      "path": "apps/api/test/real-config-mail.test.ts",
+      "status": "modified",
+      "before": "5d58c097664dc9e725575dc2e136b02fbceb093eaef34ebd58f58146a0731c08",
+      "after": "40f5990349f93eb43cb377876a7971cdc7857818c60ec4871eb1ed8b0f50dc87"
+    },
+    {
+      "path": "apps/web/src/App.tsx",
+      "status": "modified",
+      "before": "0f7fd44e7daf632ad0bc80e8645910bd077f5cb2febd0039b4d86e32a145f51e",
+      "after": "9511ac68b777f9de5eb9a6a8c67a7e55ef14cd9d845c048de24642cd67ad6e2c"
+    },
+    {
+      "path": "apps/web/src/auth/AccountDeletion.tsx",
+      "status": "added",
+      "before": null,
+      "after": "d3a78887aebac5209e028ffd3958a09b6bc7ed851b61081f301b3fad3bb09ded"
+    },
+    {
+      "path": "apps/web/src/auth/RealUseNotice.tsx",
+      "status": "modified",
+      "before": "6d72d08f9fa10bc9b80b8b1c47441e909191bc98a8fda6758e6a15f5a188900e",
+      "after": "3a9ef76afb12d5a317e73944fa7d9b82a06f89ef03f26646394d5c23860fe181"
+    },
+    {
+      "path": "apps/web/src/auth/client.ts",
+      "status": "modified",
+      "before": "ee1f3bb497f0b4c6664c4a56d1bb591084917f5e74ba9ccb5de9c68922ded07b",
+      "after": "d054fbeeb1630b0ce1fcfd0311a4e2260d3b82be7378ed309f375337a060a04f"
+    },
+    {
+      "path": "apps/web/src/deletion.test.tsx",
+      "status": "added",
+      "before": null,
+      "after": "b45f2599f32f7f29fa6182bb9c5c560a0d58a7294d172dcd75d089affda01b52"
+    },
+    {
+      "path": "apps/web/src/real-use.test.tsx",
+      "status": "modified",
+      "before": "0779f9a3b303021b98fc436e07b2488f44c76e776b1e1cef8dec7153ad67107c",
+      "after": "d1239721ad8e264094dd445e0890b9831968cce8e8ed2614c4c53d0e6ce1b496"
+    },
+    {
+      "path": "apps/web/src/tracker/Account.tsx",
+      "status": "modified",
+      "before": "1962c41e47b2ec9f57df078081172ed66e793bfc72455bfb50eaca4ac6b50087",
+      "after": "11a65b52c6e8a04955675984780e0c233235f51fb136e9c6e21af1cc08c16276"
+    },
+    {
+      "path": "apps/web/src/tracker/Dashboard.tsx",
+      "status": "modified",
+      "before": "4b07546c558584bcd9a56bd98b53ebcad6f679f46415d664f76a68763e3d5cf4",
+      "after": "a2ff253e2a11d4d28fe16ca74f7c73cfbc4efb25ca68c4daaf52536100ef7493"
+    },
+    {
+      "path": "compose.finish-real.yaml",
+      "status": "added",
+      "before": null,
+      "after": "96f1e083b9324c590e7e50e025bfdafa29c2c5c65496361803b622c89edb070f"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/artifact-verification.json",
+      "status": "added",
+      "before": null,
+      "after": "1c34180dda4a400d89b2a8226b9c730b42907e15ec53becb74f98ce577658060"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/audit-assessment.json",
+      "status": "added",
+      "before": null,
+      "after": "02e88370a7286fd75a049ec78ad93ad87bb5add54c7d702848f4fc483be1bf24"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/check-results.json",
+      "status": "added",
+      "before": null,
+      "after": "3890222ecb520f186b6b2b9fc3455557bf4434f7f02a497278a8aaba6efdc421"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/cleanup.txt",
+      "status": "added",
+      "before": null,
+      "after": "3e51d072c56cf49aed5aa4da987250b9645db08c82276e5deef0b20056fd1ea0"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/image-package-smoke.txt",
+      "status": "added",
+      "before": null,
+      "after": "a2aa78902af442873d9e2931cf548b0f15103eaf387ad5afccfffdcdf6251a04"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/image-scan.json",
+      "status": "added",
+      "before": null,
+      "after": "8d94844b7c8a9ea9bd5626bf9878ebf0a972f6ee6d30b812f26591e1c33d8775"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/integration-summary.json",
+      "status": "added",
+      "before": null,
+      "after": "104ba2bbdab2947e53aaa939da8e1957991b921dcd93be7179adeb9fd9e391fa"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/login-390.jpg",
+      "status": "added",
+      "before": null,
+      "after": "c3b1a7903acea6c823bd10b4d6b16e70733ba48ed9ba148c4b83f55656888a37"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/npm-audit.json",
+      "status": "added",
+      "before": null,
+      "after": "92cc4669c50296b3dad6f577b29ff85a8597374ac83b05a8b73e4c677f410356"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/os-inventory.txt",
+      "status": "added",
+      "before": null,
+      "after": "1c1a0d4616c4f60d77bf6066d50a351d35835131deb98be79bb28d8c90392e91"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/package-smoke.txt",
+      "status": "added",
+      "before": null,
+      "after": "a2aa78902af442873d9e2931cf548b0f15103eaf387ad5afccfffdcdf6251a04"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/postgres-tests.txt",
+      "status": "added",
+      "before": null,
+      "after": "8710124084420939433987517b77c93ff41b9b0e19a231a4b3a94566786cdd5f"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/rejected-token-390.jpg",
+      "status": "added",
+      "before": null,
+      "after": "ac8c6c7c17607463ac82cdf0ab40b218b522b14ad1e76acfd063cd436c90510e"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/release-source.json",
+      "status": "added",
+      "before": null,
+      "after": "4ef7bb39f7397312ba777f14ba088d6d55129c962ff0732a553369b9cfd5ae24"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/root-build.txt",
+      "status": "added",
+      "before": null,
+      "after": "ad6ef9b9e962b0e838c54db84ff27c3e655e5180c33e551a11f56cec7ea11a78"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/root-tests.txt",
+      "status": "added",
+      "before": null,
+      "after": "5f467525b8fd475ad80471e38da4cfc54ecb8a62e4ded24647a61faf8ae0f2d6"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/runtime-inventory.json",
+      "status": "added",
+      "before": null,
+      "after": "0456a3441a3873cf2e613072e77e91d9b3ea5df898d2e464580d3d4dec48ac7c"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/scheduler-result.json",
+      "status": "added",
+      "before": null,
+      "after": "f6df523d26f7a2236c4aa927153bab7404128d73e08b16ee3948b161b57ab67b"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/scheduler.txt",
+      "status": "added",
+      "before": null,
+      "after": "88b6a804b141a575d3799b0295b4d98c59126fa347714d6b69ee54cb3e2f14b8"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/staging-release-proposal.json",
+      "status": "added",
+      "before": null,
+      "after": "00a18fa945c4c15837942c04368de2b72a8c3677477375519b1d1a35e18fd7a0"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/tracker-build.txt",
+      "status": "added",
+      "before": null,
+      "after": "6f9cf44486cc03b831722b02cf6cb029a51a2d409377d3d6b725d51dd30b34c2"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/tracker-tests.txt",
+      "status": "added",
+      "before": null,
+      "after": "dd6de53657561966b6b86695c162a5d033a4b585fa296b8fc4e89eee1883fe8c"
+    },
+    {
+      "path": "docs/acceptance/finish-real-evidence-20261008/typecheck.txt",
+      "status": "added",
+      "before": null,
+      "after": "26ffb63fb06ce67084fc1b5bb85e31aeb47d04872f07464df6cfe140e8df5147"
+    },
+    {
+      "path": "docs/acceptance/finish-real-use-readiness-20261008.md",
+      "status": "added",
+      "before": null,
+      "after": "8e46549d4cd39118881f7f544a6491ee513081c99c827447a8cadffecdde83a6"
+    },
+    {
+      "path": "docs/operations/data-retention-deletion.md",
+      "status": "modified",
+      "before": "26e2a7ad88c57b6bc72d81529b48801165f6b27480306112b75c3066ec46365b",
+      "after": "d2b1b6266efc45da8f863482becba13e24d3b7bbd07d9ffddac50cdffd91e74a"
+    },
+    {
+      "path": "docs/operations/finish-real-operator-runbook.md",
+      "status": "added",
+      "before": null,
+      "after": "ec93b309d8f73e94f0f3e6146573b92bcf15251ff95c0a1faaa617f6e49c7033"
+    },
+    {
+      "path": "docs/operations/finish-real-private-setup.md",
+      "status": "added",
+      "before": null,
+      "after": "1a40c1e8645c2483fa64cce1a1d67044d20bd22575f6ac3479884302855e6b61"
+    },
+    {
+      "path": "docs/operations/real-use-backup.md",
+      "status": "modified",
+      "before": "e537da3d8b3bb320dab09c53cf88b85c3bfe3cc20425004c0e456073770b7199",
+      "after": "61452dd0e4f400a8953f20f212fcc289aa626e226e37b126342bfd37fbb18516"
+    },
+    {
+      "path": "docs/operations/real-use-data-lifecycle.md",
+      "status": "modified",
+      "before": "a1b1f8efe092a6acda61f005f5ef53a98ca80d633c83bc248644e17069603dc9",
+      "after": "70142e9be739d624df8cb897f956f3ab6744d82c43bf6b4e3c4466c6a8eabb77"
+    },
+    {
+      "path": "docs/operations/real-use-setup.md",
+      "status": "modified",
+      "before": "a78fe1737df143015cfa8ae290cf4476fc36cf33da04f1daad404cae7fe74745",
+      "after": "ed4affecae8e7cfebf06376269eef6223a751492da68e9fef3e174142a6cb435"
+    },
+    {
+      "path": "docs/operations/templates/real-backup-monitor.yml",
+      "status": "modified",
+      "before": "2b3f7b487feebfd8ecbb42d5cb25f6539a9a3e320ef103afdd31c4f7123adadd",
+      "after": "648a087f6cbbfcfdf24b4864de1527cfa301787360386c02788387062f56ed10"
+    },
+    {
+      "path": "scripts/finish-real-test-harness.d.mts",
+      "status": "added",
+      "before": null,
+      "after": "175a75230a478bd1a30e8cdb2283e7137de46b78717d86f6a899f82cd8a02a2a"
+    },
+    {
+      "path": "scripts/finish-real-test-harness.mjs",
+      "status": "added",
+      "before": null,
+      "after": "898f5811b859a5c10a6d2b730fd382ba3ae5a4f67b598f5144084e9bd6d7bb5e"
+    },
+    {
+      "path": "scripts/finish-scheduler-smoke.ps1",
+      "status": "added",
+      "before": null,
+      "after": "2c00bd16625bbd80cc6bfa8521b674632a0ef52c0aa6b8ff62e36a0410e88bdb"
+    },
+    {
+      "path": "scripts/real-backup-core.mjs",
+      "status": "modified",
+      "before": "d28ee6da86e447d785a27ad399b3e10df0de3da80bae0a1d606d8a6d82e1bea0",
+      "after": "23e5fad00cbd13e92668222e4e4804d6a34de8569ebafe22e30a099b710df99b"
+    },
+    {
+      "path": "scripts/real-backup-core.test.mjs",
+      "status": "modified",
+      "before": "92caa5047bcd4fa43d457cd0a3802cffd863e536dea84dcd506f8ad7d45a0c98",
+      "after": "f03ccf5b7f2321caf26f6df3ddb39811aad7870b86d138318e59a3cf6496f26b"
+    },
+    {
+      "path": "scripts/real-backup-failure.mjs",
+      "status": "added",
+      "before": null,
+      "after": "ecd2d7422edef147d27b8da1740de68eb3d5edf512c1f373918fd1a71e5fdc4b"
+    },
+    {
+      "path": "scripts/real-backup-install.ps1",
+      "status": "added",
+      "before": null,
+      "after": "bf540ccedff683e69a410a48c81b699cfc78fc971b91f38b6999efd2478c4a8e"
+    },
+    {
+      "path": "scripts/real-backup-runner-core.mjs",
+      "status": "added",
+      "before": null,
+      "after": "53b55b259a7bb01a18189559d27c6c5128e09d8e0736df8cfdbc0294c01af253"
+    },
+    {
+      "path": "scripts/real-backup-runner.mjs",
+      "status": "added",
+      "before": null,
+      "after": "ec5a394e6e51ac0042a60f3c8f805cf58a05c7c96397611d046af7b6accd6c5f"
+    },
+    {
+      "path": "scripts/real-backup-scheduled.ps1",
+      "status": "modified",
+      "before": "f4d94bab62e342e6abe13365b4ab06012ab5d01ae3834c1fc22cd5da6fab6fc5",
+      "after": "02fd9737fc79e956a88f498edf05f3360565145e6c41cd793c8cb12bc3c6345f"
+    },
+    {
+      "path": "scripts/real-backup-watchdog.mjs",
+      "status": "modified",
+      "before": "8c1e73ca32473ff2fd56d84337a32889f9496aa098b608b1e3cd5179767841df",
+      "after": "de23241f3a58a585ea9fa3b391b93bf24449b43473c5de729e965def31c9eaee"
+    },
+    {
+      "path": "scripts/real-drive-backup-core.mjs",
+      "status": "modified",
+      "before": "05ee105f915303eb8ddcb1ee562bdae6c7ae4215765d15f4ec26264d570afe3c",
+      "after": "97830e0117fb0f6123887f2edef1bff2ed47696d28363e249437988785a421f6"
+    },
+    {
+      "path": "scripts/real-drive-backup-core.test.mjs",
+      "status": "modified",
+      "before": "cee9e8d34dca3072749cf44e38d3828cdc6f6e5b2df7c247a9ba7792bbf3d65a",
+      "after": "a35837070bb87ecedd803164bd8d9dc84e8609ff362301b0f31ea79151c1b291"
+    },
+    {
+      "path": "scripts/real-drive-backup.mjs",
+      "status": "modified",
+      "before": "2269ac00b233ea0b90bd0939a4eaa45095563a2d98974e04eb9ee10de6bb9fd9",
+      "after": "02850410b3c9b2ac8081c88824da9e46d2208a50bff959bfe6852b3b6f80eb0c"
+    },
+    {
+      "path": "scripts/real-drive-retention.test.mjs",
+      "status": "added",
+      "before": null,
+      "after": "13514c6f9a0d060ca65689eeb0105e0a96f875f36e8d24ff3eebd44b4d8d18a6"
+    },
+    {
+      "path": "scripts/real-drive-setup.mjs",
+      "status": "added",
+      "before": null,
+      "after": "f4615bdc5e24e7e05b3e8af3e65467b09aff1101a2f6af755c8d7668c015d4dd"
+    },
+    {
+      "path": "scripts/real-finish-operations.test.mjs",
+      "status": "added",
+      "before": null,
+      "after": "9137424d0469bc1cbf02ef3063f9f032e5cfe28045976a08371cc7aad2484ce0"
+    },
+    {
+      "path": "scripts/real-full-restore.mjs",
+      "status": "added",
+      "before": null,
+      "after": "eba73ed0142e382c898b4a2062313b82b004a26562517ac9f97d5641cff57abd"
+    },
+    {
+      "path": "scripts/real-migration-rehearsal.mjs",
+      "status": "modified",
+      "before": "87fda9ef1b6227417a44ead6c41716e0b3a1ebc2c2e971f2ce304b629997cdae",
+      "after": "acdf14272c640f15e1655ae0578fa9c0e32a33675be4f83d005b6dea40ee1a2c"
+    },
+    {
+      "path": "scripts/real-privacy-core.d.mts",
+      "status": "added",
+      "before": null,
+      "after": "7b8aea7c932e5039edb501e1345e55cbeec95c4f503f2b6f5da5775e78d5a4c0"
+    },
+    {
+      "path": "scripts/real-privacy-core.mjs",
+      "status": "added",
+      "before": null,
+      "after": "5a71939ad58d434f5545eabc1b4d89db9f60b62c6ed3656846f85405074b529d"
+    },
+    {
+      "path": "scripts/real-privacy-operator.mjs",
+      "status": "added",
+      "before": null,
+      "after": "7d7ec1b96488342dc69d573436ab0f0f9fe44445c7013d7e24126136011598fd"
+    },
+    {
+      "path": "scripts/real-privacy-provision.d.mts",
+      "status": "added",
+      "before": null,
+      "after": "418fe81479bed626d08bd75e34cf42432892c738d755453df70001cd0b3ad676"
+    },
+    {
+      "path": "scripts/real-privacy-provision.mjs",
+      "status": "added",
+      "before": null,
+      "after": "cf19d90002adf78a083539da61f9f3579680bb16b94fe3c6e302e548d31cf913"
+    },
+    {
+      "path": "scripts/real-private-setup-check.mjs",
+      "status": "added",
+      "before": null,
+      "after": "cd7d444d1ec79936c3960a3bdd211996af6382b8eba88e9bb3d0aae682884d98"
+    },
+    {
+      "path": "scripts/real-restore-activate.mjs",
+      "status": "added",
+      "before": null,
+      "after": "98864a34ee6e5041a6fc27eb0cd22a4d7b2c83de8491c55e2c31ea800d739345"
+    },
+    {
+      "path": "scripts/real-restore-core.d.mts",
+      "status": "added",
+      "before": null,
+      "after": "91e90e4d2473d343042648bb2755a224bb57c804de8f006ffa4e46661daf290e"
+    },
+    {
+      "path": "scripts/real-restore-core.mjs",
+      "status": "added",
+      "before": null,
+      "after": "40eb96c1540f1e899512201824ca62fccf4e4aee8da4525bd03535f1bda1764a"
+    },
+    {
+      "path": "scripts/real-retention-cli.mjs",
+      "status": "added",
+      "before": null,
+      "after": "545577c711eebf40093e8ebceba5acdd113aa2a941e00a9984ced41cc6cfd57a"
+    },
+    {
+      "path": "scripts/real-retention.mjs",
+      "status": "added",
+      "before": null,
+      "after": "c10d59badf1d0f916e28eaa5b19c9c6e4037b782e6c38737cf8c1a0f8ea78e50"
+    },
+    {
+      "path": "scripts/real-watchdog-core.mjs",
+      "status": "added",
+      "before": null,
+      "after": "7d0df7dbd8ee7cade9fbb70724431a9f8086c3e42d733f582e15b8a4191993e3"
+    }
+  ]
+}

@@ -1,118 +1,158 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createChart, CandlestickSeries, LineStyle, CrosshairMode } from 'lightweight-charts'
-import { TrendingUp, TrendingDown, Zap, RefreshCw } from 'lucide-react'
 import { formatNumber } from '../../utils/formatters'
-import useCandleCountdown from '../../hooks/useCandleCountdown'
-import liveMarketService from '../../services/liveMarketService'
+import { liveMarketService, mergeHistoricalCandlesWithTrades } from '../../services/liveMarketService'
+
+const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1D']
+const EMPTY_TRADES = Object.freeze([])
+const EMPTY_CANDLES = Object.freeze([])
+const EMPTY_HISTORY_STATE = Object.freeze({ status: 'LOADING', candles: EMPTY_CANDLES, source: 'กำลังโหลด Bitkub historical OHLC' })
+const hasRange = (range) => range && Number.isFinite(range.from) && Number.isFinite(range.to) && range.from < range.to
+
+const captureChartView = (timeScale, candles) => {
+  if (!candles.length) return null
+
+  let logicalRange = null
+  let visibleRange = null
+  try { logicalRange = timeScale?.getVisibleLogicalRange?.() || null } catch {}
+  try { visibleRange = timeScale?.getVisibleRange?.() || null } catch {}
+
+  if (hasRange(logicalRange)) {
+    const center = (logicalRange.from + logicalRange.to) / 2
+    const anchorIndex = Math.max(0, Math.min(candles.length - 1, Math.round(center)))
+    const anchorTime = candles[anchorIndex]?.time
+    if (anchorTime !== undefined) {
+      return {
+        kind: 'logical',
+        range: { from: logicalRange.from, to: logicalRange.to },
+        anchorIndex,
+        anchorTime,
+      }
+    }
+  }
+
+  // A single candle gives a degenerate time range (from === to); it cannot
+  // represent the user's zoom. Use a logical range when available, otherwise
+  // let the chart fit the newly loaded data.
+  return hasRange(visibleRange) ? { kind: 'time', range: visibleRange } : null
+}
+
+const restoreChartView = (timeScale, snapshot, candles) => {
+  if (!snapshot || !candles.length) return false
+  try {
+    if (snapshot.kind === 'logical') {
+      const nextAnchorIndex = candles.findIndex((candle) => candle.time === snapshot.anchorTime)
+      if (nextAnchorIndex < 0) return false
+      const shift = nextAnchorIndex - snapshot.anchorIndex
+      timeScale?.setVisibleLogicalRange?.({
+        from: snapshot.range.from + shift,
+        to: snapshot.range.to + shift,
+      })
+      return true
+    }
+    if (snapshot.kind === 'time') {
+      timeScale?.setVisibleRange?.(snapshot.range)
+      return true
+    }
+  } catch {}
+  return false
+}
 
 export default function TradingChart({
   pair,
-  candles = [],
-  currentPrice,
-  priceChangePercent = null,
+  recentTrades = EMPTY_TRADES,
+  currentPrice = null,
+  ticker = null,
+  dataStatus = 'UNAVAILABLE',
+  dataSource = 'Bitkub public market feed',
+  dataUpdatedAt = null,
+  dataTimestampType = 'received',
+  tradeStatus = { status: 'UNAVAILABLE' },
+  providerSymbol = null,
   tickDirection = 'none',
   limitOrders = [],
   onCancelLimitOrder,
 }) {
   const [timeframe, setTimeframe] = useState('15m')
-  const { formatted, isUrgent } = useCandleCountdown(timeframe)
+  const [ohlc, setOhlc] = useState(null)
+  const [historyState, setHistoryState] = useState({ status: 'LOADING', candles: [], source: 'กำลังรอ Bitkub historical OHLC' })
+  const [historyRequest, setHistoryRequest] = useState(0)
   const chartContainerRef = useRef(null)
   const chartInstanceRef = useRef(null)
   const candleSeriesRef = useRef(null)
-  const lastBarRef = useRef(null)
   const priceLinesRef = useRef([])
-  const [ohlc, setOhlc] = useState({ open: 0, high: 0, low: 0, close: 0, time: 0 })
-  const [isLoadingCandles, setIsLoadingCandles] = useState(true)
-
-  const timeframes = ['1m', '5m', '15m', '1h', '4h', '1D']
-  const hasPriceChange = priceChangePercent !== null && priceChangePercent !== undefined && Number.isFinite(Number(priceChangePercent))
-  const isUp = hasPriceChange ? Number(priceChangePercent) >= 0 : true
+  const chartDataRef = useRef({ key: null, viewKey: null, candles: [] })
+  const fittedViewRef = useRef(null)
+  const retryViewRef = useRef(null)
   const quoteAsset = pair.quoteAsset || pair.symbol?.split('/')?.[1] || 'THB'
   const quotePrefix = quoteAsset === 'THB' ? '฿' : `${quoteAsset} `
+  const activeLimitOrders = (limitOrders || []).filter((order) => order.symbol === pair.symbol)
+  const historyMatchesView = historyState.symbol === pair.symbol && historyState.timeframe === timeframe
+  const visibleHistoryState = historyMatchesView
+    ? historyState
+    : EMPTY_HISTORY_STATE
+  const candles = useMemo(
+    () => mergeHistoricalCandlesWithTrades(visibleHistoryState.candles, recentTrades, timeframe, {
+      historyTo: visibleHistoryState.to,
+      now: Date.now(),
+    }),
+    [visibleHistoryState.candles, visibleHistoryState.to, recentTrades, timeframe],
+  )
+  const historicalTimes = new Set((visibleHistoryState.candles || []).map((candle) => Number(candle.time)))
+  const hasTradeOnlyCandles = visibleHistoryState.status === 'AVAILABLE' &&
+    candles.some((candle) => !historicalTimes.has(Number(candle.time)))
+  const hasCurrentPrice = Number.isFinite(Number(currentPrice)) && Number(currentPrice) > 0
+  const has24hChange = ticker?.change24h !== null && ticker?.change24h !== undefined && Number.isFinite(Number(ticker.change24h))
 
-  // Filter limit orders for current active symbol
-  const activeLimitOrders = (limitOrders || []).filter((o) => o.symbol === pair.symbol)
-
-  // Display-only demo spread; this is not an executable market quote.
-  const spreadPct = 0.00012
-  const halfSpread = currentPrice * (spreadPct / 2)
-  const bidPrice = currentPrice - halfSpread
-  const askPrice = currentPrice + halfSpread
-  const spreadAmount = Math.max(0, askPrice - bidPrice)
-
-  // 1. Initialize the local chart renderer.
   useEffect(() => {
-    if (!chartContainerRef.current) return
+    let active = true
+    if (!providerSymbol) {
+      setHistoryState({ status: 'UNAVAILABLE', candles: [], source: 'ไม่มี mapping จาก Bitkub /symbols', symbol: pair.symbol, timeframe })
+      return () => { active = false }
+    }
 
+    setHistoryState({ status: 'LOADING', candles: [], source: 'กำลังโหลด Bitkub historical OHLC', symbol: pair.symbol, timeframe })
+    liveMarketService.loadHistoricalCandles(pair.symbol, timeframe).then((result) => {
+      if (active) setHistoryState({
+        ...(result || { status: 'UNAVAILABLE', candles: [], source: 'Bitkub historical OHLC unavailable' }),
+        symbol: pair.symbol,
+        timeframe,
+      })
+    }).catch((error) => {
+      if (active) setHistoryState({ status: 'UNAVAILABLE', candles: [], source: error?.message || 'Bitkub historical OHLC unavailable', symbol: pair.symbol, timeframe })
+    })
+
+    return () => { active = false }
+  }, [pair.symbol, providerSymbol, timeframe, historyRequest])
+
+  useEffect(() => {
+    if (!chartContainerRef.current) return undefined
     const container = chartContainerRef.current
-    container.innerHTML = ''
-
     const chart = createChart(container, {
-      layout: {
-        background: { color: '#0b0e14' },
-        textColor: '#94a3b8',
-        fontSize: 11,
-        fontFamily: 'monospace',
-      },
-      grid: {
-        vertLines: { color: '#161e2e' },
-        horzLines: { color: '#161e2e' },
-      },
-      crosshair: {
-        mode: CrosshairMode.Normal,
-      },
-      rightPriceScale: {
-        borderColor: '#1e2638',
-        autoScale: true,
-        scaleMargins: {
-          top: 0.15,
-          bottom: 0.15,
-        },
-      },
-      timeScale: {
-        borderColor: '#1e2638',
-        timeVisible: true,
-        secondsVisible: false,
-      },
-      handleScroll: {
-        mouseWheel: true,
-        pressedMouseMove: true,
-      },
-      handleScale: {
-        axisPressedMouseMove: true,
-        mouseWheel: true,
-        pinch: true,
-      },
+      layout: { background: { color: '#0b0e14' }, textColor: '#94a3b8', fontSize: 11, fontFamily: 'monospace' },
+      grid: { vertLines: { color: '#161e2e' }, horzLines: { color: '#161e2e' } },
+      crosshair: { mode: CrosshairMode.Normal },
+      rightPriceScale: { borderColor: '#1e2638', autoScale: true, scaleMargins: { top: 0.15, bottom: 0.15 } },
+      timeScale: { borderColor: '#1e2638', timeVisible: true, secondsVisible: false },
+      handleScroll: { mouseWheel: true, pressedMouseMove: true },
+      handleScale: { axisPressedMouseMove: true, mouseWheel: true, pinch: true },
     })
-
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#10b981',
-      downColor: '#f43f5e',
-      borderVisible: false,
-      wickUpColor: '#10b981',
-      wickDownColor: '#f43f5e',
+      upColor: '#10b981', downColor: '#f43f5e', borderVisible: false,
+      wickUpColor: '#10b981', wickDownColor: '#f43f5e',
     })
-
     chartInstanceRef.current = chart
     candleSeriesRef.current = candleSeries
-
-    // Crosshair move handler to update OHLC header
     chart.subscribeCrosshairMove((param) => {
-      if (!param || !param.time || !param.seriesData) return
+      if (!param?.time || !param.seriesData) return
       const bar = param.seriesData.get(candleSeries)
-      if (bar) {
-        setOhlc({ open: bar.open, high: bar.high, low: bar.low, close: bar.close })
-      }
+      if (bar) setOhlc({ open: bar.open, high: bar.high, low: bar.low, close: bar.close })
     })
-
-    // Resize observer
     const resizeObserver = new ResizeObserver((entries) => {
-      if (entries.length === 0 || !entries[0].contentRect) return
-      const { width, height } = entries[0].contentRect
-      chart.applyOptions({ width, height })
+      const rect = entries[0]?.contentRect
+      if (rect) chart.applyOptions({ width: rect.width, height: rect.height })
     })
     resizeObserver.observe(container)
-
     return () => {
       resizeObserver.disconnect()
       chart.remove()
@@ -121,352 +161,192 @@ export default function TradingChart({
     }
   }, [])
 
-  // 2. Generate demo candles in the same quote unit as the order form.
   useEffect(() => {
-    if (!candleSeriesRef.current) return
-    setIsLoadingCandles(true)
-    lastBarRef.current = null
-    setOhlc({ open: 0, high: 0, low: 0, close: 0, time: 0 })
+    const series = candleSeriesRef.current
+    if (!series) return
+    const viewKey = `${pair.symbol}|${timeframe}`
+    const key = `${viewKey}|${visibleHistoryState.status}`
+    const previous = chartDataRef.current
+    if (retryViewRef.current && retryViewRef.current.viewKey !== viewKey) retryViewRef.current = null
+    const sameBar = (left, right) => left && right && left.time === right.time &&
+      left.open === right.open && left.high === right.high && left.low === right.low && left.close === right.close
+    const unchanged = previous.key === key && previous.candles.length === candles.length &&
+      previous.candles.every((bar, index) => sameBar(bar, candles[index]))
+    if (!unchanged) {
+      const previousLast = previous.candles.at(-1)
+      const nextLast = candles.at(-1)
+      const barsBeforeLastUnchanged = previous.candles.slice(0, -1)
+        .every((bar, index) => sameBar(bar, candles[index]))
+      const updatedCurrentBar = previous.key === key && previous.candles.length === candles.length &&
+        previousLast?.time === nextLast?.time && barsBeforeLastUnchanged && !sameBar(previousLast, nextLast)
+      const appendedOneBar = previous.key === key && candles.length === previous.candles.length + 1 &&
+        previous.candles.every((bar, index) => sameBar(bar, candles[index])) &&
+        Number.isFinite(Number(previousLast?.time)) && Number(nextLast?.time) > Number(previousLast.time)
 
-    const stepSec = timeframe === '1m' ? 60 : timeframe === '5m' ? 300 : timeframe === '1h' ? 3600 : timeframe === '4h' ? 14400 : timeframe === '1D' ? 86400 : 900
-    const nowSec = Math.floor(Date.now() / 1000)
-    const currentBarTime = Math.floor(nowSec / stepSec) * stepSec
-    const base = Number.isFinite(Number(currentPrice)) && Number(currentPrice) > 0 ? Number(currentPrice) : Number(pair.price)
-    const precision = pair.precision || 2
-    const volatility = 0.003
-    const demoCandles = []
-    let walkPrice = base * (1 - (Math.random() * 0.012 - 0.006))
-
-    for (let i = 80; i >= 0; i -= 1) {
-      const time = currentBarTime - i * stepSec
-      const open = walkPrice
-      const close = i === 0 ? base : open + (Math.random() - 0.49) * volatility * open
-      const high = Math.max(open, close) + Math.random() * volatility * open * 0.7
-      const low = Math.min(open, close) - Math.random() * volatility * open * 0.7
-      demoCandles.push({
-        time,
-        open: Number(open.toFixed(precision)),
-        high: Number(high.toFixed(precision)),
-        low: Number(low.toFixed(precision)),
-        close: Number(close.toFixed(precision)),
-      })
-      walkPrice = close
-    }
-
-    candleSeriesRef.current.setData(demoCandles)
-    const last = demoCandles[demoCandles.length - 1]
-    lastBarRef.current = { ...last }
-    setOhlc({ ...last })
-    setIsLoadingCandles(false)
-    try {
-      chartInstanceRef.current.timeScale().fitContent()
-    } catch (e) {}
-
-    return () => {
-      lastBarRef.current = null
-    }
-  }, [pair.symbol, timeframe])
-  // 4. Keep the active demo candle aligned with the trade panel price.
-  useEffect(() => {
-    if (!candleSeriesRef.current || !currentPrice || isLoadingCandles || !lastBarRef.current) return
-
-    const stepSec = timeframe === '1m' ? 60 : timeframe === '5m' ? 300 : timeframe === '1h' ? 3600 : timeframe === '4h' ? 14400 : timeframe === '1D' ? 86400 : 900
-    const nowSec = Math.floor(Date.now() / 1000)
-    const bucketTime = Math.floor(nowSec / stepSec) * stepSec
-    const lastBar = lastBarRef.current
-
-    try {
-      if (bucketTime > lastBar.time) {
-        // New bar period has started
-        const newBar = {
-          time: bucketTime,
-          open: currentPrice,
-          high: currentPrice,
-          low: currentPrice,
-          close: currentPrice,
-        }
-        lastBarRef.current = newBar
-        candleSeriesRef.current.update(newBar)
-        setOhlc(newBar)
+      if (updatedCurrentBar || appendedOneBar) {
+        series.update(nextLast)
       } else {
-        // Update current forming bar at lastBar.time (monotonically safe)
-        const updatedBar = {
-          time: lastBar.time,
-          open: lastBar.open,
-          high: Math.max(lastBar.high, currentPrice),
-          low: Math.min(lastBar.low, currentPrice),
-          close: currentPrice,
+        const timeScale = chartInstanceRef.current?.timeScale()
+        const retryEntry = retryViewRef.current?.viewKey === viewKey
+          ? retryViewRef.current
+          : null
+        const viewSnapshot = retryEntry
+          ? retryEntry.snapshot
+          : previous.viewKey === viewKey
+            ? captureChartView(timeScale, previous.candles)
+            : null
+        series.setData(candles)
+        if (candles.length) {
+          const restored = viewSnapshot ? restoreChartView(timeScale, viewSnapshot, candles) : false
+          if (restored) fittedViewRef.current = viewKey
+          if (retryEntry && visibleHistoryState.status !== 'LOADING') {
+            if (!restored && fittedViewRef.current === viewKey) fittedViewRef.current = null
+            retryViewRef.current = null
+          }
+        } else if (retryEntry && visibleHistoryState.status !== 'LOADING') {
+          retryViewRef.current = null
         }
-        lastBarRef.current = updatedBar
-        candleSeriesRef.current.update(updatedBar)
-        setOhlc(updatedBar)
       }
-    } catch (e) {
-      console.warn('Candle tick update warning:', e)
+      chartDataRef.current = { key, viewKey, candles }
     }
-  }, [currentPrice, timeframe, isLoadingCandles])
+    const latestCandle = candles.length ? candles[candles.length - 1] : null
+    setOhlc((previous) => previous && latestCandle && previous.time === latestCandle.time &&
+      previous.open === latestCandle.open && previous.high === latestCandle.high &&
+      previous.low === latestCandle.low && previous.close === latestCandle.close
+      ? previous
+      : latestCandle)
+  }, [candles, pair.symbol, timeframe, visibleHistoryState.status])
 
-  // 5. Draw Interactive Broker Price Lines (Entry, TP, SL, Limit) on Canvas
   useEffect(() => {
-    if (!candleSeriesRef.current) return
+    if (visibleHistoryState.status === 'LOADING' || candles.length === 0) return
+    const key = `${pair.symbol}|${timeframe}`
+    if (fittedViewRef.current === key) return
+    chartInstanceRef.current?.timeScale().fitContent()
+    fittedViewRef.current = key
+  }, [candles.length, pair.symbol, timeframe, visibleHistoryState.status])
 
-    // Remove previous price lines
-    priceLinesRef.current.forEach((pl) => {
-      try {
-        candleSeriesRef.current.removePriceLine(pl)
-      } catch (e) {}
+  useEffect(() => {
+    const series = candleSeriesRef.current
+    if (!series) return
+    priceLinesRef.current.forEach((line) => {
+      try { series.removePriceLine(line) } catch {}
     })
     priceLinesRef.current = []
-
-    // Show only Spot limit order lines.
     activeLimitOrders.forEach((order) => {
-      const limPl = candleSeriesRef.current.createPriceLine({
-        price: order.targetPrice,
-        color: '#f59e0b',
-        lineWidth: 1,
-        lineStyle: LineStyle.Dashed,
-        axisLabelVisible: true,
-        title: `⏳ LIMIT ${order.side} @ ${quotePrefix}${formatNumber(order.targetPrice, pair.precision || 2)}`,
-      })
-      priceLinesRef.current.push(limPl)
+      if (!Number.isFinite(Number(order.targetPrice)) || Number(order.targetPrice) <= 0) return
+      priceLinesRef.current.push(series.createPriceLine({
+        price: Number(order.targetPrice), color: '#f59e0b', lineWidth: 1,
+        lineStyle: LineStyle.Dashed, axisLabelVisible: true,
+        title: `LIMIT ${order.side} @ ${quotePrefix}${formatNumber(order.targetPrice, pair.precision || 2)}`,
+      }))
     })
-
-    // Illustrative demo Bid and Ask lines.
-    if (currentPrice && currentPrice > 0) {
-      const precision = pair.precision || 2
-
-      // Ask Line (Rose dashed)
-      const askPl = candleSeriesRef.current.createPriceLine({
-        price: askPrice,
-        color: '#f43f5e',
-        lineWidth: 1,
-        lineStyle: LineStyle.Dashed,
-        axisLabelVisible: true,
-        title: `ASK ${quotePrefix}${formatNumber(askPrice, precision)} (DEMO spread ${quotePrefix}${formatNumber(spreadAmount, precision)})`,
-      })
-      priceLinesRef.current.push(askPl)
-
-      // Bid Line (Cyan dashed)
-      const bidPl = candleSeriesRef.current.createPriceLine({
-        price: bidPrice,
-        color: '#06b6d4',
-        lineWidth: 1,
-        lineStyle: LineStyle.Dashed,
-        axisLabelVisible: true,
-        title: `BID ${quotePrefix}${formatNumber(bidPrice, precision)}`,
-      })
-      priceLinesRef.current.push(bidPl)
+    if (dataStatus === 'LIVE' && Number(ticker?.highestBid) > 0 && Number(ticker?.lowestAsk) > 0) {
+      priceLinesRef.current.push(series.createPriceLine({
+        price: Number(ticker.highestBid), color: '#06b6d4', lineWidth: 1,
+        lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: `Bid ${quotePrefix}${formatNumber(ticker.highestBid, pair.precision || 2)}`,
+      }))
+      priceLinesRef.current.push(series.createPriceLine({
+        price: Number(ticker.lowestAsk), color: '#f43f5e', lineWidth: 1,
+        lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: `Ask ${quotePrefix}${formatNumber(ticker.lowestAsk, pair.precision || 2)}`,
+      }))
     }
-  }, [activeLimitOrders, pair.precision, currentPrice, bidPrice, askPrice, spreadAmount])
+  }, [activeLimitOrders, dataStatus, ticker, pair.precision, quotePrefix])
+
+  const statusStyle = dataStatus === 'LIVE'
+    ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
+    : dataStatus === 'STALE'
+      ? 'text-amber-400 border-amber-500/30 bg-amber-500/10'
+      : 'text-slate-400 border-slate-700 bg-slate-800/50'
+  const latestTrade = recentTrades[0]
+  const latestTradeTime = latestTrade?.timestamp
+    ? new Date(latestTrade.timestamp).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+    : null
+  const candleCoverage = candles.length
+    ? `${new Date(candles[0].time * 1000).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })} – ${new Date(candles[candles.length - 1].time * 1000).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}`
+    : null
+  const historyReceivedAt = Number.isFinite(Number(visibleHistoryState.receivedAt)) && Number(visibleHistoryState.receivedAt) > 0
+    ? new Date(Number(visibleHistoryState.receivedAt)).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+    : null
+  const candleSourceText = visibleHistoryState.status === 'AVAILABLE'
+    ? `Bitkub REST /tradingview/history + ${hasTradeOnlyCandles ? 'partial OHLC จาก matched trades ใน bucket ที่ไม่มี history' : 'matched trades หลัง snapshot'} • ${candleCoverage || 'ยังไม่มีช่วงข้อมูล'}${historyReceivedAt ? ` • received ${historyReceivedAt} ICT` : ''}`
+    : candles.length
+      ? `แท่งจาก matched trades บางส่วน • ${candleCoverage} • history ${visibleHistoryState.status}`
+      : `OHLC ${visibleHistoryState.status} • ${visibleHistoryState.source || 'ไม่มีข้อมูล'} • ไม่มี matched trades สำหรับสร้างแท่ง`
 
   return (
     <div className="flex flex-col h-full bg-[#0b0e14] border border-[#1e2638] rounded-3xl p-3.5 sm:p-5 shadow-2xl relative overflow-hidden font-sans">
-      
-      {/* Demo chart header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-slate-950/80 border border-slate-800/90 rounded-2xl mb-2 text-[11px] font-mono shadow-inner">
-        <div className="flex items-center space-x-2.5 text-slate-300">
-          <div className="flex items-center space-x-1 text-emerald-400 font-extrabold tracking-wide">
-            <Zap className="w-3.5 h-3.5 fill-emerald-400" />
-            <span>FINNTECH Spot DEMO</span>
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/80 mb-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <strong className="text-white text-lg">{pair.symbol}</strong>
+            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">Spot</span>
+            <span aria-label={`Ticker status ${dataStatus}`} className={`text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded border ${statusStyle}`}>Ticker: {dataStatus}</span>
+            <span className="text-[10px] text-slate-500">ข้อมูลจาก feed เมื่อพร้อมใช้งาน / คำสั่ง PAPER</span>
           </div>
-          <span className="text-slate-700 hidden sm:inline">•</span>
-          <span className="text-slate-400 hidden sm:inline">
-            แหล่งข้อมูล: <strong className="text-cyan-300">ราคาจำลองในเครื่อง</strong>
-          </span>
-          <span className="text-slate-700 hidden sm:inline">•</span>
-          <div className="flex items-center space-x-1.5 text-slate-300">
-            <span className="text-amber-300 font-bold">Spread DEMO:</span>
-            <span className="text-amber-400 font-bold">
-              {quotePrefix}{formatNumber(spreadAmount, pair.precision || 2)}
-            </span>
+          <div className={`mt-1 flex flex-wrap items-baseline gap-2 font-mono ${tickDirection === 'down' ? 'text-rose-400' : 'text-emerald-400'}`}>
+            <span className="text-xl sm:text-2xl font-extrabold">{hasCurrentPrice ? `${quotePrefix}${formatNumber(currentPrice, pair.precision || 2)}` : '—'}</span>
+            <span className="text-xs text-slate-400">24h {has24hChange ? `${Number(ticker.change24h) > 0 ? '+' : ''}${Number(ticker.change24h)}%` : '—'}</span>
+            <span className="text-xs text-slate-500">สูง {ticker?.high24h ? `${quotePrefix}${formatNumber(ticker.high24h, pair.precision || 2)}` : '—'}</span>
+            <span className="text-xs text-slate-500">ต่ำ {ticker?.low24h ? `${quotePrefix}${formatNumber(ticker.low24h, pair.precision || 2)}` : '—'}</span>
           </div>
+          <div className="mt-1 text-[10px] text-slate-500">Source: {dataSource || 'Bitkub public market feed'}{dataUpdatedAt ? ` • ${dataTimestampType === 'provider' ? 'provider time' : 'received'} ${new Date(dataUpdatedAt).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })} ICT` : ' • ไม่มี timestamp'}{latestTradeTime ? ` • trade time ${latestTradeTime} ICT` : ''}</div>
         </div>
-
-        <div className="flex items-center space-x-2.5">
-          <div className="flex items-center space-x-1.5 text-[10px]">
-            <span className="px-2 py-0.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-bold font-mono">
-              BID {quotePrefix}{formatNumber(bidPrice, pair.precision || 2)}
-            </span>
-            <span className="px-2 py-0.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold font-mono">
-              ASK {quotePrefix}{formatNumber(askPrice, pair.precision || 2)}
-            </span>
-          </div>
-
+        <div className="flex items-center gap-1 bg-slate-800/70 p-1 rounded-xl border border-slate-700/60 text-xs">
+          {TIMEFRAMES.map((value) => (
+            <button key={value} onClick={() => setTimeframe(value)} className={`px-2 py-1 rounded-lg font-medium ${timeframe === value ? 'bg-emerald-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'}`}>{value}</button>
+          ))}
         </div>
       </div>
 
-      {/* Chart Toolbar & Symbol Info */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-2.5 border-b border-slate-800/80 mb-2">
-        {/* Pair, demo price and candle countdown */}
-        <div className="flex items-center space-x-3">
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-extrabold text-lg sm:text-xl text-white tracking-tight">
-                {pair.symbol}
-              </span>
-              <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                {pair.name}
-              </span>
-              {pair.category === 'crypto' && (
-                <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                  Spot
-                </span>
-              )}
-
-              {/* Explicit Market Feed Status Badge */}
-              {(() => {
-                const symStatus = liveMarketService.getSymbolStatus(pair.symbol)
-                const isDemo = symStatus.status === 'DEMO'
-                const isStale = symStatus.status === 'STALE'
-                return (
-                  <span
-                    className={`text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded border flex items-center space-x-1 ${
-                      isDemo
-                        ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
-                        : isStale
-                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                        : 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-                    }`}
-                    title={`Feed Source: ${symStatus.source}`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${isDemo ? 'bg-cyan-400' : isStale ? 'bg-amber-400' : 'bg-rose-400'}`} />
-                    <span>{symStatus.status}</span>
-                  </span>
-                )
-              })()}
-            </div>
-            
-            <div className="flex items-center space-x-2 mt-0.5">
-              <span
-                className={`text-xl sm:text-2xl font-mono font-extrabold transition-all duration-150 flex items-center space-x-2 ${
-                  tickDirection === 'up'
-                    ? 'text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded shadow-sm shadow-emerald-500/20'
-                    : tickDirection === 'down'
-                    ? 'text-rose-400 bg-rose-500/15 px-1.5 py-0.5 rounded shadow-sm shadow-rose-500/20'
-                    : isUp
-                    ? 'text-emerald-400'
-                    : 'text-rose-400'
-                }`}
-              >
-                <span>{quotePrefix}{formatNumber(currentPrice, pair.precision || 2)}</span>
-                <span className="relative flex h-2 w-2">
-                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${tickDirection === 'down' ? 'bg-rose-400' : 'bg-emerald-400'}`} />
-                  <span className={`relative inline-flex rounded-full h-2 w-2 ${tickDirection === 'down' ? 'bg-rose-500' : 'bg-emerald-500'}`} />
-                </span>
-              </span>
-
-              {hasPriceChange ? <span
-                className={`text-xs font-semibold px-2 py-0.5 rounded-full flex items-center space-x-0.5 ${
-                  isUp
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                }`}
-              >
-                {isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                <span>{isUp ? '+' : ''}{Number(priceChangePercent).toFixed(2)}%</span>
-              </span> : <span className="text-[10px] px-2 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700">24h —</span>}
-            </div>
-
-            {/* Demo candle countdown and OHLC */}
-            <div className="flex flex-wrap items-center gap-2 mt-1 font-mono">
-              <div className="flex items-center space-x-1.5">
-                <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">
-                  DEMO Bar:
-                </span>
-                <span
-                  title="เวลานับถอยหลังปิดแท่งเทียนจำลอง"
-                  className={`text-xs font-bold px-1.5 py-0.5 rounded flex items-center space-x-1 transition-colors ${
-                    isUrgent
-                      ? 'text-rose-400 bg-rose-500/10 border border-rose-500/30 animate-pulse'
-                      : 'text-amber-400 bg-amber-400/10 border border-amber-500/20'
-                  }`}
-                >
-                  <span>⏱️</span>
-                  <span>{formatted}</span>
-                  <span className="text-[9px] text-slate-400 font-normal">({timeframe})</span>
-                </span>
-              </div>
-
-              {ohlc.close > 0 && (
-                <div className="hidden sm:flex items-center space-x-2 text-[10px] bg-slate-900/80 px-2 py-0.5 rounded-lg border border-slate-800 text-slate-400">
-                  <span>O: <strong className="text-slate-200">{pair.symbol.endsWith('/THB') ? '฿' : '$'}{formatNumber(ohlc.open, pair.precision || 2)}</strong></span>
-                  <span>H: <strong className="text-emerald-400">{pair.symbol.endsWith('/THB') ? '฿' : '$'}{formatNumber(ohlc.high, pair.precision || 2)}</strong></span>
-                  <span>L: <strong className="text-rose-400">{pair.symbol.endsWith('/THB') ? '฿' : '$'}{formatNumber(ohlc.low, pair.precision || 2)}</strong></span>
-                  <span>C: <strong className="text-slate-200">{pair.symbol.endsWith('/THB') ? '฿' : '$'}{formatNumber(ohlc.close, pair.precision || 2)}</strong></span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Timeframe selector */}
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center bg-slate-800/70 p-1 rounded-xl border border-slate-700/60 text-xs">
-            {timeframes.map((tf) => (
-              <button
-                key={tf}
-                onClick={() => setTimeframe(tf)}
-                className={`px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
-                  timeframe === tf
-                    ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                }`}
-              >
-                {tf}
-              </button>
-            ))}
-          </div>
-
-          <div className="px-2.5 py-1 rounded-xl bg-slate-800/70 border border-slate-700/60 text-xs font-mono font-bold text-emerald-400 flex items-center space-x-1">
-            <span>แท่งเทียน DEMO</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Lightweight Charts Canvas Container with Order Badges Overlay */}
-      <div className="flex-1 min-h-[340px] w-full relative">
+      <div className="flex-1 min-h-[300px] w-full relative">
         <div ref={chartContainerRef} className="w-full h-full rounded-2xl overflow-hidden" />
-
-        {/* Floating Limit Orders Overlay with Cancel Button */}
+        {candles.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0b0e14]/80 text-center px-5 text-xs text-slate-400 pointer-events-none">
+            {visibleHistoryState.status === 'LOADING'
+              ? `กำลังโหลด OHLC ${timeframe} จาก Bitkub`
+              : 'ยังไม่มีแท่ง OHLC หรือ matched trades ที่ตรวจสอบได้'}
+          </div>
+        )}
         {activeLimitOrders.length > 0 && (
-          <div className="absolute top-3 right-16 z-10 flex flex-col space-y-1.5 pointer-events-auto max-w-xs">
+          <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5 max-w-xs">
             {activeLimitOrders.map((order) => (
-              <div
-                key={`limit-${order.id}`}
-                className="flex items-center justify-between space-x-2 px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-950/80 text-amber-300 shadow-lg backdrop-blur-md font-mono text-[11px]"
-              >
-                <span>⏳ LIMIT {order.side} @ {quotePrefix}{formatNumber(order.targetPrice, pair.precision || 2)}</span>
-                <button
-                  onClick={() => onCancelLimitOrder && onCancelLimitOrder(order.id)}
-                  title="ยกเลิกคำสั่ง"
-                  className="w-5 h-5 rounded-md bg-amber-600 hover:bg-amber-500 text-white font-bold flex items-center justify-center text-xs shadow-md transition-all active:scale-90 cursor-pointer"
-                >
-                  ✕
-                </button>
+              <div key={order.id} className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-950/80 text-amber-300 font-mono text-[11px]">
+                <span>LIMIT {order.side} @ {quotePrefix}{formatNumber(order.targetPrice, pair.precision || 2)}</span>
+                <button onClick={() => onCancelLimitOrder?.(order.id)} title="ยกเลิกคำสั่ง" className="w-5 h-5 rounded-md bg-amber-600 hover:bg-amber-500 text-white font-bold">×</button>
               </div>
             ))}
           </div>
         )}
-
-        {isLoadingCandles && (
-          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center space-x-2 text-xs font-mono text-emerald-400 z-20 pointer-events-none">
-            <RefreshCw className="w-4 h-4 animate-spin" />
-          <span>กำลังเตรียมกราฟ DEMO...</span>
-          </div>
-        )}
       </div>
 
-      {/* Chart Footer Indicator Badges & OHLC */}
-      <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-[11px] text-slate-400 font-mono">
-        <div className="flex items-center space-x-3 sm:space-x-4">
-          <span>O: <strong className="text-slate-200">{quotePrefix}{formatNumber(ohlc.open || currentPrice, pair.precision || 2)}</strong></span>
-          <span>H: <strong className="text-emerald-400">{quotePrefix}{formatNumber(ohlc.high || currentPrice, pair.precision || 2)}</strong></span>
-          <span>L: <strong className="text-rose-400">{quotePrefix}{formatNumber(ohlc.low || currentPrice, pair.precision || 2)}</strong></span>
-          <span>C: <strong className="text-slate-200">{quotePrefix}{formatNumber(ohlc.close || currentPrice, pair.precision || 2)}</strong></span>
-        </div>
-        <div className="text-emerald-400 font-semibold flex items-center space-x-1.5 text-[10px]">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
-          <span>ข้อมูลแท่งเทียน DEMO • 24h —</span>
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-[11px] text-slate-400 font-mono">
+        {ohlc ? (
+          <div className="flex items-center gap-3">
+            <span>O {quotePrefix}{formatNumber(ohlc.open, pair.precision || 2)}</span>
+            <span>H {quotePrefix}{formatNumber(ohlc.high, pair.precision || 2)}</span>
+            <span>L {quotePrefix}{formatNumber(ohlc.low, pair.precision || 2)}</span>
+            <span>C {quotePrefix}{formatNumber(ohlc.close, pair.precision || 2)}</span>
+          </div>
+        ) : <span>OHLC: ยังไม่มีข้อมูล</span>}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span aria-label={`Trades status ${tradeStatus?.status || 'UNAVAILABLE'}`}>Trades: {tradeStatus?.status || 'UNAVAILABLE'}</span>
+          <span>{tradeStatus?.source || 'ยังไม่มี trades source'}</span>
+          <span>{candleSourceText}</span>
+          {providerSymbol && ['UNAVAILABLE', 'NO_DATA'].includes(visibleHistoryState.status) && (
+            <button
+              type="button"
+              onClick={() => {
+                const viewKey = `${pair.symbol}|${timeframe}`
+                const previous = chartDataRef.current
+                const candles = previous.viewKey === viewKey ? previous.candles : []
+                const snapshot = captureChartView(chartInstanceRef.current?.timeScale(), candles)
+                retryViewRef.current = { viewKey, snapshot }
+                setHistoryRequest((value) => value + 1)
+              }}
+              className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2"
+            >ลองโหลด history ใหม่</button>
+          )}
+          <span>PAPER trading</span>
         </div>
       </div>
     </div>

@@ -28,3 +28,15 @@ dist-ssr
 .env
 .env.*
 !.env.example
+!.env.test.example
+!.env.auth.test.example
+!.env.auth.local.example
+!.env.backup.test.example
+
+# FINNTECH tracker workspace outputs
+apps/*/dist
+packages/*/dist
+apps/*/coverage
+packages/*/coverage
+coverage
+apps/api/src/generated

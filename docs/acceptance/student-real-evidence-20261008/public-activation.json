@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "url": "https://finntech-personal.onrender.com",
+  "deploy": "dep-db3qikmgekts73fql4f0",
+  "renderStatus": "Live",
+  "publicRegistration": true,
+  "authenticationMode": "email-password",
+  "recovery": false,
+  "confirmation": "Owner explicitly confirmed public activation",
+  "publicAcceptanceExit": 0,
+  "persistenceRecheckExit": 0
+}

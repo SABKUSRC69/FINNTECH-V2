@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "downloaded": true,
+  "parsed": true,
+  "version": 2,
+  "transactions": 1,
+  "trades": 1,
+  "cashAccounts": 1,
+  "credentialFields": false
+}

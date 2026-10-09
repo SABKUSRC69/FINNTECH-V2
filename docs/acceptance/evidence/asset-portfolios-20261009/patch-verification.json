@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "patch": "docs/acceptance/asset-portfolios-20261009.patch",
+  "bytes": 2616359,
+  "baselineFiles": 634,
+  "changedFiles": 124,
+  "unchangedBaselineFiles": 614,
+  "missingBaselineFiles": [],
+  "gitApplyCheckExit": 0,
+  "scratchApplyExit": 0,
+  "verifiedPostFiles": 739,
+  "patchSha256": "15481d7eb86ece134c2e98f37de1230a3128e9bb3a2eb6cf95df24050adbfbae",
+  "commit": false,
+  "push": false,
+  "deploy": false
+}

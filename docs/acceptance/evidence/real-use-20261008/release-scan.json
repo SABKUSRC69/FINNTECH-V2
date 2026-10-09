@@ -1,0 +1,25 @@
+{
+  "scannedFiles": 4707,
+  "secretMatches": 0,
+  "advisoryPackages": {
+    "prisma": false,
+    "@prisma/config": false,
+    "deepmerge-ts": false,
+    "mysql2": false,
+    "source-map-js": false
+  },
+  "assets": [
+    {
+      "name": "index-C6gUoZb_.js",
+      "sha256": "3a1d6465e815a7341b59abb428772f975efd87287acda9918114eb8d39eba56c"
+    },
+    {
+      "name": "index-XFcPHNIy.css",
+      "sha256": "2b59b0c263070e688b3f72b64408e4b7a17ae2e4573606aa498e625a666c3671"
+    }
+  ],
+  "runtimePackageCount": 119,
+  "localLogFiles": 42,
+  "localLogSecretMatches": 0,
+  "scope": "Only randomized synthetic rehearsal secrets; no cloud/private owner secrets accessed. Source/env excluded from release context. NOT a universal secret detector."
+}

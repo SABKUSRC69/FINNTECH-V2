@@ -1,0 +1,56 @@
+{
+  "target": "dedicated synthetic PostgreSQL:5441",
+  "timingsMs": {
+    "verified": [
+      526,
+      524,
+      521,
+      523,
+      524
+    ],
+    "unverified": [
+      512,
+      523,
+      524,
+      521,
+      553
+    ],
+    "unknown": [
+      518,
+      521,
+      513,
+      515,
+      519
+    ]
+  },
+  "websocketRevocationMs": {
+    "market": 5008,
+    "stocks": 5008,
+    "includesResetAndDatabaseLatency": true
+  },
+  "invariants": {
+    "ledgerOwnerDigestUnchanged": true,
+    "decimalPrecisionUnchanged": true,
+    "ownerMappingUnchanged": true,
+    "noAutoSessionAfterVerifyOrReset": true
+  },
+  "faultHits": [
+    "after-consume",
+    "after-hash",
+    "after-password-update",
+    "before-session-revoke",
+    "after-reset-hook",
+    "after-session-revoke",
+    "before-delivery-enqueue"
+  ],
+  "boundedDeliveryAttempts": 4,
+  "actualResetResponseLossAfterCommit": true,
+  "rateLimitSharedAcrossActualProcesses": true,
+  "actualDeliveryRestartRecovered": true,
+  "websocketDatabaseFailureMs": {
+    "market": 3808,
+    "stocks": 3809,
+    "includesDatabaseStopLatency": true
+  },
+  "actualProcessAndDatabaseRestart": true
+}

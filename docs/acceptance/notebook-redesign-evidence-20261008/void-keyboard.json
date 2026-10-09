@@ -1,0 +1,22 @@
+{
+  "voidFocusBefore": {
+    "dialog": true,
+    "inside": true,
+    "label": ""
+  },
+  "voidWrap": {
+    "dialog": true,
+    "inside": true,
+    "label": "กลับโดยไม่ยกเลิก"
+  },
+  "voidForward": {
+    "dialog": true,
+    "inside": true,
+    "label": "ปิดยืนยันยกเลิกรายการ"
+  },
+  "voidReturn": {
+    "dialog": false,
+    "inside": false,
+    "label": "ยกเลิกรายการ"
+  }
+}

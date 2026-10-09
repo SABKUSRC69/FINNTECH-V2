@@ -1,0 +1,43 @@
+
+> finntech@1.0.0 pretest
+> npm run tracker:build:shared && npm --workspace apps/api run prisma:generate
+
+
+> finntech@1.0.0 tracker:build:shared
+> npm --workspace packages/finance run build && npm --workspace packages/contracts run build
+
+
+> @finntech/finance@0.1.0 build
+> tsc -p tsconfig.build.json
+
+
+> @finntech/contracts@0.1.0 build
+> tsc -p tsconfig.build.json
+
+
+> @finntech/api@0.1.0 prisma:generate
+> prisma generate
+
+
+✔ Generated Prisma Client (7.10.0) to .\src\generated\prisma in 310ms
+
+
+> finntech@1.0.0 test
+> vitest run --configLoader runner
+
+
+ RUN  v5.0.1 C:/Users/Admin/Downloads/FINNTECH
+
+
+ Test Files  49 passed (49)
+      Tests  408 passed (408)
+   Start at  23:02:51
+   Duration  9.96s (environment 42%, tests 24%, import 22%, transform 11%, worker 1%)
+
+Environment  happy-dom was created 49 times · 43.90s total, 42% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma\schema.prisma.

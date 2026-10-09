@@ -1,0 +1,20 @@
+{
+  "commit": "8d74df8e3aa2b31310681edc59890b716216241b",
+  "branch": "codex/student-real-use",
+  "pushExit": 0,
+  "files": [
+    "apps/web/THIRD_PARTY_NOTICES.md",
+    "apps/web/public/art/notebook-cat.svg",
+    "apps/web/public/art/notebook-stickers.svg",
+    "apps/web/src/App.tsx",
+    "apps/web/src/auth/AccountDeletion.tsx",
+    "apps/web/src/journal.css",
+    "apps/web/src/presentation.tsx",
+    "apps/web/src/tracker/Account.tsx",
+    "apps/web/src/tracker/Backup.tsx",
+    "apps/web/src/tracker/FinanceHistory.tsx",
+    "apps/web/src/tracker/ModalDialog.tsx",
+    "apps/web/src/tracker/PageIntro.tsx",
+    "apps/web/src/tracker/TrackerNavigation.tsx"
+  ]
+}

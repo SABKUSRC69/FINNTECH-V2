@@ -1,0 +1,27 @@
+
+> @finntech/api@0.1.0 pretest
+> npm run prisma:generate
+
+
+> @finntech/api@0.1.0 prisma:generate
+> prisma generate
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma\schema.prisma.
+
+✔ Generated Prisma Client (7.10.0) to .\src\generated\prisma in 1.45s
+
+
+> @finntech/api@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.1 C:/Users/Admin/Downloads/FINNTECH/apps/api
+
+
+ Test Files  14 passed (14)
+      Tests  125 passed (125)
+   Start at  20:30:23
+   Duration  17.50s (import 61%, transform 24%, tests 14%, worker 1%)
+

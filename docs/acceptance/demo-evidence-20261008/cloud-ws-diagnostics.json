@@ -1,0 +1,69 @@
+[
+  {
+    "event": "open",
+    "elapsed": 817,
+    "route": "market"
+  },
+  {
+    "event": "message",
+    "elapsed": 819,
+    "route": "market"
+  },
+  {
+    "event": "open",
+    "elapsed": 905,
+    "route": "stocks"
+  },
+  {
+    "event": "message",
+    "elapsed": 905,
+    "route": "stocks"
+  },
+  {
+    "event": "message",
+    "elapsed": 2522,
+    "route": "market"
+  },
+  {
+    "event": "message",
+    "elapsed": 2536,
+    "route": "stocks"
+  },
+  {
+    "event": "signout",
+    "elapsed": 7629,
+    "status": 200
+  },
+  {
+    "event": "meAfterSignout",
+    "elapsed": 7965,
+    "status": 401
+  },
+  {
+    "event": "newHandshakeAfterLogout",
+    "elapsed": 8758,
+    "status": 401
+  },
+  {
+    "event": "close",
+    "elapsed": 27705,
+    "route": "market",
+    "code": 1006
+  },
+  {
+    "event": "close",
+    "elapsed": 27810,
+    "route": "stocks",
+    "code": 1006
+  },
+  {
+    "event": "finalSocketState",
+    "elapsed": 52973,
+    "readyState": 3
+  },
+  {
+    "event": "finalSocketState",
+    "elapsed": 52973,
+    "readyState": 3
+  }
+]

@@ -8,14 +8,22 @@ export default function PriceAlertModal({
   onClose,
   selectedSymbol,
   currentPrice,
+  priceStatus = 'UNAVAILABLE',
   alerts = [],
   onAddAlert,
   onDeleteAlert,
 }) {
-  const [symbol, setSymbol] = useState(selectedSymbol || 'BTC/USDT')
+  const [symbol, setSymbol] = useState(selectedSymbol || 'BTC/THB')
   const [condition, setCondition] = useState('GTE') // 'GTE' (>=) or 'LTE' (<=)
-  const [targetPrice, setTargetPrice] = useState(currentPrice ? currentPrice.toString() : '76500')
+  const [targetPrice, setTargetPrice] = useState(currentPrice ? currentPrice.toString() : '')
   const [note, setNote] = useState('')
+  const selectedPair = TRADING_PAIRS.find((pair) => pair.symbol === symbol) || TRADING_PAIRS[0]
+  const quoteAsset = selectedPair?.quoteAsset || 'THB'
+
+  React.useEffect(() => setSymbol(selectedSymbol || 'BTC/THB'), [selectedSymbol])
+  React.useEffect(() => {
+    if (!targetPrice && Number.isFinite(Number(currentPrice)) && Number(currentPrice) > 0) setTargetPrice(String(currentPrice))
+  }, [currentPrice, targetPrice])
 
   if (!isOpen) return null
 
@@ -100,13 +108,14 @@ export default function PriceAlertModal({
           {/* Target Price */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-[11px] text-slate-400 font-semibold">ราคาเป้าหมาย (Target Price USD)</label>
+              <label className="text-[11px] text-slate-400 font-semibold">ราคาเป้าหมาย ({quoteAsset})</label>
               <button
                 type="button"
-                onClick={() => setTargetPrice(currentPrice.toString())}
-                className="text-[10px] text-emerald-400 hover:underline"
+                disabled={priceStatus !== 'LIVE' || !Number.isFinite(Number(currentPrice)) || Number(currentPrice) <= 0}
+                onClick={() => setTargetPrice(String(currentPrice))}
+                className="text-[10px] text-emerald-400 hover:underline disabled:text-slate-600 disabled:no-underline"
               >
-                ดึงราคาปัจจุบัน (${formatNumber(currentPrice, 2)})
+                {priceStatus === 'LIVE' ? `ใช้ราคาปัจจุบัน (${quoteAsset} ${formatNumber(currentPrice, 2)})` : 'ราคาไม่ LIVE'}
               </button>
             </div>
             <input
@@ -115,7 +124,7 @@ export default function PriceAlertModal({
               required
               value={targetPrice}
               onChange={(e) => setTargetPrice(e.target.value)}
-              placeholder="เช่น 78000"
+              placeholder="ใส่ราคาเป้าหมาย"
               className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono font-bold focus:outline-none focus:border-emerald-500"
             />
           </div>

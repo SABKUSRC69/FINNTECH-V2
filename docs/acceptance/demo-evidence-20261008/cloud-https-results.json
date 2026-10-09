@@ -1,0 +1,60 @@
+{
+  "origin": "https://finntech-beta.onrender.com",
+  "checkedAt": "2026-10-07T21:00:07.886Z",
+  "results": [
+    {
+      "check": "HTTPS readiness and enabled synthetic-only DEMO",
+      "result": "PASS"
+    },
+    {
+      "check": "Direct APIs/code gate, exact Origin, signup/recovery unchanged",
+      "result": "PASS"
+    },
+    {
+      "check": "Incorrect code and oversized bodies rejected",
+      "result": "PASS"
+    },
+    {
+      "check": "Correct code, double submission and lost-response replay share one genuine Secure session",
+      "result": "PASS"
+    },
+    {
+      "check": "Reload/resume and bounded server workspace expiration",
+      "result": "PASS"
+    },
+    {
+      "check": "Independent owners reject foreign mutation/read spoof; Decimal and original-key ledger retry preserved",
+      "result": "PASS"
+    },
+    {
+      "check": "HTTPS backup attachment parses against contract and contains no credentials",
+      "result": "PASS"
+    },
+    {
+      "check": "Published HTML/JS/CSS contain no shared code",
+      "result": "PASS"
+    },
+    {
+      "check": "Real WSS authenticates both market and stocks; anonymous upgrade rejected",
+      "result": "PASS"
+    },
+    {
+      "check": "Measured real WSS client closure",
+      "result": "PASS",
+      "closureAfterLogoutMs": 22723,
+      "noMessagesAfterRevalidation": true
+    },
+    {
+      "check": "Logout revokes HTTP/receipt/WSS; new upgrades denied, data stops and both transports close",
+      "result": "PASS"
+    },
+    {
+      "check": "Fresh workspace receives new owner; verification sessions logged out without data deletion",
+      "result": "PASS"
+    },
+    {
+      "check": "Natural four-hour expiry, production code/epoch rotation and Render idle/cold start",
+      "result": "NOT TESTED"
+    }
+  ]
+}

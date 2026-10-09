@@ -1,0 +1,23 @@
+{
+  "status": "PASS",
+  "syntheticOnly": true,
+  "PostgreSQL": 18,
+  "archivePortable": true,
+  "authenticatedBeforeRestore": true,
+  "allPublicTablesAndConstraintsMatched": true,
+  "exactCastRewriteWhitelist": [
+    "delivery_kind",
+    "delivery_status"
+  ],
+  "constraintBehaviorMatched": true,
+  "sourceUnchanged": true,
+  "plaintextDiskFiles": false,
+  "targetNetwork": "none",
+  "tableCount": 27,
+  "evidenceSha256": "0e5781865233690a97441b04cfbcf0eefcb218c4e48e5b427163644e79a89dff",
+  "physicalOffDeviceCopy": "NOT_TESTED",
+  "actualSchedule": "NOT_TESTED",
+  "actualAlerts": "NOT_TESTED",
+  "productionRPO": "NOT_TESTED",
+  "productionRTO": "NOT_TESTED"
+}

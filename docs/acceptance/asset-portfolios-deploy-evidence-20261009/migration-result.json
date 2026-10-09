@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "exitCode": 0,
+  "migrations": 13,
+  "newMigrations": [
+    "20261009000000_owned_asset_ledgers",
+    "20261009000001_asset_history_guards",
+    "20261009000002_asset_numeric_invariants"
+  ],
+  "existingDatasetTablesUnchanged": 12,
+  "demoUntouched": true
+}

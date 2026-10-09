@@ -1,0 +1,96 @@
+- link "ข้ามไปยังเนื้อหา":
+  - /url: "#tracker-content"
+- banner:
+  - generic: F
+  - text: FINNTECH
+  - generic: PERSONAL MONEY JOURNAL
+  - generic: บัญชีส่วนบุคคล
+  - button "ซ่อนยอดเงิน":
+  - button "เปิดโหมดมืด":
+- navigation "ส่วนการเงิน":
+  - text: FINNTECH
+  - generic: สมุดการเงินของคุณ
+  - paragraph: สารบัญการเงิน
+  - button "สินทรัพย์รวม":
+    - generic: สินทรัพย์รวม
+  - button "รายรับรายจ่าย":
+    - generic: รายรับรายจ่าย
+  - button "พอร์ตคริปโต" [active] [pressed]:
+    - generic: พอร์ตคริปโต
+  - button "งบประมาณ":
+    - generic: งบประมาณ
+  - button "สำรองข้อมูล":
+    - generic: สำรองข้อมูล
+  - button "บัญชีและดูแลข้อมูล":
+    - generic: บัญชีและดูแลข้อมูล
+  - button "ราคาหุ้นสหรัฐ":
+    - generic: ราคาหุ้นสหรัฐ
+  - paragraph:
+    - text: บันทึกด้วยตัวเอง
+    - text: THB และ USDT แยกกัน
+- main:
+  - paragraph: YOUR INVESTMENT RECORDS
+  - heading "พอร์ตคริปโต" [level=1]
+  - paragraph: ติดตามต้นทุนและประวัติ · USDT แยกต่อพอร์ต ไม่มีการส่งคำสั่งซื้อขาย
+  - paragraph: สวัสดี Synthetic student acceptance 1
+  - button "โหลดข้อมูลล่าสุด"
+  - button "ออกจากระบบ"
+  - heading "พอร์ตคริปโต · USDT" [level=2]
+  - paragraph: บันทึกประวัติด้วยมือ · ไม่มีการส่งคำสั่งตลาด · ค่าธรรมเนียมคิดเป็น USDT
+  - text: พอร์ตที่ดู
+  - combobox "พอร์ตที่ดู":
+    - option "เลือกพอร์ต"
+    - option "Synthetic acceptance portfolio" [selected]
+  - heading "สินทรัพย์ที่ถืออยู่" [level=3]
+  - paragraph: "มูลค่ารวม: 0.0008173001 USDT"
+  - article:
+    - heading "BTC" [level=4]
+    - generic: ราคาอ้างอิงพร้อม
+    - generic: ปริมาณ 0.00000001
+    - generic: ต้นทุน 0.009999991234567891 USDT
+    - generic: ต้นทุนเฉลี่ย 999,999.1234567891 USDT
+    - generic: ราคาอ้างอิง 81,730.01 USDT
+    - generic: มูลค่าประเมิน 0.0008173001 USDT
+    - generic: กำไร/ขาดทุนรับรู้ 0.00 USDT
+    - generic: กำไร/ขาดทุนยังไม่รับรู้ -0.009182691134567891 USDT
+    - generic: ผลตอบแทนต้นทุน -91.83% · ไม่ใช่การเปลี่ยนแปลงราคาตลาด
+    - generic: สัดส่วนพอร์ต 100.00%
+    - text: Binance public · USDT · รายการซื้อขายต้นทาง
+    - text: "เวลาต้นทาง: 2026-10-08T19:46:45.389Z"
+    - text: "เวลารับ: 2026-10-08T19:46:45.459Z · ไม่มี feed/ไม่รองรับแสดง N/A"
+  - paragraph: ราคาผ่าน backend · เกิน 30 วินาทีถือว่าล้าสมัย · ไม่รวมยอดกับ THB
+  - heading "บันทึกซื้อ/ขายในประวัติ" [level=3]
+  - form "บันทึกคริปโต":
+    - text: สินทรัพย์
+    - combobox "สินทรัพย์": BTC
+    - text: ชนิดประวัติ
+    - combobox "ชนิดประวัติ":
+      - option "ซื้อ" [selected]
+      - option "ขาย"
+    - text: ปริมาณ
+    - textbox "ปริมาณ"
+    - text: ราคาต่อหน่วย USDT
+    - textbox "ราคาต่อหน่วย USDT"
+    - text: ค่าธรรมเนียม USDT
+    - textbox "ค่าธรรมเนียม USDT": "0"
+    - text: วันที่ในประวัติ
+    - textbox "วันที่ในประวัติ": 2026-10-09
+    - button "บันทึกประวัติ"
+  - heading "สร้างพอร์ตแยก" [level=3]
+  - form "สร้างพอร์ต":
+    - text: ชื่อพอร์ต
+    - textbox "ชื่อพอร์ต"
+    - button "สร้างพอร์ต"
+  - paragraph: ต้นทุนแยกต่อพอร์ตและสินทรัพย์ ค้นหา BTC, ETH, SOL, XRP, BNB, DOGE และ ADA จากรายชื่อที่ backend ยืนยันคู่ spot USDT แล้ว สินทรัพย์ไม่รองรับ/ถูกถอดยังเก็บประวัติไว้ แต่การประเมินเป็น N/A เริ่มถือครองเดิมด้วยประวัติซื้อและต้นทุนที่ทราบ ไม่หักเงินสดอัตโนมัติ
+  - heading "ประวัติของพอร์ต" [level=3]
+  - paragraph: การแก้ไขรักษาพอร์ตและสินทรัพย์เดิม เก็บต้นฉบับและคำนวณต้นทุนใหม่ทั้งประวัติ
+  - paragraph: ซื้อ BTC · 2026-10-08
+  - paragraph: 0.00000001 @ 999,999.123456789012345678 USDT · fee 0.000000000000000001
+  - button "แก้ไขประวัติ"
+  - button "ยกเลิกประวัติ"
+  - paragraph: ข้อมูล DEMO เดิมยังอยู่ที่ต้นทาง ไม่มีการย้ายหรือรวมยอดอัตโนมัติ เวอร์ชันนี้ยังไม่เปิดการนำเข้า legacy
+- contentinfo:
+  - group "ความเป็นส่วนตัวและเงื่อนไขการใช้":
+    - generic "ความเป็นส่วนตัวและเงื่อนไขการใช้ FINNTECH"
+  - paragraph:
+    - text: ข้อมูลเพื่อการติดตาม ไม่ใช่คำแนะนำการลงทุน

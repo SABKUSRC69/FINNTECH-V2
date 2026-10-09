@@ -1,0 +1,242 @@
+[
+  {
+    "width": 320,
+    "page": "assets",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 320,
+    "page": "crypto",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 320,
+    "page": "stocks",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 320,
+    "page": "backup",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 375,
+    "page": "assets",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 375,
+    "page": "crypto",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 375,
+    "page": "stocks",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 375,
+    "page": "backup",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 768,
+    "page": "assets",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 768,
+    "page": "crypto",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 768,
+    "page": "stocks",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 768,
+    "page": "backup",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 1024,
+    "page": "assets",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 1024,
+    "page": "crypto",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 1024,
+    "page": "stocks",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 1024,
+    "page": "backup",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 1440,
+    "page": "assets",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 1440,
+    "page": "crypto",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 1440,
+    "page": "stocks",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 1440,
+    "page": "backup",
+    "small": [],
+    "theme": "light"
+  },
+  {
+    "width": 320,
+    "page": "assets",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 320,
+    "page": "crypto",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 320,
+    "page": "stocks",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 320,
+    "page": "backup",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 375,
+    "page": "assets",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 375,
+    "page": "crypto",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 375,
+    "page": "stocks",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 375,
+    "page": "backup",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 768,
+    "page": "assets",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 768,
+    "page": "crypto",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 768,
+    "page": "stocks",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 768,
+    "page": "backup",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 1024,
+    "page": "assets",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 1024,
+    "page": "crypto",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 1024,
+    "page": "stocks",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 1024,
+    "page": "backup",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 1440,
+    "page": "assets",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 1440,
+    "page": "crypto",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 1440,
+    "page": "stocks",
+    "small": [],
+    "theme": "dark"
+  },
+  {
+    "width": 1440,
+    "page": "backup",
+    "small": [],
+    "theme": "dark"
+  }
+]

@@ -1,0 +1,19 @@
+name: finntech-beta-rehearsal-20261007
+services:
+  postgres-beta-rehearsal:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: finntech_beta_rehearsal_20261007
+      POSTGRES_USER: beta_fixture
+      POSTGRES_PASSWORD: ${BETA_REHEARSAL_PASSWORD:?Synthetic password required}
+    ports:
+      - "127.0.0.1:5442:5432"
+    volumes:
+      - beta_rehearsal_20261007_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U beta_fixture -d finntech_beta_rehearsal_20261007"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+volumes:
+  beta_rehearsal_20261007_pgdata:

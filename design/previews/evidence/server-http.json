@@ -1,0 +1,8 @@
+{
+  "pid": 5700,
+  "status": 200,
+  "host": "127.0.0.1:4296",
+  "csp": [
+    "default-src 'self'; connect-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'"
+  ]
+}

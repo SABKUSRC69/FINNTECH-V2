@@ -1,0 +1,13 @@
+{
+  "auditExit": 1,
+  "findings": {
+    "info": 0,
+    "low": 0,
+    "moderate": 2,
+    "high": 12,
+    "critical": 0,
+    "total": 14
+  },
+  "runtimePackages": 119,
+  "runtimeAffectedNames": []
+}

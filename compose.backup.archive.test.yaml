@@ -1,0 +1,19 @@
+name: finntech-archive-restore-20261006
+services:
+  postgres-archive-restore:
+    image: postgres:16-alpine
+    pull_policy: never
+    network_mode: none
+    environment:
+      POSTGRES_DB: finntech_archive_restore_test
+      POSTGRES_USER: restore_fixture
+      POSTGRES_PASSWORD: ${TRACKER_BACKUP_TEST_DB_PASSWORD:?Set the existing synthetic password in .env.backup.test}
+    volumes:
+      - archive_restore_20261006_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U restore_fixture -d finntech_archive_restore_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+volumes:
+  archive_restore_20261006_pgdata:

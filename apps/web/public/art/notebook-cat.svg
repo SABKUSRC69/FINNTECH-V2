@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 200" fill="none">
+  <!-- Original FINNTECH artwork: a cat with its little ledger. No Canva asset reused. -->
+  <ellipse cx="118" cy="178" rx="85" ry="9" fill="#795044" opacity=".1"/>
+  <g stroke="#795044" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M167 165c44 1 47-31 28-37-13-4-19 9-10 15" fill="#dfbb96"/>
+    <path d="M77 111c-13 20-11 48 0 58 14 9 70 9 87-1 10-16 4-43-8-59" fill="#ead0b2"/>
+    <path d="m63 64 6-35 29 19c13-4 32-4 45 0l25-20 10 39c9 9 9 31 0 42-15 19-79 18-102 0-13-10-18-28-13-45Z" fill="#fff4df"/>
+    <path d="m74 44 9 13M160 44l-8 15M110 49l-2 12m15-12 1 12" stroke="#bb8b68" stroke-width="5"/>
+    <path d="M111 92q8 10 14 0m-8-6 3 4 4-4Z" fill="#795044"/>
+    <path d="m68 87-19-4m20 12-17 5m121-14 20-5m-20 14 17 5"/>
+    <circle cx="97" cy="82" r="3" fill="#49312d" stroke="none"/><circle cx="144" cy="82" r="3" fill="#49312d" stroke="none"/>
+    <ellipse cx="86" cy="94" rx="8" ry="4" fill="#f2bdd0" stroke="none"/><ellipse cx="155" cy="94" rx="8" ry="4" fill="#f2bdd0" stroke="none"/>
+    <path d="m85 116 67 2-5 54-66-2Z" fill="#b9d9ea"/>
+    <path d="m100 118-4 53M107 134l27 1m-28 12 25 1m-26 12 19 1" stroke="#795044" stroke-width="2"/>
+    <path d="M82 126c-18-3-18 16-3 20m71-19c19-2 20 14-1 20" fill="#fff4df"/>
+    <path d="M89 169c-13-7-24 3-17 9h32m43-9c14-7 23 3 16 9h-31" fill="#ead0b2"/>
+    <path d="m200 47 3-7 3 7 8 2-8 3-3 7-3-7-7-3Z" fill="#f2bdd0" stroke-width="2"/>
+    <path d="M30 128c-12-9-21 3-3 14l3 2 3-2c18-11 9-23-3-14Z" fill="#f2bdd0" stroke-width="2"/>
+  </g>
+</svg>

@@ -1,0 +1,94 @@
+{
+  "checkedAt": "2026-10-07T21:30:22.634Z",
+  "baseline": "Saved exact pre-task working tree",
+  "files": [
+    {
+      "file": "apps/web/src/App.tsx",
+      "beforeSha256": "366c1263e8c443cf27918944c5777d2c2a2c7c34c6dd7f77c9490dbd7b53c91e",
+      "afterSha256": "de99db5defbeec9c54cc562af77e5e43b344b9739dedbe2554d23e2e52c6ca2d"
+    },
+    {
+      "file": "apps/web/src/App.test.tsx",
+      "beforeSha256": "ae878afd35fa229d1ce55de5062ec3e0be7b57d0bf6a3e218ca9bfb3e9a09a50",
+      "afterSha256": "109e24e02ac64b43ea25a6a809c1980cd61dd30fa44db83b3ebe3d13d70c57a5"
+    },
+    {
+      "file": "apps/web/src/auth/DemoEntry.tsx",
+      "beforeSha256": "a1ef4588c56908c6b59a120b824ac45b14249968f946048fcc6f696999f43fed",
+      "afterSha256": "9947f5b6bd45052c2f46d5a62d94f863ac8e5ac611d98df97df10eb6981d8b53"
+    },
+    {
+      "file": "apps/web/src/auth/DemoEntry.test.tsx",
+      "beforeSha256": "1b926844f4ed1c7a95c001e1c2faaff313e86e5217ad564308f59dfba5d1bebd",
+      "afterSha256": "cd6ad2e583e68c9d09485c61b2dcca58867e95bc799045337867a33ae7c010c7"
+    },
+    {
+      "file": "apps/web/src/auth/client.ts",
+      "beforeSha256": "771ee936568c728c0d73a2b756def7afba7c4e2d6d3b9abf607123176ed731cc",
+      "afterSha256": "a132f2f6a4feec37a352fe1495c913e73bf51694bb1768161ea9e5bd364657db"
+    },
+    {
+      "file": "apps/web/src/auth/client.test.ts",
+      "beforeSha256": "dbd1e4a79bbc41810b97a5ae740dd58ad9af58e1d3137afe6128dcdc6e632253",
+      "afterSha256": "e535c49994b936f676c11cce1764a11aba57867e9ebe24f477eae65895503643"
+    },
+    {
+      "file": "docs/acceptance/demo-review-fix-20261008.md",
+      "beforeSha256": null,
+      "afterSha256": "c691ad7ccfebafd3f1ee2c15a83f82bab116acdb888eef1670dabda19ec31f94"
+    }
+  ],
+  "patchSha256": "01d14eb17cfe9d2d57f783959ce5e3ce49efbb0dab0bbc06dd158c0a5636fb7b",
+  "patchCheckExit": 0,
+  "priorReleaseNonTargetFilesUnchanged": 132,
+  "checks": [
+    {
+      "command": "npm test",
+      "exit": 0,
+      "durationMs": 15506
+    },
+    {
+      "command": "npm run build",
+      "exit": 0,
+      "durationMs": 5843
+    },
+    {
+      "command": "npm run tracker:typecheck",
+      "exit": 0,
+      "durationMs": 14054
+    },
+    {
+      "command": "npm run tracker:test",
+      "exit": 0,
+      "durationMs": 21340
+    },
+    {
+      "command": "npm run tracker:build",
+      "exit": 0,
+      "durationMs": 12115
+    },
+    {
+      "command": "node --no-strip-types scripts/tracker-package-smoke.mjs",
+      "exit": 0,
+      "durationMs": 243
+    },
+    {
+      "command": "git diff --check",
+      "exit": 0,
+      "durationMs": 242
+    }
+  ],
+  "focused": {
+    "before": {
+      "exit": 1,
+      "failed": 6,
+      "passed": 21
+    },
+    "final": {
+      "exit": 0,
+      "passed": 35
+    }
+  },
+  "productionAccessed": false,
+  "commitPushDeploy": false
+}

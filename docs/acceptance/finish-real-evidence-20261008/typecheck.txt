@@ -1,0 +1,45 @@
+
+> finntech@1.0.0 tracker:typecheck
+> npm run tracker:build:shared && npm --workspace packages/finance run typecheck && npm --workspace packages/contracts run typecheck && npm --workspace apps/api run typecheck && npm --workspace apps/web run typecheck
+
+
+> finntech@1.0.0 tracker:build:shared
+> npm --workspace packages/finance run build && npm --workspace packages/contracts run build
+
+
+> @finntech/finance@0.1.0 build
+> tsc -p tsconfig.build.json
+
+
+> @finntech/contracts@0.1.0 build
+> tsc -p tsconfig.build.json
+
+
+> @finntech/finance@0.1.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> @finntech/contracts@0.1.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> @finntech/api@0.1.0 pretypecheck
+> npm run prisma:generate
+
+
+> @finntech/api@0.1.0 prisma:generate
+> prisma generate
+
+Loaded Prisma config from prisma.config.ts.
+
+Prisma schema loaded from prisma\schema.prisma.
+
+✔ Generated Prisma Client (7.10.0) to .\src\generated\prisma in 275ms
+
+
+> @finntech/api@0.1.0 typecheck
+> tsc -p tsconfig.json --noEmit
+
+
+> @finntech/web@0.1.0 typecheck
+> tsc -p tsconfig.json --noEmit

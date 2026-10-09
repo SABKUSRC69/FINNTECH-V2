@@ -1,0 +1,19 @@
+name: finntech-auth-test
+services:
+  postgres-auth-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: finntech_auth_test
+      POSTGRES_USER: auth_fixture
+      POSTGRES_PASSWORD: ${TRACKER_AUTH_DB_PASSWORD:?Set a synthetic local password in .env.auth.test}
+    ports:
+      - "127.0.0.1:5435:5432"
+    volumes:
+      - finntech_auth_test_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_fixture -d finntech_auth_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  finntech_auth_test_pgdata:

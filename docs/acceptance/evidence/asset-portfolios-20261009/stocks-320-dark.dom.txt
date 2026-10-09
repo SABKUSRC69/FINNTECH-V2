@@ -1,0 +1,236 @@
+- link "ข้ามไปยังเนื้อหา":
+  - /url: "#tracker-content"
+- banner:
+  - generic: F
+  - generic: FINNTECH
+  - button "ซ่อนยอดเงิน":
+  - button "เปิดโหมดสว่าง" [pressed]:
+- navigation "เมนูมือถือ":
+  - button "ภาพรวม":
+    - generic: ภาพรวม
+  - button "รายการ":
+    - generic: รายการ
+  - button "พอร์ต":
+    - generic: พอร์ต
+  - button "เพิ่มเติม" [active]:
+    - generic: เพิ่มเติม
+- main:
+  - paragraph: YOUR STOCK RECORDS
+  - heading "ราคาหุ้นสหรัฐ" [level=1]
+  - paragraph: บันทึกหุ้นและ ETF · ต้นทุน/ประวัติ USD แยกจาก watchlist
+  - paragraph: สวัสดี บัญชีสังเคราะห์ — ทดสอบพอร์ต
+  - button "โหลดข้อมูลล่าสุด"
+  - button "ออกจากระบบ"
+  - region "ราคาหุ้นสหรัฐ":
+    - region "พอร์ตหุ้นและ ETF":
+      - heading "หุ้นและ ETF ที่คุณบันทึก · USD" [level=2]
+      - paragraph: ติดตามสิ่งที่ถืออยู่ภายนอก ไม่มีการส่งคำสั่งหรือหักเงินสด ไม่รองรับ split/dividend หรือ corporate actions อัตโนมัติ
+      - text: พอร์ตหุ้น
+      - combobox "พอร์ตหุ้น":
+        - option "เลือกพอร์ต"
+        - option "พอร์ตหุ้นสังเคราะห์" [selected]
+      - paragraph: "มูลค่าประเมินของพอร์ต: N/A USD · ข้อมูลราคายังไม่ครบ"
+      - article:
+        - heading "AAPL" [level=3]
+        - paragraph: จำนวน 0.50 หุ้น
+        - paragraph: ต้นทุน 51.00 USD · เฉลี่ย 102.00 USD
+        - paragraph: มูลค่าประเมิน N/A USD
+        - paragraph: ราคาอ้างอิง N/A USD/หุ้น
+        - paragraph:
+          - text: Alpaca IEX · เวลาต้นทาง N/A
+          - text: เวลารับ N/A
+        - paragraph: กำไร/ขาดทุนรับรู้ 0.00 USD
+        - paragraph: ยังไม่รับรู้ N/A USD · ผลตอบแทน N/A%
+        - paragraph: สัดส่วน N/A%
+        - paragraph: ไม่มีราคาสดที่บัญชีนี้มีสิทธิ์ใช้ ต้นทุนและประวัติยังครบ
+      - heading "สร้างพอร์ตหุ้น" [level=3]
+      - form "สร้างพอร์ตหุ้น":
+        - text: ชื่อพอร์ตหุ้น
+        - textbox "ชื่อพอร์ตหุ้น"
+        - button "สร้างพอร์ตหุ้น"
+      - heading "บันทึกประวัติซื้อ/ขายหุ้น" [level=3]
+      - paragraph: เริ่มตำแหน่งที่ถืออยู่ด้วยประวัติซื้อ ระบุวันที่ จำนวน และต้นทุนจริงที่ทราบ ค่าธรรมเนียมเป็น USD · วันเดียวกันเรียงตามลำดับบันทึก การแก้ไขคงลำดับเดิมและย้อนคำนวณทั้งประวัติ
+      - form "บันทึกประวัติหุ้น":
+        - text: หลักทรัพย์ US / USD
+        - combobox "หลักทรัพย์ US / USD": AAPL
+        - text: ชนิดประวัติหุ้น
+        - combobox "ชนิดประวัติหุ้น":
+          - option "ซื้อ" [selected]
+          - option "ขาย"
+        - text: จำนวนหุ้น (รวมเศษหุ้น)
+        - textbox "จำนวนหุ้น (รวมเศษหุ้น)"
+        - text: ราคาประวัติต่อหุ้น USD
+        - textbox "ราคาประวัติต่อหุ้น USD"
+        - text: ค่าธรรมเนียม USD
+        - textbox "ค่าธรรมเนียม USD": "0"
+        - text: วันที่ประวัติหุ้น
+        - textbox "วันที่ประวัติหุ้น": 2026-10-09
+        - text: บันทึกหุ้น
+        - textbox "บันทึกหุ้น"
+        - button "บันทึกประวัติหุ้น"
+      - heading "ประวัติพอร์ตหุ้น" [level=3]
+      - article:
+        - paragraph: 2026-10-08 · ซื้อ AAPL · 0.50 @ 100.00 USD · fee 1.00 USD
+        - paragraph: ประวัติสมมติ ไม่มีการซื้อขายจริง
+        - button "แก้ไขประวัติหุ้น"
+        - button "ยกเลิกประวัติหุ้น"
+    - heading "ติดตามหุ้นและ ETF สหรัฐ · USD" [level=2]
+    - paragraph: Alpaca Basic · ราคา last trade จาก IEX เท่านั้น ไม่ใช่ราคาครบทุกตลาดสหรัฐ · สูงสุด 30 หลักทรัพย์
+    - paragraph: Watchlist ไม่ใช่รายการที่คุณถือจริง แยกจากการถือครอง ไม่รวมยอดตามรายชื่อที่ติดตาม ราคา IEX ใช้ได้เฉพาะเจ้าของ key ตามสิทธิ์เดิม ผู้ใช้ทั่วไปบันทึกต้นทุนและประวัติได้แม้ราคา N/A
+    - status: ยังไม่ได้ตั้งค่า Alpaca key ฝั่ง server
+    - paragraph: เจ้าของต้องรับ key ฟรีจาก Alpaca และตั้งค่าเฉพาะฝั่ง server ก่อน ไม่ต้องส่ง key หรือ secret ในแชต ระบบไม่แสดงราคาจำลอง
+    - article "ราคา AAPL":
+      - heading "AAPL" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา MSFT":
+      - heading "MSFT" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา NVDA":
+      - heading "NVDA" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา AMZN":
+      - heading "AMZN" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา GOOGL":
+      - heading "GOOGL" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา META":
+      - heading "META" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา TSLA":
+      - heading "TSLA" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา AVGO":
+      - heading "AVGO" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา AMD":
+      - heading "AMD" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา INTC":
+      - heading "INTC" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา QCOM":
+      - heading "QCOM" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา ORCL":
+      - heading "ORCL" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา CRM":
+      - heading "CRM" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา ADBE":
+      - heading "ADBE" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา NFLX":
+      - heading "NFLX" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา JPM":
+      - heading "JPM" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา BAC":
+      - heading "BAC" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา V":
+      - heading "V" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา MA":
+      - heading "MA" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา WMT":
+      - heading "WMT" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา COST":
+      - heading "COST" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา KO":
+      - heading "KO" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา PEP":
+      - heading "PEP" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา XOM":
+      - heading "XOM" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา CVX":
+      - heading "CVX" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา JNJ":
+      - heading "JNJ" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา PG":
+      - heading "PG" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา UNH":
+      - heading "UNH" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา SPY":
+      - heading "SPY" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - article "ราคา QQQ":
+      - heading "QQQ" [level=3]
+      - generic: ราคาไม่พร้อม
+      - paragraph: N/A USD
+      - paragraph: "เวลารายการล่าสุด: N/A"
+    - paragraph: ราคาผ่าน backend และส่งเข้าเว็บทุก 5 วินาที · อายุรายการเกิน 30 วินาทีถือว่าเก่า · การเชื่อมต่อสำเร็จไม่ได้หมายความว่ามีการซื้อขายใหม่ตลอดเวลา · ใช้ส่วนตัวเฉพาะเจ้าของ key
+  - paragraph: ข้อมูล DEMO เดิมยังอยู่ที่ต้นทาง ไม่มีการย้ายหรือรวมยอดอัตโนมัติ เวอร์ชันนี้ยังไม่เปิดการนำเข้า legacy
+- contentinfo:
+  - paragraph:
+    - text: ข้อมูลเพื่อการติดตาม ไม่ใช่คำแนะนำการลงทุน

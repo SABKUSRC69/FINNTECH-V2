@@ -86,6 +86,9 @@ export class TradingViewSignalSimulatorService {
   // Register execution handler (called from TradingTerminal)
   onSignalReceived(callback) {
     this.executionCallback = callback
+    return () => {
+      if (this.executionCallback === callback) this.executionCallback = null
+    }
   }
 
   // Normalize incoming symbol from various formats (e.g. BINANCE:BTCUSDT -> BTC/USDT)
@@ -181,7 +184,7 @@ export class TradingViewSignalSimulatorService {
         symbol,
         action: String(payload.action || '').toUpperCase().trim() || 'EMPTY',
         status: 'REJECTED',
-        reason: 'รองรับเฉพาะคู่ Spot DEMO ในระบบ',
+        reason: 'รองรับเฉพาะคู่ Spot PAPER ในระบบ',
         comment: payload.comment || 'Unsupported Spot pair',
         isSimulation,
       }

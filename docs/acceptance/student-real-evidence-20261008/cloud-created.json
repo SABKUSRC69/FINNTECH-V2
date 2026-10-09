@@ -1,0 +1,7 @@
+{
+  "database": "finntech_personal",
+  "role": "personal_app",
+  "registration": "closed",
+  "demoDatabaseUntouched": true,
+  "newRolePrivileged": false
+}

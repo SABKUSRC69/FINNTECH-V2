@@ -1,0 +1,88 @@
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, describe, it, expect, vi } from 'vitest'
+import { randomBytes } from 'node:crypto'
+import DemoEntry from './DemoEntry'
+import { AuthRequestError, readAccount, submitDemo } from './client'
+
+vi.mock('./client', async importOriginal => ({ ...await importOriginal<typeof import('./client')>(), readAccount: vi.fn(), submitDemo: vi.fn() }))
+afterEach(() => { cleanup(); vi.resetAllMocks() })
+describe('demo entry workflow', () => {
+  it('keeps a committed entry locked across repeated verification failure and nonterminal replay rejection', async () => {
+    const code = randomBytes(24).toString('hex'), complete = vi.fn(), pendingLock = vi.fn()
+    vi.mocked(submitDemo).mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new AuthRequestError('temporarily rejected')).mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined)
+    vi.mocked(readAccount).mockRejectedValueOnce(new AuthRequestError('GET failed'))
+      .mockRejectedValueOnce(new AuthRequestError('GET still failed')).mockResolvedValueOnce({ status: 'signed-in', account: { name: 'Synthetic', demo: true } })
+    render(<DemoEntry complete={complete} lock={vi.fn()} pendingLock={pendingLock} disabled={false} />)
+    const field = screen.getByLabelText('รหัสทดลอง') as HTMLInputElement
+    fireEvent.change(field, { target: { value: code } }); fireEvent.submit(screen.getByRole('form'))
+    for (const text of ['GET failed', 'temporarily rejected', 'GET still failed']) {
+      await screen.findByText(text)
+      expect(field.disabled).toBe(true); expect(field.value).toBe(code)
+      expect(screen.getByRole('button', { name: 'เริ่มพื้นที่ทดลองใหม่' }).hasAttribute('disabled')).toBe(true)
+      expect(pendingLock).not.toHaveBeenCalledWith(false)
+      fireEvent.click(screen.getByRole('button', { name: 'ตรวจผลคำขอ DEMO เดิม' }))
+    }
+    await waitFor(() => expect(complete).toHaveBeenCalledOnce())
+    expect(submitDemo).toHaveBeenCalledTimes(5)
+    expect(vi.mocked(submitDemo).mock.calls).toEqual([['prepare'], ...Array.from({ length: 4 }, () => ['enter', code])])
+    expect(field.value).toBe(''); expect(pendingLock).toHaveBeenLastCalledWith(false)
+  })
+  it('allows a deliberate fresh action only after the original receipt returns terminal 410', async () => {
+    const pendingLock = vi.fn()
+    vi.mocked(submitDemo).mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new AuthRequestError('ended receipt', false, true)).mockResolvedValueOnce(undefined)
+    vi.mocked(readAccount).mockRejectedValueOnce(new AuthRequestError('verification failed'))
+    render(<DemoEntry complete={vi.fn()} lock={vi.fn()} pendingLock={pendingLock} disabled={false} />)
+    fireEvent.change(screen.getByLabelText('รหัสทดลอง'), { target: { value: randomBytes(24).toString('hex') } }); fireEvent.submit(screen.getByRole('form'))
+    fireEvent.click(await screen.findByRole('button', { name: 'ตรวจผลคำขอ DEMO เดิม' }))
+    await screen.findByText('ended receipt')
+    expect(screen.queryByRole('button', { name: 'ตรวจผลคำขอ DEMO เดิม' })).toBeNull()
+    expect(pendingLock).toHaveBeenLastCalledWith(false)
+    expect(submitDemo).not.toHaveBeenCalledWith('reset')
+    fireEvent.click(screen.getByRole('button', { name: 'เริ่มพื้นที่ทดลองใหม่' }))
+    await waitFor(() => expect(submitDemo).toHaveBeenCalledWith('reset'))
+  })
+  it('submits one prepared request despite double click, then verifies the authenticated account', async () => {
+    const code = randomBytes(24).toString('hex'), complete = vi.fn(), lock = vi.fn(), pendingLock = vi.fn()
+    let finish!: () => void
+    vi.mocked(submitDemo).mockImplementation(async route => { if (route === 'enter') await new Promise<void>(resolve => { finish = resolve }) })
+    vi.mocked(readAccount).mockResolvedValue({ status: 'signed-in', account: { name: 'ผู้ทดลอง', demo: true } })
+    render(<DemoEntry complete={complete} lock={lock} pendingLock={pendingLock} disabled={false} />)
+    const field = screen.getByLabelText('รหัสทดลอง'); expect(field.getAttribute('type')).toBe('password')
+    fireEvent.change(field, { target: { value: code } })
+    fireEvent.submit(screen.getByRole('form')); fireEvent.submit(screen.getByRole('form'))
+    await waitFor(() => expect(submitDemo).toHaveBeenCalledWith('enter', code))
+    expect(vi.mocked(submitDemo).mock.calls.filter(([route]) => route === 'enter')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'เริ่มพื้นที่ทดลองใหม่' }).hasAttribute('disabled')).toBe(true)
+    finish(); await waitFor(() => expect(complete).toHaveBeenCalledOnce())
+    expect((field as HTMLInputElement).value).toBe('')
+  })
+  it('lost response locks fresh entry and edits, retry sends the same code without preparing/resetting again', async () => {
+    const code = randomBytes(24).toString('hex'), complete = vi.fn(), pendingLock = vi.fn()
+    vi.mocked(submitDemo).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new AuthRequestError('unknown', true)).mockResolvedValueOnce(undefined)
+    vi.mocked(readAccount).mockResolvedValue({ status: 'signed-in', account: { name: 'ผู้ทดลอง', demo: true } })
+    const storage = vi.spyOn(Storage.prototype, 'setItem')
+    render(<DemoEntry complete={complete} lock={vi.fn()} pendingLock={pendingLock} disabled={false} />)
+    fireEvent.change(screen.getByLabelText('รหัสทดลอง'), { target: { value: code } }); fireEvent.submit(screen.getByRole('form'))
+    await screen.findByRole('button', { name: 'ตรวจผลคำขอ DEMO เดิม' })
+    expect(screen.getByLabelText('รหัสทดลอง').hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'เริ่มพื้นที่ทดลองใหม่' }).hasAttribute('disabled')).toBe(true)
+    expect(pendingLock).toHaveBeenCalledWith(true)
+    fireEvent.click(screen.getByRole('button', { name: 'ตรวจผลคำขอ DEMO เดิม' }))
+    await waitFor(() => expect(complete).toHaveBeenCalledOnce())
+    const entries = vi.mocked(submitDemo).mock.calls.filter(([route]) => route === 'enter')
+    expect(entries).toEqual([['enter', code], ['enter', code]])
+    expect(vi.mocked(submitDemo).mock.calls.filter(([route]) => route === 'prepare')).toHaveLength(1)
+    expect(storage).not.toHaveBeenCalled(); storage.mockRestore()
+  })
+  it('rejection permits correction, while fresh explicitly resets only the browser request cookie', async () => {
+    vi.mocked(submitDemo).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new AuthRequestError('รหัสไม่ถูกต้อง')).mockResolvedValueOnce(undefined)
+    render(<DemoEntry complete={vi.fn()} lock={vi.fn()} pendingLock={vi.fn()} disabled={false} />)
+    fireEvent.change(screen.getByLabelText('รหัสทดลอง'), { target: { value: randomBytes(24).toString('hex') } }); fireEvent.submit(screen.getByRole('form'))
+    await screen.findByText('รหัสไม่ถูกต้อง')
+    expect(screen.getByLabelText('รหัสทดลอง').hasAttribute('disabled')).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'เริ่มพื้นที่ทดลองใหม่' }))
+    await waitFor(() => expect(submitDemo).toHaveBeenCalledWith('reset'))
+  })
+})

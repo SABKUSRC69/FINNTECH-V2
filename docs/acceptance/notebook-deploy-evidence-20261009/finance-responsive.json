@@ -1,0 +1,100 @@
+[
+  {
+    "amount": true,
+    "navigation": "ส่วนการเงิน",
+    "overflow": false,
+    "theme": "light",
+    "width": 320
+  },
+  {
+    "amount": true,
+    "navigation": "ส่วนการเงิน",
+    "overflow": false,
+    "theme": "light",
+    "width": 375
+  },
+  {
+    "amount": true,
+    "navigation": "ส่วนการเงิน",
+    "overflow": false,
+    "theme": "light",
+    "width": 390
+  },
+  {
+    "amount": true,
+    "navigation": "ส่วนการเงิน",
+    "overflow": false,
+    "theme": "light",
+    "width": 768
+  },
+  {
+    "amount": true,
+    "navigation": "ส่วนการเงิน",
+    "overflow": false,
+    "theme": "light",
+    "width": 1024
+  },
+  {
+    "amount": true,
+    "navigation": "ส่วนการเงิน",
+    "overflow": false,
+    "theme": "light",
+    "width": 1280
+  },
+  {
+    "amount": true,
+    "navigation": "ส่วนการเงิน",
+    "overflow": false,
+    "theme": "light",
+    "width": 1440
+  },
+  {
+    "amount": true,
+    "navigation": "ส่วนการเงิน",
+    "overflow": false,
+    "theme": "dark",
+    "width": 320
+  },
+  {
+    "amount": true,
+    "navigation": "ส่วนการเงิน",
+    "overflow": false,
+    "theme": "dark",
+    "width": 375
+  },
+  {
+    "amount": true,
+    "navigation": "ส่วนการเงิน",
+    "overflow": false,
+    "theme": "dark",
+    "width": 390
+  },
+  {
+    "amount": true,
+    "navigation": "ส่วนการเงิน",
+    "overflow": false,
+    "theme": "dark",
+    "width": 768
+  },
+  {
+    "amount": true,
+    "navigation": "ส่วนการเงิน",
+    "overflow": false,
+    "theme": "dark",
+    "width": 1024
+  },
+  {
+    "amount": true,
+    "navigation": "ส่วนการเงิน",
+    "overflow": false,
+    "theme": "dark",
+    "width": 1280
+  },
+  {
+    "amount": true,
+    "navigation": "ส่วนการเงิน",
+    "overflow": false,
+    "theme": "dark",
+    "width": 1440
+  }
+]

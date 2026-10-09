@@ -1,0 +1,697 @@
+diff --git a/apps/web/THIRD_PARTY_NOTICES.md b/apps/web/THIRD_PARTY_NOTICES.md
+index f9712e9..6f4cf9d 100644
+--- a/apps/web/THIRD_PARTY_NOTICES.md
++++ b/apps/web/THIRD_PARTY_NOTICES.md
+@@ -1,4 +1,4 @@
+-# Font notice — Calm Personal Finance
++# Font and artwork notices — FINNTECH notebook
+ 
+ Noto Sans Thai variable font, unmodified, self-hosted at public/fonts/NotoSansThai.ttf.
+ Copyright 2022 The Noto Project Authors (https://github.com/notofonts/thai).
+@@ -12,3 +12,11 @@ No font modifications, subscriptions, CDN requests or additional payment require
+ 
+ Layout, CSS and new frontend components are authored for FINNTECH. Existing inline SVG icons retained.
+ No additional UI dependencies, paid templates or Pro blocks introduced.
++
++The owner's Canva PDF was inspected as a visual reference only. No slide raster,
++portrait, cat artwork, chart, typeface or other exported Canva asset is bundled.
++`public/art/notebook-cat.svg` and `notebook-stickers.svg` are original FINNTECH
++artwork created for this redesign. Notebook layers, dots, binding and tape are CSS.
++The Latin wordmark uses the user's available system serif font; no font file is
++redistributed for it. The Noto Sans Thai font and full OFL notice above remain
++unmodified and local. No runtime CDN, tracking, paid service or new dependency.
+diff --git a/apps/web/public/art/notebook-cat.svg b/apps/web/public/art/notebook-cat.svg
+new file mode 100644
+index 0000000..77ec7b0
+--- /dev/null
++++ b/apps/web/public/art/notebook-cat.svg
+@@ -0,0 +1,20 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 200" fill="none">
++  <!-- Original FINNTECH artwork: a cat with its little ledger. No Canva asset reused. -->
++  <ellipse cx="118" cy="178" rx="85" ry="9" fill="#795044" opacity=".1"/>
++  <g stroke="#795044" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
++    <path d="M167 165c44 1 47-31 28-37-13-4-19 9-10 15" fill="#dfbb96"/>
++    <path d="M77 111c-13 20-11 48 0 58 14 9 70 9 87-1 10-16 4-43-8-59" fill="#ead0b2"/>
++    <path d="m63 64 6-35 29 19c13-4 32-4 45 0l25-20 10 39c9 9 9 31 0 42-15 19-79 18-102 0-13-10-18-28-13-45Z" fill="#fff4df"/>
++    <path d="m74 44 9 13M160 44l-8 15M110 49l-2 12m15-12 1 12" stroke="#bb8b68" stroke-width="5"/>
++    <path d="M111 92q8 10 14 0m-8-6 3 4 4-4Z" fill="#795044"/>
++    <path d="m68 87-19-4m20 12-17 5m121-14 20-5m-20 14 17 5"/>
++    <circle cx="97" cy="82" r="3" fill="#49312d" stroke="none"/><circle cx="144" cy="82" r="3" fill="#49312d" stroke="none"/>
++    <ellipse cx="86" cy="94" rx="8" ry="4" fill="#f2bdd0" stroke="none"/><ellipse cx="155" cy="94" rx="8" ry="4" fill="#f2bdd0" stroke="none"/>
++    <path d="m85 116 67 2-5 54-66-2Z" fill="#b9d9ea"/>
++    <path d="m100 118-4 53M107 134l27 1m-28 12 25 1m-26 12 19 1" stroke="#795044" stroke-width="2"/>
++    <path d="M82 126c-18-3-18 16-3 20m71-19c19-2 20 14-1 20" fill="#fff4df"/>
++    <path d="M89 169c-13-7-24 3-17 9h32m43-9c14-7 23 3 16 9h-31" fill="#ead0b2"/>
++    <path d="m200 47 3-7 3 7 8 2-8 3-3 7-3-7-7-3Z" fill="#f2bdd0" stroke-width="2"/>
++    <path d="M30 128c-12-9-21 3-3 14l3 2 3-2c18-11 9-23-3-14Z" fill="#f2bdd0" stroke-width="2"/>
++  </g>
++</svg>
+diff --git a/apps/web/public/art/notebook-stickers.svg b/apps/web/public/art/notebook-stickers.svg
+new file mode 100644
+index 0000000..1399038
+--- /dev/null
++++ b/apps/web/public/art/notebook-stickers.svg
+@@ -0,0 +1,7 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80" fill="none">
++  <!-- Original decorative star and stitched heart; no text or controls. -->
++  <path d="m26 9 5 13 14 1-11 10 3 14-12-7-12 7 3-14L5 23l15-1Z" fill="#b9d9ea" stroke="#795044" stroke-width="2"/>
++  <path d="M81 29c-21-20-36 3-9 27l9 8 9-8c27-24 12-47-9-27Z" fill="#f2bdd0" stroke="#795044" stroke-width="2"/>
++  <path d="M80 36c-17-17-26 2-6 20l7 6 7-6c20-18 11-37-8-20Z" stroke="#795044" stroke-dasharray="2 4"/>
++  <circle cx="53" cy="59" r="4" fill="#b9d9ea"/>
++</svg>
+diff --git a/apps/web/src/App.tsx b/apps/web/src/App.tsx
+index 0b34633..0be193c 100644
+--- a/apps/web/src/App.tsx
++++ b/apps/web/src/App.tsx
+@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
+ import { AuthRequestError, readAccount, submitAuth, submitDemo, type AccountSnapshot } from './auth/client'
+ import DemoEntry from './auth/DemoEntry'
+ import Dashboard from './tracker/Dashboard'
+-import { Icon, PresentationControls, PresentationProvider, usePresentation } from './presentation'
++import { Icon, NotebookCat, PresentationControls, PresentationProvider, usePresentation } from './presentation'
+ import RecoveryPanel, { takeRecoveryLink, type RecoveryLink } from './auth/RecoveryPanel'
+ import RealUseNotice from './auth/RealUseNotice'
+ 
+@@ -179,6 +179,7 @@ function AccountApp(): JSX.Element {
+         {uncertain && <button className="auth-secondary mx-5 mb-5" disabled={busy} onClick={() => { void refresh() }}>ตรวจสอบสถานะอีกครั้ง</button>}
+       </> : <main id="tracker-content" tabIndex={-1} className="tracker-auth-main mx-auto grid max-w-6xl gap-6 px-5 py-7 sm:px-8 sm:py-12 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-20 lg:py-16">
+         <section className="journal-auth-story space-y-3 lg:space-y-6">
++          <div className="notebook-auth-art" aria-hidden="true"><span className="notebook-auth-wordmark">FINNTECH</span><span className="notebook-auth-caption">a little book of your money</span><NotebookCat /></div>
+           {view.rehearsal && <p role="note" className="text-sm font-semibold text-teal-700">ข้อมูลสังเคราะห์ · Real-use rehearsal — ยังไม่เปิดรับข้อมูลจริง</p>}
+           <p className="hidden text-sm font-semibold tracking-wide text-teal-700 lg:block">YOUR PERSONAL MONEY JOURNAL</p>
+           <h1 className="text-3xl font-semibold leading-[1.35] tracking-tight lg:text-5xl">พื้นที่สำหรับ<br className="hidden lg:block" />การเงินของคุณ</h1>
+diff --git a/apps/web/src/auth/AccountDeletion.tsx b/apps/web/src/auth/AccountDeletion.tsx
+index c7e98c0..db1abc7 100644
+--- a/apps/web/src/auth/AccountDeletion.tsx
++++ b/apps/web/src/auth/AccountDeletion.tsx
+@@ -38,7 +38,7 @@ export default function AccountDeletion({ locked=false, lock, done, initialKey }
+     } finally {running.current=false;setBusy(false)}
+   }
+   const confirmed=receipt?.status==='REQUESTED'||receipt?.status==='PURGED'
+-  return <section aria-label="ขอลบบัญชี" className="tracker-card rounded-2xl border border-slate-200 p-5 space-y-4">
++  return <section aria-label="ขอลบบัญชี" className="tracker-card notebook-danger rounded-2xl border border-slate-200 p-5 space-y-4">
+     <h2 className="text-xl font-semibold">ขอลบบัญชีและข้อมูล</h2>
+     <p>ส่งออกข้อมูลก่อนยืนยัน คำขอนี้จะปิดการใช้งานและเพิกถอนทุกเซสชันทันที ผู้ดูแลจะลบข้อมูลตามหมายเลขคำขอ สำเนาสำรองหมดอายุตามนโยบายและจะไม่นำบัญชีที่ขอลบกลับมาเปิดใช้งาน</p>
+     {confirmed ? <><p role="status">{receipt.status==='PURGED'?'ลบข้อมูลในฐานที่ใช้งานแล้ว':'รับคำขอลบแล้ว รอผู้ดูแลดำเนินการ'} · เลขที่ {receipt.caseId}</p><button className="auth-secondary" onClick={()=>{clear();done()}}>กลับไปเข้าสู่ระบบ</button></> : <>
+diff --git a/apps/web/src/journal.css b/apps/web/src/journal.css
+index 1deb74a..799e55a 100644
+--- a/apps/web/src/journal.css
++++ b/apps/web/src/journal.css
+@@ -1,216 +1,242 @@
+-@font-face {
+-  font-family: 'Noto Local';
+-  src: url('/fonts/NotoSansThai.ttf') format('truetype');
+-  font-weight: 100 900;
+-  font-display: swap;
+-}
+-
+-:root { font-family: 'Noto Local', 'Leelawadee UI', Tahoma, system-ui, sans-serif; background: #f4f0e8; color-scheme: light; }
++@font-face { font-family: 'Noto Local'; src: url('/fonts/NotoSansThai.ttf') format('truetype'); font-weight: 100 900; font-display: swap; }
++:root { font-family: 'Noto Local', 'Leelawadee UI', Tahoma, system-ui, sans-serif; background: #eaf5ff; color-scheme: light; }
+ body { margin: 0; min-width: 0; }
++/* Shared notebook tokens; pastels are surfaces, never low-contrast body text. */
+ .tracker-app {
+-  --canvas: #f4f0e8; --surface: #fffcf7; --surface-muted: #ece7dc;
+-  --ink: #343b3b; --muted: #686b62; --line: #d9d3c7;
+-  --accent: #98533e; --accent-ink: #fff; --accent-soft: #f2e4d9;
+-  --positive: #45634e; --negative: #9b3542; --warning: #7e501a; --warning-bg: #fff0d7;
+-  --space-page: 48px; --radius: 5px;
+-  background: var(--canvas); color: var(--ink); line-height: 1.75;
++  --canvas:#eaf5ff; --surface:#fffcf1; --surface-muted:#f1ecdf; --paper-pink:#fff1f5; --paper-blue:#dceefa;
++  --ink:#49312d; --muted:#705c57; --line:#b49a8e; --control-line:#987c70; --dot:#c5d8e4; --accent:#795044; --accent-ink:#fff;
++  --accent-hover:#634037; --accent-soft:#f4dfd7; --focus:#286a88; --positive:#28654a; --negative:#a12c4b;
++  --warning:#795312; --warning-bg:#fff0ca; --disabled:#e4ddd3;
++  --shadow:0 5px 0 rgb(73 49 45 / .07),0 12px 30px rgb(73 49 45 / .04); --space-page:28px; --radius:18px;
++  background:var(--canvas); background-image:radial-gradient(var(--dot) .9px,transparent .9px); background-size:22px 22px;
++  color:var(--ink); font-size:16px; line-height:1.65; min-width:0; isolation:isolate;
+ }
+ .tracker-app[data-theme='dark'] {
+-  --canvas: #242620; --surface: #30332b; --surface-muted: #383c32;
+-  --ink: #f1eee6; --muted: #bdc1b4; --line: #4c5143;
+-  --accent: #e1ab8d; --accent-ink: #36271e; --accent-soft: #42352b;
+-  --positive: #a2d1af; --negative: #f0adb2; --warning: #efc58a; --warning-bg: #413321;
+-  color-scheme: dark;
+-}
+-.tracker-app[data-theme] { color: var(--ink); }
+-.tracker-app :is(.bg-white, .tracker-card) { background: var(--surface); }
+-.tracker-app :is(.bg-slate-100, .bg-slate-50) { background: var(--surface-muted); }
+-.tracker-app :is(.text-slate-900, .text-slate-800, .text-slate-700) { color: var(--ink); }
+-.tracker-app :is(.text-slate-600, .text-slate-500, .text-slate-400) { color: var(--muted); }
+-.tracker-app :is(.border-slate-100, .border-slate-200, .border-slate-300, .border-slate-200\/80) { border-color: var(--line); }
+-.tracker-app :is(.text-teal-700, .text-teal-800) { color: var(--positive); }
+-.tracker-app .text-rose-700 { color: var(--negative); }
+-.tracker-app .text-amber-900 { color: var(--warning); }
+-.tracker-app .bg-amber-50 { background: var(--warning-bg); }
+-.tracker-app :is(.border-rose-200, .border-amber-200, .border-teal-200) { border-color: var(--line); }
+-.tracker-app .bg-teal-50 { background: var(--accent-soft); }
+-.tracker-app button, .tracker-app a { touch-action: manipulation; }
+-.tracker-app button { min-height: 44px; }
+-.tracker-app button:disabled { cursor: not-allowed; opacity: .6; }
+-.tracker-app :is(button, a, input, select):focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+-.tracker-app :is(h1, h2, h3, h4, p, label) { overflow-wrap: anywhere; }
+-.tracker-app :is(h2, h3) { font-weight: 550; letter-spacing: -.02em; }
+-.tracker-app .tracker-card { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: none; }
+-.tracker-app .auth-input { min-width: 0; border-color: var(--line); color: var(--ink); background: var(--surface); border-radius: var(--radius); font-size: 16px; padding: 11px 14px; }
+-.tracker-app .auth-input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+-.tracker-app .auth-input:disabled { background: var(--surface-muted); color: var(--muted); }
+-.tracker-app .auth-label { color: var(--ink); min-width: 0; font-weight: 500; }
+-.tracker-app .auth-primary { background: var(--accent); color: var(--accent-ink); min-height: 46px; border-radius: var(--radius); font-weight: 550; }
+-.tracker-app .auth-primary:hover:not(:disabled) { filter: brightness(.93); }
+-.tracker-app .auth-primary:disabled { background: var(--surface-muted); color: var(--muted); }
+-.tracker-app .auth-secondary { border-color: var(--line); color: var(--ink); background: transparent; border-radius: var(--radius); }
+-.tracker-app .auth-secondary:hover:not(:disabled) { background: var(--surface-muted); }
+-.tracker-icon { width: 20px; height: 20px; flex: 0 0 20px; }
+-.tracker-app .tracker-header { border: 0; background: var(--canvas); }
+-.tracker-header-inner { max-width: 1500px; margin: auto; min-height: 92px; }
+-.tracker-brand { font-size: 16px; }
+-.tracker-brand .journal-mark { background: transparent; color: var(--ink); border-radius: 0; font-size: 32px; font-weight: 650; width: 44px; }
+-.journal-mark::after { content: '.'; color: var(--accent); }
+-.journal-brand-subtitle { display: block; font-size: 9px; letter-spacing: .12em; color: var(--muted); font-weight: 400; }
+-.tracker-display-controls { display: flex; gap: 8px; }
+-.tracker-icon-button { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--muted); background: var(--surface); }
+-.tracker-icon-button:hover, .tracker-icon-button[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); }
+-.tracker-app .tracker-local-badge { border: 0; border-radius: 0; background: transparent; color: var(--muted); font-size: 11px; }
+-.tracker-layout { display: grid; grid-template-columns: 92px minmax(0, 1fr); max-width: 1500px; margin: auto; }
+-.tracker-nav { padding: 24px 14px; border-right: 1px solid var(--line); position: sticky; top: 20px; align-self: start; }
+-.tracker-nav-heading, .tracker-nav-note { display: none; }
+-.tracker-nav-item { width: 100%; min-height: 48px; display: flex; align-items: center; gap: 12px; color: var(--muted); padding: 12px; margin: 6px 0; text-align: left; font-size: 14px; border-radius: var(--radius); }
+-.tracker-nav > .tracker-nav-item { width: 52px; height: 52px; justify-content: center; margin: 8px auto; border-radius: 50%; }
+-.tracker-nav > .tracker-nav-item span { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); overflow: hidden; }
+-.tracker-nav-active, .tracker-nav-item:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent); }
+-.tracker-mobile-nav { display: none; }
+-.tracker-app .tracker-main { min-width: 0; padding: 28px var(--space-page) 48px; }
+-.journal-page-intro { display: flex; align-items: end; justify-content: space-between; gap: 24px; padding-bottom: 28px; margin-bottom: 28px; border-bottom: 1px solid var(--line); }
+-.journal-kicker { font-size: 10px; letter-spacing: .16em; color: var(--muted); margin-bottom: 12px; }
+-.journal-page-intro h1 { font-size: 36px; font-weight: 500; letter-spacing: -.04em; line-height: 1.4; }
+-.journal-page-description { color: var(--muted); margin-top: 10px; font-size: 14px; }
+-.journal-greeting { margin-top: 12px; color: var(--muted); font-size: 12px; }
+-.journal-page-actions { display: flex; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
+-.tracker-section-heading { display: flex; justify-content: space-between; align-items: end; gap: 24px; }
+-.tracker-month { flex: 0 0 190px; }
+-.tracker-month .auth-input { font-size: 16px; }
+-.tracker-app .tracker-summary { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 0; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
+-.tracker-app .tracker-summary-card { border: 0; background: transparent; padding: 20px 24px; border-radius: 0; }
+-.tracker-app .tracker-summary-card:not(:first-child) { border-left: 1px solid var(--line); }
+-.tracker-app .tracker-balance-card { background: var(--accent-soft); color: var(--ink); }
+-.tracker-summary-card .text-2xl { font-size: 28px; font-weight: 500; }
+-.tracker-summary-card .text-2xl > span { display: inline-block; white-space: nowrap; }
+-.tracker-stat-icon { display: none; }
+-.tracker-stat-caption { font-size: 12px; color: var(--muted); margin-top: 12px; }
+-.journal-finance-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+-.journal-analysis { grid-column: 1; grid-row: 1; min-width: 0; }
+-.journal-editor { grid-column: 2; grid-row: 1 / span 2; min-width: 0; display: grid; gap: 24px; }
+-.journal-history { grid-column: 1; min-width: 0; }
+-.tracker-app .journal-analysis .tracker-card { background: transparent; border: 0; padding: 16px 0; }
+-.tracker-app .journal-history { background: transparent; border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 24px 0; }
+-.tracker-app .journal-editor .tracker-card:first-child { border-top: 2px solid var(--accent); }
+-.journal-table-scroll { overflow-x: auto; max-width: 100%; }
+-.journal-table { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 500px; }
+-.journal-table th { text-align: left; color: var(--muted); font-weight: 500; font-size: 12px; padding: 14px 12px; border-bottom: 1px solid var(--line); }
+-.journal-table td { padding: 18px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+-.journal-table .journal-number { text-align: right; font-variant-numeric: tabular-nums; }
+-.journal-table .journal-record { min-width: 160px; max-width: 260px; overflow-wrap: anywhere; }
+-.journal-table .journal-record small { display: block; color: var(--muted); font-size: 12px; margin-top: 6px; }
+-.journal-row-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+-.journal-row-actions button { padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius); font-size: 12px; }
+-.journal-number { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+-.journal-status { padding: 6px 10px; border-radius: var(--radius); border: 1px solid var(--line); display: inline-block; font-size: 12px; }
+-.tracker-app .journal-budget-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 32px; align-items: start; }
+-.tracker-app .journal-budget-track { background: transparent; border: 0; padding: 0; }
+-.journal-crypto-layout { display: grid; gap: 28px; }
+-.journal-crypto-editor { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+-.tracker-app .journal-holdings { background: transparent; padding: 0; border: 0; }
+-.tracker-app .journal-holdings article { background: var(--surface); border-radius: var(--radius); border-color: var(--line); }
+-.tracker-app .journal-trade-history { border: 0; background: transparent; padding: 24px 0; border-top: 1px solid var(--line); border-radius: 0; }
+-.journal-assets { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+-.journal-assets > :is(.journal-assets-heading, .journal-assets-summary, .journal-assets-feedback, .journal-assets-note) { grid-column: 1 / -1; }
+-.tracker-app .journal-assets-summary { display: grid; grid-template-columns: 1.3fr 1fr; gap: 28px; }
+-.tracker-app .journal-assets-summary .tracker-card { border: 0; padding: 24px 0; background: transparent; }
+-.tracker-app .journal-assets-summary .tracker-card:last-child { padding: 24px; background: var(--accent-soft); }
+-.journal-assets-summary .text-3xl { font-size: 42px; font-weight: 500; color: var(--accent); }
+-.tracker-app .journal-asset-portfolios { grid-column: 1; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; padding: 24px 0; }
+-.journal-cash-editor { grid-column: 2; grid-row: 3 / span 2; border-top: 2px solid var(--accent)!important; }
+-.tracker-app .journal-rate { grid-column: 1; border: 0; border-radius: 0; background: var(--surface-muted); }
+-.journal-assets > .journal-assets-feedback { margin-top: 0; }
+-.tracker-app .journal-care-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+-.journal-care-layout > :last-child { grid-column: 1 / -1; }
+-.journal-care-layout > *, .journal-assets > * { margin-top: 0!important; }
+-.journal-backup-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+-.journal-backup-layout > :not(.tracker-card) { grid-column: 1 / -1; }
+-.journal-backup-layout > * { margin-top: 0!important; }
+-.journal-stock-intro { border: 0!important; border-top: 2px solid var(--accent)!important; background: var(--surface-muted)!important; }
+-.tracker-dialog { width: min(560px, calc(100% - 32px)); max-height: calc(100dvh - 48px); margin: auto; padding: 28px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--surface); overflow-y: auto; overflow-wrap: anywhere; }
+-.tracker-dialog::backdrop { background: rgb(24 26 21 / .6); }
+-.tracker-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+-.tracker-dialog .tracker-nav-item { width: 100%; }
+-.tracker-footer { max-width: 1500px; padding-left: 140px; color: var(--muted); }
+-.tracker-auth-main ~ .tracker-footer { padding-left: 32px; }
+-.tracker-privacy-note { margin: auto; max-width: 1500px; padding: 12px 32px; font-size: 13px; color: var(--ink); background: var(--accent-soft); }
+-.tracker-skip { position: absolute; top: -100px; left: 12px; z-index: 40; padding: 12px 16px; background: var(--surface); color: var(--ink); }
+-.tracker-skip:focus { top: 10px; }
+-.expense-bar { width: 100%; height: 6px; }
+-.expense-track { fill: var(--line); }
+-.expense-fill { fill: var(--accent); }
+-.tracker-app .tracker-auth-main { max-width: 1250px; min-height: 75vh; gap: 60px; padding-top: 40px; padding-bottom: 60px; }
+-.journal-auth-story { padding-left: 18px; border-left: 2px solid var(--accent); }
+-.journal-auth-story h1 { font-weight: 500; letter-spacing: -.04em; line-height: 1.5; }
+-.tracker-app .journal-auth-card { border: 0; border-top: 2px solid var(--accent); border-radius: var(--radius); padding: 36px; box-shadow: none; }
+-.journal-auth-tabs button { border-radius: var(--radius); min-height: 46px; }
+-.journal-auth-tabs button[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
+-
+-@media (max-width: 1199px) {
+-  .tracker-app { --space-page: 28px; }
+-  .journal-finance-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
+-  .journal-page-intro { align-items: start; }
+-  .journal-page-actions { flex-direction: column; }
+-  .tracker-summary-card .text-2xl { font-size: 24px; }
++  --canvas:#1c2831; --surface:#302b2b; --surface-muted:#3d3534; --paper-pink:#3f3039; --paper-blue:#293e49;
++  --ink:#fff1df; --muted:#d2bfb3; --line:#867066; --control-line:#a78d80; --dot:#354651; --accent:#f0bdc9; --accent-ink:#382629;
++  --accent-hover:#f8d5de; --accent-soft:#4c3741; --focus:#acd9f0; --positive:#aad7b8; --negative:#ffb2c4;
++  --warning:#f6d490; --warning-bg:#463a24; --disabled:#45403d; --shadow:0 5px 0 rgb(0 0 0 / .15),0 12px 30px rgb(0 0 0 / .1); color-scheme:dark;
+ }
+-@media (max-width: 1023px) {
+-  .journal-finance-layout, .tracker-app .journal-budget-layout, .journal-crypto-editor, .journal-assets, .tracker-app .journal-care-layout, .journal-backup-layout { grid-template-columns: minmax(0, 1fr); }
+-  .journal-editor, .journal-history, .journal-analysis, .journal-cash-editor, .journal-asset-portfolios, .tracker-app .journal-rate { grid-column: auto; grid-row: auto; }
+-  .journal-analysis { order: 0; } .journal-editor { order: 0; } .journal-history { order: 0; }
+-  .journal-page-intro h1 { font-size: 30px; }
+-  .tracker-app .tracker-summary { grid-template-columns: 1fr 1fr; }
+-  .tracker-app .tracker-balance-card { grid-column: 1 / -1; }
+-  .tracker-app .tracker-summary-card:not(:first-child) { border-left: 0; }
+-  .tracker-app .tracker-summary-card:last-child { border-left: 1px solid var(--line); }
+-  .tracker-app .tracker-auth-main { min-height: auto; gap: 32px; }
++.tracker-app[data-theme] { color:var(--ink); }
++/* Existing utility classes retain their semantic meaning across both themes. */
++.tracker-app :is(.bg-white,.tracker-card) { background:var(--surface); }
++.tracker-app :is(.bg-slate-100,.bg-slate-50) { background:var(--surface-muted); }
++.tracker-app :is(.text-slate-900,.text-slate-800,.text-slate-700) { color:var(--ink); }
++.tracker-app :is(.text-slate-600,.text-slate-500,.text-slate-400) { color:var(--muted); }
++.tracker-app :is(.border-slate-100,.border-slate-200,.border-slate-300,.border-slate-200\/80,.border-teal-200) { border-color:var(--line); }
++.tracker-app :is(.text-teal-700,.text-teal-800) { color:var(--positive); }
++.tracker-app .text-rose-700 { color:var(--negative); }
++.tracker-app .border-rose-200 { border-color:var(--negative); }
++.tracker-app .text-amber-900 { color:var(--warning); }
++.tracker-app .bg-amber-50 { background:var(--warning-bg); }
++.tracker-app .border-amber-200 { border-color:var(--warning); }
++.tracker-app .bg-teal-50 { background:var(--paper-blue); }
++.tracker-app .text-xs { font-size:12px; line-height:1.65; }
++.tracker-app .text-sm { font-size:14px; line-height:1.65; }
++.tracker-app :is(h1,h2,h3,h4,p,label) { overflow-wrap:anywhere; }
++.tracker-app :is(h1,h2,h3,h4) { font-weight:650; letter-spacing:0; }
++.tracker-app :is(button,a) { touch-action:manipulation; }
++.tracker-app button { min-height:44px; min-width:44px; }
++.tracker-app button:disabled { cursor:not-allowed; opacity:.65; }
++.tracker-app :is(button,a,input,select,textarea,[tabindex]):focus-visible { outline:3px solid var(--focus); outline-offset:4px; }
++.tracker-app input[type='checkbox'] { width:20px; height:20px; flex-shrink:0; accent-color:var(--accent); }
++.tracker-app label:has(> input[type='checkbox']) { min-height:44px; display:flex; align-items:center; gap:12px; }
++.tracker-app .tracker-card { min-width:0; padding:24px; border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
++.tracker-app .auth-label { color:var(--ink); min-width:0; font-size:14px; font-weight:600; }
++.tracker-app .auth-input { min-width:0; max-width:100%; border-color:var(--control-line); color:var(--ink); background:var(--surface); border-radius:10px; font-size:16px; line-height:1.5; min-height:48px; padding:12px; }
++.tracker-app .auth-input:focus { border-color:var(--focus); box-shadow:0 0 0 1px var(--focus); }
++.tracker-app .auth-input:disabled { background:var(--disabled); color:var(--muted); }
++.tracker-app .auth-input[type='file'] { padding:8px; overflow:hidden; }
++.tracker-app .auth-input::file-selector-button { border:1px solid var(--line); border-radius:7px; margin-right:8px; padding:8px; background:var(--paper-blue); color:var(--ink); }
++.tracker-app .auth-primary { background:var(--accent); color:var(--accent-ink); min-height:48px; border:1px solid transparent; border-radius:10px; font-size:14px; font-weight:650; box-shadow:0 3px 0 rgb(73 49 45 / .1); }
++.tracker-app .auth-primary:hover:not(:disabled) { background:var(--accent-hover); }
++.tracker-app .auth-primary:disabled { background:var(--disabled); color:var(--muted); border-color:var(--line); box-shadow:none; opacity:1; }
++.tracker-app .auth-secondary { border-color:var(--control-line); color:var(--ink); background:var(--surface); border-radius:10px; font-size:14px; }
++.tracker-app .auth-secondary:hover:not(:disabled) { background:var(--paper-blue); }
++.tracker-icon { width:22px; height:22px; flex:0 0 22px; }
++.tracker-icon-button { display:grid; place-items:center; width:44px; height:44px; border:1px solid var(--control-line); border-radius:12px; color:var(--ink); background:var(--surface); }
++.tracker-icon-button:hover,.tracker-icon-button[aria-pressed='true'] { background:var(--paper-blue); }
++.tracker-display-controls { display:flex; gap:8px; flex-shrink:0; }
++/* Visible desktop notebook index, shared guard-controlled navigation. */
++.tracker-app .tracker-header { background:var(--surface); border-bottom:1px solid var(--line); }
++.tracker-header-inner { max-width:1440px; min-height:80px; margin:auto; }
++.tracker-brand { min-width:0; }
++.tracker-brand .journal-mark { width:40px; height:44px; border-radius:11px 11px 4px 4px; border:1px solid var(--line); background:var(--paper-pink); color:var(--ink); font-family:Georgia,serif; font-size:30px; font-weight:600; }
++.journal-brand-subtitle { display:block; font-size:10px; letter-spacing:.1em; color:var(--muted); font-weight:500; }
++.tracker-app .tracker-local-badge { border-color:var(--line); background:var(--paper-blue); color:var(--ink); font-size:12px; }
++.tracker-layout { display:grid; grid-template-columns:240px minmax(0,1fr); max-width:1440px; margin:auto; padding:24px 24px 0; }
++.tracker-nav { position:sticky; top:24px; align-self:start; padding:30px 14px 18px; border:1px solid var(--line); border-radius:12px 12px 22px 22px; background:var(--surface); box-shadow:var(--shadow); }
++.tracker-nav::before,.notebook-auth-art::before { content:''; position:absolute; top:-11px; left:22px; right:22px; height:23px; background:radial-gradient(ellipse at 50% 100%,transparent 6px,var(--line) 7px,var(--line) 8px,transparent 9px) 0 0 / 26px 23px repeat-x; pointer-events:none; }
++.notebook-index-brand { display:flex; align-items:center; gap:10px; padding:4px 12px 20px; font-family:Georgia,serif; font-weight:600; letter-spacing:.07em; }
++.notebook-index-brand small { display:block; font-family:'Noto Local',sans-serif; font-weight:400; font-size:12px; letter-spacing:0; margin-top:4px; color:var(--muted); }
++.tracker-nav-heading { padding:0 12px 10px; color:var(--muted); font-size:12px; border-bottom:1px dashed var(--line); margin-bottom:12px; }
++.tracker-nav-item { display:flex; align-items:center; gap:10px; text-align:left; width:100%; padding:11px 12px; margin:5px 0; border:1px solid transparent; border-radius:10px; color:var(--ink); font-size:14px; line-height:1.5; min-height:48px; }
++.tracker-nav-item:hover:not(:disabled) { background:var(--paper-pink); border-color:var(--line); }
++.tracker-nav-active { background:var(--paper-blue); border-color:var(--line); font-weight:650; box-shadow:3px 3px 0 rgb(73 49 45 / .08); }
++.tracker-nav-note { display:flex; gap:8px; padding:16px 12px 0; margin-top:20px; border-top:1px dashed var(--line); color:var(--muted); font-size:12px; }
++.notebook-cat { width:220px; max-width:100%; height:auto; pointer-events:none; user-select:none; }
++.notebook-cat-small { width:96px; }
++.tracker-nav > .notebook-cat { display:block; margin:12px auto 0; }
++.tracker-mobile-nav { display:none; }
++.tracker-app .tracker-main { min-width:0; padding:4px 0 40px var(--space-page); }
++.journal-page-intro { display:flex; align-items:start; justify-content:space-between; gap:16px; padding:4px 0 22px; border-bottom:1px dashed var(--line); }
++.journal-page-intro > div:first-child { min-width:0; }
++.journal-kicker { font-size:11px; letter-spacing:.07em; color:var(--muted); margin-bottom:8px; font-weight:600; }
++.journal-page-intro h1 { font-size:30px; line-height:1.45; }
++.journal-page-description { color:var(--muted); margin-top:8px; font-size:14px; }
++.journal-greeting { margin-top:10px; color:var(--muted); font-size:13px; overflow-wrap:anywhere; }
++.journal-page-actions { display:flex; flex-wrap:wrap; gap:8px; max-width:290px; justify-content:flex-end; }
++.tracker-section-heading { display:flex; justify-content:space-between; align-items:end; gap:16px; }
++.tracker-month { flex:0 0 190px; }
++.tracker-app .tracker-summary { display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:16px; }
++.tracker-app .tracker-card.tracker-balance-card { background:var(--paper-blue); }
++.tracker-app .tracker-summary-card:nth-child(3) { background:var(--paper-pink); }
++.tracker-summary-card .text-2xl { font-size:25px; font-weight:650; }
++.tracker-stat-icon { opacity:.7; }
++.tracker-stat-caption { font-size:12px; color:var(--muted); margin-top:10px; }
++/* Paper compositions: no rotation/clipping of inputs, tables or live content. */
++.journal-finance-layout { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:20px; align-items:start; }
++.journal-editor { grid-column:1; grid-row:1 / span 2; min-width:0; display:grid; gap:20px; }
++.journal-analysis { grid-column:2; grid-row:1; min-width:0; }
++.journal-history { grid-column:1 / -1; min-width:0; }
++.tracker-app .journal-analysis .tracker-card { background:var(--paper-pink); border-top:4px solid var(--line); }
++.expense-bar { width:100%; height:8px; }
++.expense-track { fill:var(--line); opacity:.35; }
++.expense-fill { fill:var(--accent); }
++.journal-table-scroll { overflow-x:auto; max-width:100%; border:1px solid var(--line); border-radius:10px; }
++.journal-table { border-collapse:collapse; width:100%; font-size:14px; min-width:600px; }
++.journal-table th { text-align:left; color:var(--ink); font-weight:600; padding:14px 16px; border-bottom:1px solid var(--line); background:var(--paper-blue); }
++.journal-table td { padding:16px; border-bottom:1px solid var(--line); vertical-align:top; }
++.journal-table tbody tr:last-child td { border-bottom:0; }
++.journal-table tbody tr:hover { background:var(--paper-pink); }
++.journal-table .journal-number { text-align:right; font-variant-numeric:tabular-nums; min-width:150px; }
++.journal-table .journal-record { min-width:160px; max-width:300px; overflow-wrap:anywhere; }
++.journal-table .journal-record small { display:block; color:var(--muted); font-size:12px; margin-top:6px; }
++.journal-row-actions { display:flex; flex-wrap:wrap; gap:8px; }
++.journal-row-actions button { padding:8px 12px; border:1px solid var(--line); background:var(--surface); border-radius:9px; font-size:13px; }
++.journal-number { font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
++.journal-status { padding:6px 10px; border-radius:8px; border:1px solid var(--line); display:inline-block; font-size:12px; }
++.notebook-empty { text-align:center; padding:24px 8px; }
++.notebook-empty .notebook-cat { display:block; margin:auto; }
++.journal-budget-layout,.journal-crypto-editor,.journal-backup-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; align-items:start; }
++.tracker-app .tracker-card.journal-budget-track { background:var(--paper-pink); }
++.journal-budget-track > div > div { background:var(--surface); border-color:var(--line); }
++.journal-crypto-layout { display:grid; gap:20px; }
++.tracker-app .tracker-card.journal-holdings { background:var(--paper-blue); }
++.journal-holdings article { background:var(--surface); }
++.journal-holdings dl > div { display:block; padding-bottom:6px; border-bottom:1px dashed var(--line); }
++.journal-holdings dl,.journal-trade-history { font-variant-numeric:tabular-nums; }
++.journal-holdings dl > div:last-child { border-bottom:0; }
++.journal-assets { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:20px; align-items:start; }
++.journal-assets > :is(.journal-assets-heading,.journal-assets-summary,.journal-assets-feedback,.journal-assets-note) { grid-column:1 / -1; }
++.journal-assets-summary { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:20px; }
++.journal-assets-summary .text-3xl { font-size:32px; }
++.journal-asset-portfolios { grid-column:1; }
++.journal-cash-editor { grid-column:2; grid-row:3 / span 2; }
++.tracker-app .tracker-card.journal-rate { grid-column:1; background:var(--paper-pink); }
++.journal-care-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; align-items:start; }
++.journal-care-layout > *,.journal-assets > *,.journal-backup-layout > * { margin-top:0!important; }
++.tracker-app .tracker-card.notebook-danger { grid-column:1 / -1; order:10; border:2px solid var(--negative); background:var(--paper-pink); }
++.notebook-danger .auth-primary { background:var(--negative); color:var(--surface); }
++.notebook-danger h2 { color:var(--negative); }
++.journal-backup-layout > :not(.tracker-card) { grid-column:1 / -1; }
++.tracker-app .tracker-card.notebook-import { background:var(--paper-pink); }
++.tracker-app .tracker-card.journal-stock-intro { background:var(--paper-blue); }
++.tracker-dialog { width:min(560px,calc(100% - 32px)); max-height:calc(100dvh - 48px); margin:auto; padding:24px; border:1px solid var(--line); border-radius:20px; color:var(--ink); background:var(--surface); box-shadow:var(--shadow); overflow-y:auto; overflow-wrap:anywhere; }
++.tracker-dialog::backdrop { background:rgb(28 26 32 / .65); }
++.tracker-dialog-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:12px; border-bottom:1px dashed var(--line); }
++.tracker-sheet .tracker-nav-item { background:var(--paper-pink); border-color:var(--line); margin:8px 0; }
++.tracker-footer { max-width:1440px; padding-left:292px; color:var(--muted); }
++.tracker-auth-main ~ .tracker-footer { padding-left:32px; }
++.tracker-footer details { background:var(--surface); border:1px solid var(--line); border-radius:12px; margin-bottom:20px; padding:12px 16px; }
++.tracker-footer summary { min-height:44px; cursor:pointer; }
++.tracker-privacy-note { margin:auto; max-width:1440px; padding:12px 24px; font-size:14px; color:var(--ink); background:var(--paper-pink); border-bottom:1px solid var(--line); }
++.tracker-skip { position:absolute; top:-100px; left:12px; z-index:40; padding:12px 16px; background:var(--surface); color:var(--ink); }
++.tracker-skip:focus { top:10px; }
++/* Auth illustration uses original local SVG and decorative layers, not slide rasters. */
++.tracker-app .tracker-auth-main { max-width:1200px; min-height:70vh; padding:44px 32px; gap:64px; }
++.journal-auth-story { position:relative; min-width:0; }
++.notebook-auth-art { position:relative; padding:35px 28px 24px; border:1px solid var(--line); border-radius:14px; background:var(--paper-pink); box-shadow:var(--shadow); min-height:220px; margin:16px 0 28px; }
++.notebook-auth-art::after { content:''; position:absolute; inset:-8px 12px 8px -10px; border:1px solid var(--line); border-radius:14px; background:repeating-linear-gradient(var(--surface) 0 29px,var(--line) 30px,var(--surface) 31px); z-index:-1; transform:rotate(-3deg); pointer-events:none; }
++.notebook-auth-wordmark { display:block; font-family:Georgia,'Times New Roman',serif; font-size:clamp(32px,4vw,52px); letter-spacing:-.02em; line-height:1.2; color:var(--ink); }
++.notebook-auth-caption { display:block; color:var(--muted); font-size:13px; margin-top:10px; }
++.notebook-auth-art .notebook-cat { display:block; width:175px; margin:4px 0 -10px auto; }
++.notebook-auth-art .notebook-auth-wordmark::after { content:''; display:inline-block; width:62px; height:44px; background:url('/art/notebook-stickers.svg') center / contain no-repeat; margin-left:8px; pointer-events:none; }
++.journal-auth-story h1 { font-size:30px; line-height:1.55; }
++.tracker-app .journal-auth-card { position:relative; padding:32px; border-radius:18px; }
++.journal-auth-card::before { content:''; position:absolute; top:-8px; right:30px; width:70px; height:20px; border:1px dashed var(--line); background:var(--paper-blue); transform:rotate(4deg); pointer-events:none; }
++.journal-auth-card::after { content:''; position:absolute; left:22px; right:22px; bottom:-7px; height:12px; background:radial-gradient(circle,var(--surface) 4.5px,var(--line) 5px,transparent 5.5px) 0 0 / 18px 12px repeat-x; pointer-events:none; }
++.journal-auth-tabs { background:var(--surface-muted); border:1px solid var(--line); border-radius:12px; }
++.journal-auth-tabs button { border-radius:8px; min-height:46px; }
++.journal-auth-tabs button[aria-pressed='true'] { background:var(--paper-blue); color:var(--ink); box-shadow:0 2px 0 rgb(73 49 45 / .08); }
++@media (max-width:1199px) {
++  .tracker-app { --space-page:22px; }
++  .tracker-layout { grid-template-columns:220px minmax(0,1fr); padding:24px 20px 0; }
++  .journal-page-intro { display:block; }
++  .journal-page-actions { justify-content:start; max-width:none; margin-top:16px; }
++  .journal-finance-layout,.journal-budget-layout,.journal-crypto-editor,.journal-assets,.journal-care-layout { grid-template-columns:minmax(0,1fr); }
++  .journal-editor,.journal-history,.journal-analysis,.journal-cash-editor,.journal-asset-portfolios,.tracker-app .journal-rate { grid-column:auto; grid-row:auto; }
++  .journal-editor { order:1; } .journal-analysis { order:2; } .journal-history { order:3; }
++  .tracker-app .tracker-summary { gap:12px; grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
++  .tracker-balance-card { grid-column:1 / -1; }
++  .tracker-footer { padding-left:264px; }
++  .tracker-app .tracker-auth-main { gap:32px; }
+ }
+-@media (max-width: 767px) {
+-  .tracker-app { --space-page: 20px; }
+-  .tracker-layout { display: block; }
+-  .tracker-nav { display: none; }
+-  .tracker-header-inner { min-height: 76px; padding: 12px 20px; }
+-  .tracker-local-badge, .journal-brand-subtitle { display: none; }
+-  .tracker-header .tracker-brand { gap: 6px; }
+-  .tracker-header .tracker-brand > span:last-child { font-size: 14px; letter-spacing: .06em; }
+-  .tracker-icon-button { width: 44px; height: 44px; }
+-  .tracker-display-controls { gap: 6px; }
+-  .tracker-app .tracker-main { padding-top: 20px; padding-bottom: 32px; }
+-  .journal-page-intro { display: block; padding-bottom: 22px; margin-bottom: 22px; }
+-  .journal-page-intro h1 { font-size: 29px; }
+-  .journal-page-description { font-size: 13px; }
+-  .journal-page-actions { flex-direction: row; margin-top: 20px; }
+-  .tracker-section-heading { display: block; }
+-  .tracker-month { display: block; width: 100%; max-width: 240px; margin-top: 16px; }
+-  .tracker-app .tracker-summary-card { padding: 20px 14px; }
+-  .tracker-summary-card .text-2xl { font-size: 22px; }
+-  .tracker-balance-card .text-2xl { font-size: 30px; }
+-  .tracker-stat-caption { font-size: 12px; }
+-  .tracker-app .journal-assets-summary { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+-  .journal-assets-summary .text-3xl { font-size: 36px; }
+-  .journal-table { min-width: 480px; }
+-  .journal-row-actions { flex-direction: column; }
+-  .tracker-mobile-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); position: fixed; bottom: 0; left: 0; right: 0; z-index: 20; border-top: 1px solid var(--line); padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); gap: 4px; background: var(--surface); }
+-  .tracker-mobile-nav .tracker-nav-item { padding: 5px 2px; margin: 0; flex-direction: column; justify-content: center; font-size: 11px; min-height: 48px; gap: 3px; text-align: center; }
+-  .tracker-app:has(.tracker-mobile-nav) { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+-  .tracker-footer, .tracker-auth-main ~ .tracker-footer { padding: 0 20px 32px; }
+-  .tracker-sheet { width: 100%; max-width: 560px; margin: auto auto 0; border-radius: 12px 12px 0 0; padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); }
+-  .tracker-privacy-note { padding: 12px 20px; }
+-  .tracker-app .auth-input { font-size: 16px; }
+-  .tracker-app .tracker-auth-main { padding: 28px 20px; gap: 28px; }
+-  .tracker-app .journal-auth-card { padding: 24px; }
+-  .journal-auth-story h1 { font-size: 30px; }
++@media (max-width:1023px) {
++  .tracker-layout { grid-template-columns:200px minmax(0,1fr); padding:22px 16px 0; }
++  .tracker-nav { padding:28px 10px 16px; }
++  .tracker-nav-item { font-size:13px; padding:10px 8px; }
++  .tracker-nav-note { padding:14px 4px 0; }
++  .journal-assets-summary,.journal-backup-layout { grid-template-columns:minmax(0,1fr); }
++  .tracker-footer { padding-left:238px; }
++  .tracker-app .tracker-auth-main { grid-template-columns:minmax(0,1fr); max-width:720px; min-height:0; }
++  .notebook-auth-art { min-height:160px; }
++  .notebook-auth-art .notebook-cat { width:115px; position:absolute; right:20px; bottom:10px; }
++  .notebook-auth-caption { max-width:60%; }
+ }
+-@media (max-width: 360px) {
+-  .tracker-app { --space-page: 16px; }
+-  .tracker-header-inner { padding-left: 12px; padding-right: 12px; }
+-  .tracker-header .tracker-brand > span:last-child { font-size: 12px; }
+-  .journal-page-intro h1 { font-size: 27px; }
+-  .tracker-summary-card .text-2xl { font-size: 20px; }
+-  .tracker-balance-card .text-2xl { font-size: 27px; }
+-  .tracker-app .journal-auth-card { padding: 20px; }
++@media (max-width:767px) {
++  .tracker-app { --space-page:16px; }
++  .tracker-layout { display:block; padding:20px 16px 0; }
++  .tracker-nav { display:none; }
++  .tracker-header-inner { min-height:76px; padding:12px 16px; }
++  .tracker-local-badge,.journal-brand-subtitle { display:none; }
++  .tracker-header .tracker-brand { gap:8px; }
++  .tracker-header .tracker-brand > span:last-child { font-size:14px; letter-spacing:.05em; }
++  .tracker-display-controls { gap:6px; }
++  .tracker-brand .journal-mark { width:34px; font-size:25px; }
++  .tracker-app .tracker-main { padding:0 0 32px; }
++  .journal-page-intro h1 { font-size:27px; }
++  .tracker-section-heading { display:block; }
++  .tracker-month { display:block; width:100%; max-width:240px; margin-top:14px; }
++  .tracker-app .tracker-card { padding:18px; border-radius:16px; }
++  .tracker-app .tracker-summary-card { padding:16px; }
++  .tracker-summary-card .text-2xl { font-size:22px; }
++  .tracker-balance-card .text-2xl { font-size:28px; }
++  .tracker-summary-card .tracker-stat-icon { display:none; }
++  .journal-assets-summary .text-3xl { font-size:28px; }
++  .journal-row-actions { flex-direction:column; }
++  .tracker-mobile-nav { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); position:fixed; bottom:0; left:0; right:0; z-index:20; border-top:1px solid var(--line); padding:8px 8px calc(8px + env(safe-area-inset-bottom)); gap:4px; background:var(--surface); box-shadow:0 -4px 14px rgb(73 49 45 / .07); }
++  .tracker-mobile-nav .tracker-nav-item { padding:5px 2px; margin:0; flex-direction:column; justify-content:center; font-size:12px; min-height:52px; gap:3px; text-align:center; border-radius:10px; }
++  .tracker-app:has(.tracker-mobile-nav) { padding-bottom:calc(100px + env(safe-area-inset-bottom)); }
++  .tracker-footer,.tracker-auth-main ~ .tracker-footer { padding:0 16px 32px; }
++  .tracker-sheet { width:100%; max-width:560px; margin:auto auto 0; border-radius:22px 22px 0 0; padding:24px 20px calc(24px + env(safe-area-inset-bottom)); }
++  .tracker-privacy-note { padding:12px 16px; }
++  .tracker-app .tracker-auth-main { padding:24px 16px; gap:22px; }
++  .notebook-auth-art { min-height:118px; margin:8px 6px 20px; padding:26px 20px 18px; }
++  .notebook-auth-art .notebook-cat { width:90px; right:8px; bottom:0; }
++  .notebook-auth-wordmark { font-size:28px; }
++  .notebook-auth-wordmark::after { display:none!important; }
++  .notebook-auth-caption { font-size:11px; max-width:70%; }
++  .journal-auth-story h1 { font-size:25px; }
++  .tracker-app .journal-auth-card { padding:22px; }
+ }
+-@media (prefers-reduced-motion: reduce) {
+-  .tracker-app *, .tracker-app *::before, .tracker-app *::after { scroll-behavior: auto!important; transition-duration: 0s!important; animation: none!important; }
++@media (max-width:360px) {
++  .tracker-header-inner { padding:12px; }
++  .tracker-header .tracker-brand > span:last-child { font-size:12px; }
++  .tracker-app .tracker-summary { grid-template-columns:minmax(0,1fr); }
++  .tracker-summary-card .text-2xl { font-size:24px; }
++  .journal-page-intro h1 { font-size:25px; }
++  .tracker-app .journal-auth-card { padding:18px; }
++  .notebook-auth-wordmark { font-size:25px; }
+ }
++@media (prefers-reduced-motion:reduce) { .tracker-app *,.tracker-app *::before,.tracker-app *::after { scroll-behavior:auto!important; transition-duration:0s!important; animation:none!important; } }
+diff --git a/apps/web/src/presentation.tsx b/apps/web/src/presentation.tsx
+index 7c1f704..357fe9d 100644
+--- a/apps/web/src/presentation.tsx
++++ b/apps/web/src/presentation.tsx
+@@ -1,7 +1,7 @@
+ import { createContext, useContext, useState, type ReactNode } from 'react'
+ 
+ type Theme = 'light' | 'dark'
+-export type IconName = 'finance' | 'budget' | 'crypto' | 'stocks' | 'backup' | 'assets' | 'account' | 'more' | 'sun' | 'moon' | 'eye' | 'shield'
++export type IconName = 'finance' | 'budget' | 'crypto' | 'stocks' | 'backup' | 'assets' | 'account' | 'more' | 'sun' | 'moon' | 'eye' | 'shield' | 'notebook' | 'close'
+ type Presentation = {
+   theme: Theme
+   hidden: boolean
+@@ -27,6 +27,8 @@ export function PresentationProvider({ children }: { children: ReactNode }): JSX
+ export const usePresentation = (): Presentation => useContext(PresentationContext)
+ 
+ const paths: Record<IconName, ReactNode> = {
++  notebook: <><rect x="5" y="3" width="15" height="18" rx="3" /><path d="M3 7h4M3 12h4M3 17h4M11 8h5M11 12h5M11 16h3" /></>,
++  close: <path d="m6 6 12 12M18 6 6 18" />,
+   account: <><circle cx="12" cy="8" r="4" /><path d="M4 21v-2a8 8 0 0 1 16 0v2" /></>,
+   more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
+   assets: <><rect x="3" y="7" width="18" height="14" rx="3" /><path d="M7 7V4h10v3M15 12h6v5h-6z" /></>,
+@@ -45,6 +47,11 @@ export function Icon({ name }: { name: IconName }): JSX.Element {
+   return <svg className="tracker-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{paths[name]}</svg>
+ }
+ 
++/** Original local artwork, decorative only: never a control or financial state. */
++export function NotebookCat({ compact = false }: { compact?: boolean }): JSX.Element {
++  return <img className={`notebook-cat${compact ? ' notebook-cat-small' : ''}`} src="/art/notebook-cat.svg" alt="" aria-hidden="true" draggable={false} />
++}
++
+ export function PresentationControls(): JSX.Element {
+   const { theme, hidden, toggleTheme, toggleAmounts } = usePresentation()
+   return <div className="tracker-display-controls">
+diff --git a/apps/web/src/tracker/Account.tsx b/apps/web/src/tracker/Account.tsx
+index c641997..9e18394 100644
+--- a/apps/web/src/tracker/Account.tsx
++++ b/apps/web/src/tracker/Account.tsx
+@@ -3,7 +3,6 @@ export default function Account({ name, locked, logout, backup, recovery = false
+   name: string; locked: boolean; logout: () => void; backup: () => void; recovery?: boolean; demo?: boolean; freshDemo?: (() => void) | undefined; real?: boolean; deletionLock?:((value:boolean)=>void)|undefined; expired?:(()=>void)|undefined
+ }): JSX.Element {
+   return <section aria-label="บัญชีและดูแลข้อมูล" className="journal-care-layout">
+-    {real && deletionLock && expired && <AccountDeletion locked={locked} lock={deletionLock} done={expired}/>}
+     <div className="tracker-card rounded-2xl border border-slate-200 p-5 sm:p-6">
+       <h2 className="text-xl font-semibold">บัญชีของคุณ</h2>
+       <p className="mt-3 text-sm text-slate-500">ชื่อจากบัญชีที่เข้าสู่ระบบอยู่</p><p className="mt-1 break-words text-lg font-semibold">{name}</p>
+@@ -23,5 +22,6 @@ export default function Account({ name, locked, logout, backup, recovery = false
+       <p className="mt-3 text-sm leading-7 text-slate-500">{real ? 'บันทึกด้วยตนเอง · บริการฟรีอาจพักหรือหยุดเมื่อเกินโควตา · ไม่มี SLA · ไม่มีการส่งคำสั่งซื้อขาย ฝากถอน หรือเครดิตเริ่มต้น' : 'เวอร์ชันทดลองในเครื่อง · ยังไม่รับรองความพร้อมสำหรับข้อมูลจริงหรือออนไลน์ · ไม่มีการส่งคำสั่งซื้อขาย ฝากถอน หรือเครดิตเริ่มต้น'}</p>
+       <p className="mt-3 text-sm text-slate-500">รายรับรายจ่ายและเงินสดใช้ THB · ต้นทุนและกำไรขาดทุนคริปโตใช้ USDT แยกพอร์ต</p>
+     </div>
++    {real && deletionLock && expired && <AccountDeletion locked={locked} lock={deletionLock} done={expired}/>}
+   </section>
+ }
+diff --git a/apps/web/src/tracker/Backup.tsx b/apps/web/src/tracker/Backup.tsx
+index f2b2c21..23434d9 100644
+--- a/apps/web/src/tracker/Backup.tsx
++++ b/apps/web/src/tracker/Backup.tsx
+@@ -65,12 +65,12 @@ export default function Backup({ lock, restored, expired }: { lock: (value: bool
+     } finally { running.current = false; setBusy(false) }
+   }
+   return <section className="journal-backup-layout" aria-label="สำรองและกู้คืน">
+-    <div className="tracker-card rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><h2 className="text-xl font-semibold">สำรองและกู้คืนข้อมูล</h2>
++    <div className="tracker-card notebook-export rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><p className="journal-kicker">เก็บสำเนา · EXPORT</p><h2 className="text-xl font-semibold">สำรองและกู้คืนข้อมูล</h2>
+       <p className="mt-3 text-sm leading-7 text-slate-600">สำรองรายรับรายจ่ายทุกเดือน หมวดหมู่ งบประมาณ พอร์ต ประวัติคริปโตและยอดเงินสด รวมรายการที่ยกเลิก เก็บไฟล์ไว้ในที่ส่วนตัว เพราะมีข้อมูลการเงินและบันทึกช่วยจำของคุณ</p>
+       <p className="mt-2 text-sm leading-7 text-slate-600">ไฟล์นี้ไม่มีข้อมูลบัญชีล็อกอินหรือการตั้งค่า server ไม่รวม legacy DEMO ราคาตลาด หรือพอร์ตหุ้น เป็นสำเนาข้อมูล tracker สูงสุด 2,000 รายการ / 2 MiB</p>
+       <button className="auth-primary mt-4" disabled={disabled} onClick={() => { void download() }}>ดาวน์โหลดไฟล์สำรอง</button>
+     </div>
+-    <div className="tracker-card rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><h3 className="font-semibold">ตรวจไฟล์ก่อนกู้คืน</h3>
++    <div className="tracker-card notebook-import rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><p className="journal-kicker">ตรวจแล้วค่อยนำเข้า · RESTORE</p><h3 className="font-semibold">ตรวจไฟล์ก่อนกู้คืน</h3>
+       <p className="mt-2 text-sm leading-7 text-slate-600">กู้คืนลงบัญชีที่ยังไม่มีข้อมูลการเงินเท่านั้น ไม่เขียนทับ ไม่รวมข้อมูลกับรายการเดิม และไม่รับไฟล์ DEMO เก่า เลือกเฉพาะไฟล์สำรองของคุณที่เชื่อถือได้</p>
+       <label className="auth-label mt-4">ไฟล์สำรอง JSON<input className="auth-input" type="file" accept="application/json,.json" disabled={disabled} onChange={event => { void selectFile(event) }} /></label>
+       {preview && <div className="mt-5 space-y-3">
+diff --git a/apps/web/src/tracker/FinanceHistory.tsx b/apps/web/src/tracker/FinanceHistory.tsx
+index 4221af6..98ba6f7 100644
+--- a/apps/web/src/tracker/FinanceHistory.tsx
++++ b/apps/web/src/tracker/FinanceHistory.tsx
+@@ -1,5 +1,6 @@
+ import type { FinanceOverview } from '@finntech/contracts'
+ import { displayDecimal } from './client'
++import { NotebookCat } from '../presentation'
+ 
+ type Entry = FinanceOverview['transactions'][number]
+ export default function FinanceHistory({ finance, categoryLabel, money, disabled, edit, cancel }: {
+@@ -9,7 +10,7 @@ export default function FinanceHistory({ finance, categoryLabel, money, disabled
+   return <section className="tracker-card journal-history">
+     <h2 className="text-lg font-semibold">รายการในเดือนนี้</h2>
+     <p className="mt-2 text-xs text-slate-500">รายการยกเลิกเก็บไว้เป็นประวัติและไม่รวมในยอด การแก้ไขสร้างรายการทดแทน</p>
+-    {finance?.transactions.length === 0 && <p className="py-8 text-center text-sm text-slate-500">ยังไม่มีรายการ เริ่มจากบันทึกแรกของคุณ</p>}
++    {finance?.transactions.length === 0 && <div className="notebook-empty"><NotebookCat compact /><p className="text-sm text-slate-500">ยังไม่มีรายการ เริ่มจากบันทึกแรกของคุณ</p></div>}
+     {!!finance?.transactions.length && <div className="journal-table-scroll mt-4" tabIndex={0} role="region" aria-label="ตารางรายการรายรับรายจ่าย เลื่อนแนวนอนได้">
+       <table className="journal-table"><caption className="sr-only">ประวัติรายรับรายจ่าย หน่วย THB</caption>
+         <thead><tr><th scope="col">วันที่</th><th scope="col">หมวดหมู่ / บันทึก</th><th scope="col" className="journal-number">จำนวนเงิน · THB</th><th scope="col">จัดการรายการ</th></tr></thead>
+diff --git a/apps/web/src/tracker/ModalDialog.tsx b/apps/web/src/tracker/ModalDialog.tsx
+index 468b4a7..df4392a 100644
+--- a/apps/web/src/tracker/ModalDialog.tsx
++++ b/apps/web/src/tracker/ModalDialog.tsx
+@@ -1,4 +1,5 @@
+ import { useEffect, useRef, type ReactNode } from 'react'
++import { Icon } from '../presentation'
+ 
+ /** Native modal makes the background inert; explicit Tab handling also keeps focus inside. */
+ export default function ModalDialog({ title, children, onDismiss, closeDisabled = false, sheet = false }: {
+@@ -26,7 +27,7 @@ export default function ModalDialog({ title, children, onDismiss, closeDisabled
+       if (event.shiftKey && (document.activeElement === first || document.activeElement === event.currentTarget)) { event.preventDefault(); last?.focus() }
+       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+     }}>
+-    <div className="tracker-dialog-heading"><h2 className="text-lg font-semibold">{title}</h2><button type="button" className="tracker-icon-button" aria-label={`ปิด${title}`} disabled={closeDisabled} onClick={onDismiss}>×</button></div>
++    <div className="tracker-dialog-heading"><h2 className="text-lg font-semibold">{title}</h2><button type="button" className="tracker-icon-button" aria-label={`ปิด${title}`} disabled={closeDisabled} onClick={onDismiss}><Icon name="close" /></button></div>
+     {children}
+   </dialog>
+ }
+diff --git a/apps/web/src/tracker/PageIntro.tsx b/apps/web/src/tracker/PageIntro.tsx
+index 4f890aa..7c4551c 100644
+--- a/apps/web/src/tracker/PageIntro.tsx
++++ b/apps/web/src/tracker/PageIntro.tsx
+@@ -8,7 +8,7 @@ const copy: Record<Section, [string, string]> = {
+   crypto: ['YOUR INVESTMENT RECORDS', 'ติดตามต้นทุนและประวัติ · USDT แยกต่อพอร์ต ไม่มีการส่งคำสั่งซื้อขาย'],
+   stocks: ['MARKET WATCHLIST', 'ติดตามราคาหุ้นใน USD · ไม่ใช่รายการสินทรัพย์ที่ถือจริง'],
+   backup: ['TAKE CARE OF YOUR RECORDS', 'เก็บสำเนาข้อมูลของคุณ · ตรวจไฟล์ก่อนกู้คืนเสมอ'],
+-  account: ['YOUR PERSONAL SPACE', 'บัญชีและการดูแลข้อมูล · ใช้งานส่วนตัวในเครื่องก่อน'],
++  account: ['YOUR PERSONAL SPACE', 'บัญชีและการดูแลข้อมูล · เก็บสำเนาไว้ในที่ส่วนตัว'],
+ }
+ 
+ export default function PageIntro({ section, name, children }: {
+diff --git a/apps/web/src/tracker/TrackerNavigation.tsx b/apps/web/src/tracker/TrackerNavigation.tsx
+index 12ae85d..e95764b 100644
+--- a/apps/web/src/tracker/TrackerNavigation.tsx
++++ b/apps/web/src/tracker/TrackerNavigation.tsx
+@@ -1,5 +1,5 @@
+ import { useState } from 'react'
+-import { Icon } from '../presentation'
++import { Icon, NotebookCat } from '../presentation'
+ import ModalDialog from './ModalDialog'
+ 
+ export const sections = [
+@@ -17,9 +17,11 @@ export default function TrackerNavigation({ section, locked, navigate }: {
+   const moreActive = secondary.some(([value]) => value === section)
+   return <>
+     <nav aria-label="ส่วนการเงิน" className="tracker-nav">
+-      <p className="tracker-nav-heading">พื้นที่การเงิน</p>
++      <div className="notebook-index-brand"><Icon name="notebook" /><span>FINNTECH<small>สมุดการเงินของคุณ</small></span></div>
++      <p className="tracker-nav-heading">สารบัญการเงิน</p>
+       {sections.map(([value, label]) => <button key={value} title={label} type="button" disabled={locked} onClick={() => navigate(value)} aria-current={section === value ? 'page' : undefined} aria-pressed={section === value} className={`tracker-nav-item ${section === value ? 'tracker-nav-active' : ''}`}><Icon name={value} /><span>{label}</span></button>)}
+       <div className="tracker-nav-note"><Icon name="shield" /><p>บันทึกด้วยตัวเอง<br />THB และ USDT แยกกัน</p></div>
++      <NotebookCat compact />
+     </nav>
+     <nav aria-label="เมนูมือถือ" className="tracker-mobile-nav">
+       {([['assets', 'ภาพรวม'], ['finance', 'รายการ'], ['crypto', 'พอร์ต']] as const).map(([value, label]) => <button key={value} type="button" disabled={locked} onClick={() => navigate(value)} aria-current={section === value ? 'page' : undefined} className={`tracker-nav-item ${section === value ? 'tracker-nav-active' : ''}`}><Icon name={value} /><span>{label}</span></button>)}

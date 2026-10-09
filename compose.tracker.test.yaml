@@ -1,0 +1,19 @@
+name: finntech-tracker-acceptance
+services:
+  postgres-tracker-acceptance:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: finntech_tracker_acceptance
+      POSTGRES_USER: tracker_acceptance
+      POSTGRES_PASSWORD: ${TRACKER_ACCEPTANCE_DB_PASSWORD:?Use synthetic credentials only}
+    ports:
+      - "127.0.0.1:5437:5432"
+    volumes:
+      - finntech_tracker_acceptance_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracker_acceptance -d finntech_tracker_acceptance"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  finntech_tracker_acceptance_pgdata:

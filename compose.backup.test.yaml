@@ -1,0 +1,19 @@
+name: finntech-backup-rehearsal
+services:
+  postgres-recovery:
+    image: postgres:16-alpine
+    pull_policy: never
+    network_mode: none
+    environment:
+      POSTGRES_DB: finntech_restore_test
+      POSTGRES_USER: restore_fixture
+      POSTGRES_PASSWORD: ${TRACKER_BACKUP_TEST_DB_PASSWORD:?Set a synthetic password in .env.backup.test}
+    volumes:
+      - finntech_backup_rehearsal_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U restore_fixture -d finntech_restore_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  finntech_backup_rehearsal_pgdata:

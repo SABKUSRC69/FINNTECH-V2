@@ -1,0 +1,144 @@
+{
+  "overflowChecks": [
+    {
+      "overflow": false,
+      "screen": "entry",
+      "scrollWidth": 305,
+      "width": 320
+    },
+    {
+      "overflow": false,
+      "screen": "entry",
+      "scrollWidth": 375,
+      "width": 390
+    },
+    {
+      "overflow": false,
+      "screen": "entry",
+      "scrollWidth": 753,
+      "width": 768
+    },
+    {
+      "overflow": false,
+      "screen": "entry",
+      "scrollWidth": 1280,
+      "width": 1280
+    },
+    {
+      "overflow": false,
+      "screen": "entry",
+      "scrollWidth": 1440,
+      "width": 1440
+    },
+    {
+      "overflow": false,
+      "screen": "account",
+      "scrollWidth": 305,
+      "theme": "light",
+      "width": 320
+    },
+    {
+      "overflow": false,
+      "screen": "account",
+      "scrollWidth": 375,
+      "theme": "light",
+      "width": 390
+    },
+    {
+      "overflow": false,
+      "screen": "account",
+      "scrollWidth": 753,
+      "theme": "light",
+      "width": 768
+    },
+    {
+      "overflow": false,
+      "screen": "account",
+      "scrollWidth": 1265,
+      "theme": "light",
+      "width": 1280
+    },
+    {
+      "overflow": false,
+      "screen": "account",
+      "scrollWidth": 1425,
+      "theme": "light",
+      "width": 1440
+    },
+    {
+      "overflow": false,
+      "screen": "account",
+      "scrollWidth": 305,
+      "theme": "dark",
+      "width": 320
+    },
+    {
+      "overflow": false,
+      "screen": "account",
+      "scrollWidth": 375,
+      "theme": "dark",
+      "width": 390
+    },
+    {
+      "overflow": false,
+      "screen": "account",
+      "scrollWidth": 753,
+      "theme": "dark",
+      "width": 768
+    },
+    {
+      "overflow": false,
+      "screen": "account",
+      "scrollWidth": 1265,
+      "theme": "dark",
+      "width": 1280
+    },
+    {
+      "overflow": false,
+      "screen": "account",
+      "scrollWidth": 1425,
+      "theme": "dark",
+      "width": 1440
+    },
+    {
+      "overflow": false,
+      "screen": "entry",
+      "scrollWidth": 305,
+      "theme": "dark",
+      "width": 320
+    },
+    {
+      "overflow": false,
+      "screen": "entry",
+      "scrollWidth": 375,
+      "theme": "dark",
+      "width": 390
+    },
+    {
+      "overflow": false,
+      "screen": "entry",
+      "scrollWidth": 753,
+      "theme": "dark",
+      "width": 768
+    },
+    {
+      "overflow": false,
+      "screen": "entry",
+      "scrollWidth": 1280,
+      "theme": "dark",
+      "width": 1280
+    },
+    {
+      "overflow": false,
+      "screen": "entry",
+      "scrollWidth": 1440,
+      "theme": "dark",
+      "width": 1440
+    }
+  ],
+  "reloadResumed": true,
+  "keyboardTabMovedToBackup": true,
+  "keyboardFreshLoggedOut": true,
+  "incorrectCodeRejectedInBrowser": true,
+  "realPublicDemo": "NOT TESTED"
+}

@@ -1,0 +1,30 @@
+# Candidate only; owner must create/connect free accounts and supply secret-store values.
+services:
+  - type: web
+    name: finntech-beta
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.beta
+    healthCheckPath: /api/ready
+    autoDeployTrigger: off
+    envVars:
+      - key: TRACKER_RUNTIME_MODE
+        value: cloud-beta
+      - key: NODE_ENV
+        value: production
+      - key: TRACKER_BETA_ACCESS
+        value: public
+      - key: TRACKER_BETA_DATA_MODE
+        value: synthetic
+      - key: TRACKER_RECOVERY_MODE
+        value: off
+      - key: TRACKER_BETA_REGISTRATIONS_OPEN
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: BETTER_AUTH_SECRET
+        sync: false
+      - key: TRACKER_ORIGIN
+        sync: false
+      - key: TRACKER_BETA_DATABASE_HOST
+        sync: false

@@ -1,0 +1,23 @@
+{
+  "healthBeforeStop": {
+    "status": "ok",
+    "service": "tracker-api",
+    "checks": {
+      "process": "ok",
+      "database": "ok",
+      "auth": "not_checked"
+    },
+    "capabilities": {
+      "recovery": true,
+      "verification": true
+    }
+  },
+  "capabilities": {
+    "recovery": true,
+    "verification": true
+  },
+  "stoppedOwnedApi": true,
+  "dockerStopExit": 0,
+  "remainingListenerPorts": [],
+  "retainedVolume": true
+}

@@ -1,0 +1,9 @@
+{
+  "result": "PASS",
+  "releaseFiles": 138,
+  "changedFiles": 31,
+  "zipHashesVerified": true,
+  "privateValuesInPublishedFiles": 0,
+  "sourceCommit": "e8caa93e92ca169ffa7759aebd8f4b1d74adc222",
+  "zipSha256": "81f2056fceed5b47663781f70481ac83265773be9807d9c34720f6d88881ce6a"
+}

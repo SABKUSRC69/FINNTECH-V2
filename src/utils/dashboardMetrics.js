@@ -24,10 +24,10 @@ function summarizeTransactions(transactions, monthKey) {
   }, { income: 0, expense: 0 })
 }
 
-function getAccountNetWorth({ portfolio, spotBalances, openOrders }) {
+function getAccountNetWorth({ portfolio, spotBalances, openOrders, marketSnapshot }) {
   if (!spotBalances || typeof spotBalances !== 'object') return null
-  const portfolioValue = calculatePortfolioValuation(portfolio)
-  const spotValue = calculateSpotWalletValuation(spotBalances, openOrders)
+  const portfolioValue = calculatePortfolioValuation(portfolio, marketSnapshot)
+  const spotValue = calculateSpotWalletValuation(spotBalances, openOrders, marketSnapshot)
   if (portfolioValue.totalValueTHB === null || spotValue.totalValueTHB === null) return null
   const total = portfolioValue.totalValueTHB + spotValue.totalValueTHB
   return Number.isFinite(total) ? total : null
@@ -38,6 +38,7 @@ export function calculateDashboardMetrics({
   portfolio = [],
   spotBalances,
   openOrders = [],
+  marketSnapshot,
   now = new Date(),
 } = {}) {
   const safeTransactions = Array.isArray(transactions) ? transactions : []
@@ -46,37 +47,43 @@ export function calculateDashboardMetrics({
   const previousMonthKey = localMonthKey(previousMonth)
   const currentMonth = summarizeTransactions(safeTransactions, currentMonthKey)
   const previousMonthStats = summarizeTransactions(safeTransactions, previousMonthKey)
+  const hasTransactionsForMonth = (monthKey) => safeTransactions.some((item) => {
+    const date = parseTransactionDate(item?.date)
+    return date && localMonthKey(date) === monthKey &&
+      (item?.type === 'income' || item?.type === 'expense') &&
+      Number.isFinite(Number(item?.amount)) && Number(item.amount) >= 0
+  })
+  const currentMonthHasTransactions = hasTransactionsForMonth(currentMonthKey)
+  const previousMonthHasTransactions = hasTransactionsForMonth(previousMonthKey)
   const cashflow = []
 
   for (let offset = 5; offset >= 0; offset -= 1) {
     const date = new Date(now.getFullYear(), now.getMonth() - offset, 1)
     const key = localMonthKey(date)
     const month = summarizeTransactions(safeTransactions, key)
+    const hasTransactions = hasTransactionsForMonth(key)
     cashflow.push({
       month: date.toLocaleDateString('th-TH', { month: 'short' }),
       monthKey: key,
-      income: month.income,
-      expense: month.expense,
-      savings: month.income - month.expense,
+      hasTransactions,
+      income: hasTransactions ? month.income : null,
+      expense: hasTransactions ? month.expense : null,
+      savings: hasTransactions ? month.income - month.expense : null,
     })
   }
 
   return {
     currentMonthKey,
     currentMonthLabel: now.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' }),
-    totalIncome: currentMonth.income,
-    totalExpense: currentMonth.expense,
-    netSavings: currentMonth.income - currentMonth.expense,
-    previousMonthIncome: previousMonthStats.income,
-    previousMonthExpense: previousMonthStats.expense,
-    currentMonthHasTransactions: safeTransactions.some((item) => {
-      const date = parseTransactionDate(item?.date)
-      return date && localMonthKey(date) === currentMonthKey &&
-        (item?.type === 'income' || item?.type === 'expense') &&
-        Number.isFinite(Number(item?.amount)) && Number(item.amount) >= 0
-    }),
+    totalIncome: currentMonthHasTransactions ? currentMonth.income : null,
+    totalExpense: currentMonthHasTransactions ? currentMonth.expense : null,
+    netSavings: currentMonthHasTransactions ? currentMonth.income - currentMonth.expense : null,
+    previousMonthIncome: previousMonthHasTransactions ? previousMonthStats.income : null,
+    previousMonthExpense: previousMonthHasTransactions ? previousMonthStats.expense : null,
+    currentMonthHasTransactions,
+    previousMonthHasTransactions,
     cashflow,
-    netWorth: getAccountNetWorth({ portfolio, spotBalances, openOrders }),
+    netWorth: getAccountNetWorth({ portfolio, spotBalances, openOrders, marketSnapshot }),
   }
 }
 

@@ -1,0 +1,1419 @@
+diff --git a/apps/api/db-test/demo.integration.ts b/apps/api/db-test/demo.integration.ts
+new file mode 100644
+index 0000000..6ad26be
+--- /dev/null
++++ b/apps/api/db-test/demo.integration.ts
+@@ -0,0 +1,233 @@
++import assert from 'node:assert/strict'
++import { randomBytes, randomUUID } from 'node:crypto'
++import { once } from 'node:events'
++import { after, before, test } from 'node:test'
++import request from 'supertest'
++import { WebSocket } from 'ws'
++import { createTrackerDatabase } from '../src/persistence/database.js'
++import { createAuthRuntime } from '../src/auth/runtime.js'
++import { authSubjectAllowed } from '../src/auth/authorization.js'
++import { createApp } from '../src/app.js'
++import { MarketRelay } from '../src/tracker/market.js'
++import { StockMarketRelay } from '../src/tracker/stocks.js'
++import { attachMarketStream } from '../src/tracker/stream.js'
++import type { PrismaClient } from '../src/generated/prisma/client.js'
++
++const target = new URL(process.env.DATABASE_URL ?? 'http://invalid')
++if (target.hostname !== '127.0.0.1' || target.port !== '5443' || target.pathname !== '/finntech_demo_test_20261008' || target.username !== 'demo_fixture') throw new Error('Unexpected synthetic test target')
++const db = createTrackerDatabase(target.href), origin = 'https://synthetic.onrender.com'
++const code = randomBytes(24).toString('hex'), secret = randomBytes(32).toString('hex')
++const demo = { enabled: true, code, epoch: randomUUID(), expiresIn: 3600, accountLimit: 5000 }
++const configuration = { databaseUrl: target.href, origin, secret, secureCookies: true, beta: { access: 'public' as const, registrationsOpen: false, invitedEmails: new Set<string>() }, demo }
++const auth = createAuthRuntime(db, configuration), app = createApp({ auth, database: db })
++let nonceA = '', nonceB = '', cookieA = '', cookieB = '', ownerA = '', ownerB = '', userA = '', initialCount = 0
++const post = (route: string, body: object, cookie = '', application = app) => request(application).post(route).set('Origin', origin).set('Cookie', cookie).send(body)
++const get = (route: string, cookie = '', application = app) => request(application).get(route).set('Cookie', cookie)
++function cookie(response: request.Response, name: string): string {
++  const cookies = response.headers['set-cookie'] as unknown as string[] | undefined
++  const found = cookies?.find(value => value.startsWith(name + '='))
++  assert.ok(found && /HttpOnly/.test(found) && /Secure/.test(found), 'protected cookie present (value withheld)')
++  return found!.split(';')[0]!
++}
++async function prepare(application = app): Promise<string> {
++  const result = await post('/api/auth/demo/prepare', {}, '', application); assert.equal(result.status, 200)
++  return cookie(result, '__Host-finntech.demo_request')
++}
++before(async () => {
++  const identity = await db.$queryRaw<{ name: string; role: string }[]>`SELECT current_database() AS name, current_user AS role`
++  assert.ok(identity[0]?.name === 'finntech_demo_test_20261008' && identity[0].role === 'demo_fixture')
++  initialCount = await db.demoWorkspace.count(); nonceA = await prepare(); nonceB = await prepare()
++})
++after(async () => { await db.$disconnect() })
++
++test('server gate rejects incorrect/missing code, forged Origin, missing prepare, public signup and anonymous direct APIs', async () => {
++  const before = await db.authUser.count()
++  assert.equal((await post('/api/auth/demo/enter', { code: randomBytes(24).toString('hex') }, nonceA)).status, 403)
++  assert.equal((await post('/api/auth/demo/enter', {}, nonceA)).status, 403)
++  assert.equal((await post('/api/auth/demo/enter', { code })).status, 403)
++  assert.equal((await post('/api/auth/demo/enter', { code }, nonceA).set('Origin', 'https://forged.invalid')).status, 403)
++  assert.equal((await post('/api/auth/sign-up/email', { name: 'Synthetic', email: `${randomUUID()}@example.invalid`, password: randomBytes(24).toString('hex') })).status, 403)
++  assert.equal((await post('/api/auth/sign-in/anonymous', {})).status, 404)
++  assert.equal((await get('/api/finance?month=2026-10')).status, 401)
++  assert.equal((await post('/api/auth/request-password-reset', {})).status, 404)
++  assert.equal(await db.authUser.count(), before)
++})
++
++test('concurrent entry and response-loss replay create ONE authenticated workspace, no credential account/password', async () => {
++  const replies = await Promise.all([post('/api/auth/demo/enter', { code }, nonceA), post('/api/auth/demo/enter', { code }, nonceA)])
++  for (const result of replies) { assert.equal(result.status, 200); assert.deepEqual(result.body, { demo: true }) }
++  cookieA = cookie(replies[0]!, '__Secure-finntech.session_token')
++  assert.ok(cookieA === cookie(replies[1]!, '__Secure-finntech.session_token'), 'same protected session, values withheld')
++  assert.equal(await db.demoWorkspace.count(), initialCount + 1)
++  const replayAuth = createAuthRuntime(db, configuration), replayApp = createApp({ auth: replayAuth, database: db })
++  const lost = await post('/api/auth/demo/enter', { code }, nonceA, replayApp) // original response/session cookie was lost
++  assert.equal(lost.status, 200); assert.ok(cookie(lost, '__Secure-finntech.session_token') === cookieA, 'durable same session across runtime recreation')
++  const session = await get('/api/auth/get-session', cookieA); userA = session.body.user.id
++  assert.ok(userA); assert.ok(!('token' in session.body.session)); assert.equal(session.body.user.name, 'ผู้ทดลอง DEMO')
++  assert.equal(await db.authAccount.count({ where: { userId: userA } }), 0)
++  assert.equal(await db.authRecoveryEnrollment.count({ where: { userId: userA } }), 0)
++  const owner = await get('/api/me', cookieA); assert.equal(owner.body.demo, true); ownerA = owner.body.ownerId
++  assert.equal((await get('/api/auth-capabilities')).body.recovery, false)
++})
++
++test('two independent browser cookies have separate owners; direct foreign read/modification cannot cross ownership', async () => {
++  const result = await post('/api/auth/demo/enter', { code }, nonceB); assert.equal(result.status, 200); cookieB = cookie(result, '__Secure-finntech.session_token')
++  ownerB = (await get('/api/me', cookieB)).body.ownerId; assert.ok(ownerA !== ownerB)
++  const month = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 7)
++  const first = await get(`/api/finance?month=${month}`, cookieA)
++  assert.equal(first.body.income, '12000'); assert.equal(first.body.currency, 'THB')
++  const category = first.body.categories.find((row: { type: string }) => row.type === 'income').id
++  const value = { categoryId: category, type: 'income', amount: '0.10', currency: 'THB', date: `${month}-01`, note: 'DEMO test' }
++  assert.equal((await post('/api/finance/transactions', value, cookieB).set('Idempotency-Key', randomUUID())).status, 404)
++  const key = randomUUID(), written = await post('/api/finance/transactions', value, cookieA).set('Idempotency-Key', key)
++  assert.equal(written.status, 200)
++  assert.deepEqual((await post('/api/finance/transactions', value, cookieA).set('Idempotency-Key', key)).body, written.body)
++  const other = await get(`/api/finance?month=${month}&ownerId=${ownerA}`, cookieB).set('X-Owner-Id', ownerA)
++  assert.equal(other.body.income, '12000'); assert.equal(other.body.transactions.length, 1)
++  assert.equal((await get('/api/crypto', cookieA)).body.quoteCurrency, 'USDT')
++  assert.equal((await get('/api/crypto', cookieA)).body.holdings.length, 0)
++})
++
++test('real regular account remains isolated, login works and demo cannot replace its valid authenticated session', async () => {
++  const { demo: _demo, ...withoutDemo } = configuration
++  const normal = createAuthRuntime(db, { ...withoutDemo, beta: { ...configuration.beta, registrationsOpen: true } })
++  const normalApp = createApp({ auth: normal, database: db }), password = randomBytes(24).toString('hex'), email = `${randomUUID()}@example.invalid`
++  const signup = await post('/api/auth/sign-up/email', { name: 'Regular synthetic account', email, password }, '', normalApp)
++  assert.equal(signup.status, 200); const regularCookie = cookie(signup, '__Secure-finntech.session_token')
++  assert.equal((await get('/api/me', regularCookie)).body.demo, undefined)
++  assert.equal((await post('/api/auth/demo/enter', { code }, `${regularCookie}; ${nonceA}`)).status, 403)
++  assert.equal((await get('/api/me', regularCookie)).body.ownerId === ownerA, false)
++  assert.equal((await post('/api/auth/sign-out', {}, regularCookie, normalApp)).status, 200)
++  assert.equal((await post('/api/auth/sign-in/email', { email, password }, '', normalApp)).status, 200)
++})
++
++test('code rotation stops old code while preserving existing sessions; disabling entry also preserves sessions', async () => {
++  const rotated = { ...demo, code: randomBytes(24).toString('hex') }, rotatedAuth = createAuthRuntime(db, { ...configuration, demo: rotated })
++  const rotatedApp = createApp({ auth: rotatedAuth, database: db })
++  assert.equal((await post('/api/auth/demo/enter', { code }, nonceA, rotatedApp)).status, 403)
++  assert.equal((await get('/api/me', cookieA, rotatedApp)).status, 200)
++  const disabledAuth = createAuthRuntime(db, { ...configuration, demo: { ...rotated, enabled: false } }), disabled = createApp({ auth: disabledAuth, database: db })
++  assert.equal((await post('/api/auth/demo/prepare', {}, '', disabled)).status, 403)
++  assert.equal((await post('/api/auth/demo/enter', { code: rotated.code }, nonceA, disabled)).status, 403)
++  assert.equal((await get('/api/me', cookieA, disabled)).status, 200)
++})
++
++test('fixed expiration rejects session, get-session and same-nonce entry without renewing or creating a workspace', async () => {
++  const session = await get('/api/auth/get-session', cookieB), user = session.body.user.id
++  await db.demoWorkspace.update({ where: { userId: user }, data: { expiresAt: new Date(Date.now() - 1000) } })
++  assert.equal((await get('/api/me', cookieB)).status, 403)
++  assert.equal((await get('/api/auth/get-session', cookieB)).body, null)
++  const count = await db.demoWorkspace.count(); assert.equal((await post('/api/auth/demo/enter', { code }, nonceB)).status, 410)
++  assert.equal(await db.demoWorkspace.count(), count)
++})
++
++test('Better Auth session expiration itself also rejects entry replay and authenticated reads', async () => {
++  const separateAuth = createAuthRuntime(db, configuration), separateApp = createApp({ auth: separateAuth, database: db })
++  const nonce = await prepare(separateApp), response = await post('/api/auth/demo/enter', { code }, nonce, separateApp)
++  assert.equal(response.status, 200)
++  const sessionCookie = cookie(response, '__Secure-finntech.session_token')
++  const session = await get('/api/auth/get-session', sessionCookie, separateApp)
++  const workspace = await db.demoWorkspace.findUniqueOrThrow({ where: { userId: session.body.user.id } })
++  await db.authSession.update({ where: { id: workspace.sessionId }, data: { expiresAt: new Date(Date.now() - 1000) } })
++  assert.equal((await get('/api/me', sessionCookie, separateApp)).status, 401)
++  assert.equal((await post('/api/auth/demo/enter', { code }, nonce, separateApp)).status, 410)
++})
++
++test('logout revokes the authentic session; replay cannot resurrect it; fresh workspace leaves both previous datasets intact', async () => {
++  assert.equal((await post('/api/auth/demo/reset', {}, cookieA)).status, 403)
++  assert.equal((await post('/api/auth/sign-out', {}, cookieA)).status, 200)
++  assert.equal((await get('/api/me', cookieA)).status, 401)
++  assert.equal((await post('/api/auth/demo/enter', { code }, nonceA)).status, 410)
++  const reset = await post('/api/auth/demo/reset', {}, nonceA); assert.equal(reset.status, 200)
++  const nonce = cookie(reset, '__Host-finntech.demo_request'), entered = await post('/api/auth/demo/enter', { code }, nonce)
++  assert.equal(entered.status, 200)
++  const next = (await get('/api/me', cookie(entered, '__Secure-finntech.session_token'))).body.ownerId
++  assert.ok(next !== ownerA && next !== ownerB)
++  assert.equal(await db.financeTransaction.count({ where: { ownerId: ownerA } }), 2)
++  assert.equal(await db.financeTransaction.count({ where: { ownerId: ownerB } }), 1)
++})
++
++test('creation limit persists across runtime recreation; concurrent final slot admits exactly one workspace', async () => {
++  const currentCount = await db.demoWorkspace.count(), capped = { ...configuration, demo: { ...demo, accountLimit: currentCount + 1 } }
++  const cappedAuth = createAuthRuntime(db, capped), cappedApp = createApp({ auth: cappedAuth, database: db })
++  const n1 = await prepare(cappedApp), n2 = await prepare(cappedApp)
++  const results = await Promise.all([post('/api/auth/demo/enter', { code }, n1, cappedApp), post('/api/auth/demo/enter', { code }, n2, cappedApp)])
++  assert.deepEqual(results.map(row => row.status).sort(), [200, 429]); assert.equal(await db.demoWorkspace.count(), currentCount + 1)
++  const restartedAuth = createAuthRuntime(db, capped), restarted = createApp({ auth: restartedAuth, database: db })
++  const next = await prepare(restarted)
++  assert.equal((await post('/api/auth/demo/enter', { code }, next, restarted)).status, 429)
++})
++
++test('seeding fault rolls back Better Auth user, session, owner, receipt and finance data together', async () => {
++  const counts = async () => Promise.all([db.authUser.count(), db.authSession.count(), db.trackerUser.count(), db.demoWorkspace.count(), db.financeTransaction.count()])
++  const before = await counts()
++  const faulty = new Proxy(db, { get(clientRoot, property) {
++    if (property !== '$transaction') return Reflect.get(clientRoot, property)
++    return (operation: (tx: unknown) => Promise<unknown>, options: object) => clientRoot.$transaction(tx => operation(new Proxy(tx, { get(client, key) {
++      if (key === 'auditEvent') return { ...client.auditEvent, create: async () => { throw new Error(`synthetic_seed_fault:${code}:${target.href}`) } }
++      return Reflect.get(client, key)
++    } })), options)
++  } }) as PrismaClient
++  const faultyAuth = createAuthRuntime(faulty, configuration), faultyApp = createApp({ auth: faultyAuth, database: faulty })
++  const nonce = await prepare(faultyApp)
++  const logs: string[] = [], originalError = console.error
++  console.error = (...values: unknown[]) => { logs.push(values.map(String).join(' ')) }
++  try {
++    const response = await post('/api/auth/demo/enter', { code }, nonce, faultyApp)
++    assert.equal(response.status, 503)
++    assert.ok(![code, secret, target.href, target.password].some(value => response.text.includes(value) || logs.some(line => line.includes(value))), 'fault response/logs withhold secrets')
++  } finally { console.error = originalError }
++  assert.deepEqual(await counts(), before)
++})
++
++test('bounded bodies and global rate limit reject abuse without creating accounts', async () => {
++  const before = await db.demoWorkspace.count()
++  assert.equal((await post('/api/auth/demo/enter', { code: 'x'.repeat(2048) }, nonceA)).status, 413)
++  const limitAuth = createAuthRuntime(db, configuration), limited = createApp({ auth: limitAuth, database: db })
++  let status = 0
++  for (let i = 0; i < 31; i++) status = (await post('/api/auth/demo/enter', { code: randomBytes(24).toString('hex') }, nonceA, limited)).status
++  assert.equal(status, 429); assert.equal(await db.demoWorkspace.count(), before)
++})
++
++test('epoch revocation closes HTTP and both existing WS connections using the normal session revalidation', async () => {
++  const wsDemo = { ...demo }, wsAuth = createAuthRuntime(db, { ...configuration, demo: wsDemo }), wsApp = createApp({ auth: wsAuth, database: db })
++  const nonce = await prepare(wsApp), entered = await post('/api/auth/demo/enter', { code }, nonce, wsApp)
++  assert.equal(entered.status, 200); const sessionCookie = cookie(entered, '__Secure-finntech.session_token')
++  const market = new MarketRelay(async () => { throw new Error('synthetic_provider_disabled') }), stocks = new StockMarketRelay(null)
++  const server = wsApp.listen(0, '127.0.0.1'); await once(server, 'listening')
++  const address = server.address(); assert.ok(address && typeof address === 'object')
++  const stop = attachMarketStream(server, wsAuth, market, stocks, undefined, id => authSubjectAllowed(wsAuth, db, id))
++  const sockets: WebSocket[] = []
++  try {
++    for (const route of ['market', 'stocks']) {
++      const socket = new WebSocket(`ws://127.0.0.1:${address.port}/ws/${route}`, { origin, headers: { Cookie: sessionCookie } })
++      await once(socket, 'open'); sockets.push(socket)
++    }
++    const closed = sockets.map(socket => once(socket, 'close'))
++    wsDemo.epoch = randomUUID()
++    assert.equal((await get('/api/me', sessionCookie, wsApp)).status, 403)
++    let timer: ReturnType<typeof setTimeout> | undefined
++    try { await Promise.race([Promise.all(closed), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('session revalidation deadline')), 12000) })]) }
++    finally { clearTimeout(timer) }
++  } finally { sockets.forEach(socket => socket.terminate()); stop(); stocks.stop(); await new Promise<void>(resolve => server.close(() => resolve())) }
++})
++
++test('Better Auth logout closes an already-open demo WS connection without deleting its dataset', async () => {
++  const separateAuth = createAuthRuntime(db, configuration), separateApp = createApp({ auth: separateAuth, database: db })
++  const nonce = await prepare(separateApp), result = await post('/api/auth/demo/enter', { code }, nonce, separateApp)
++  assert.equal(result.status, 200); const sessionCookie = cookie(result, '__Secure-finntech.session_token')
++  const owner = (await get('/api/me', sessionCookie, separateApp)).body.ownerId
++  const market = new MarketRelay(async () => { throw new Error('synthetic_provider_disabled') })
++  const server = separateApp.listen(0, '127.0.0.1'); await once(server, 'listening')
++  const address = server.address(); assert.ok(address && typeof address === 'object')
++  const stop = attachMarketStream(server, separateAuth, market, undefined, undefined, id => authSubjectAllowed(separateAuth, db, id))
++  const socket = new WebSocket(`ws://127.0.0.1:${address.port}/ws/market`, { origin, headers: { Cookie: sessionCookie } })
++  try {
++    await once(socket, 'open'); const closed = once(socket, 'close')
++    assert.equal((await post('/api/auth/sign-out', {}, sessionCookie, separateApp)).status, 200)
++    let timer: ReturnType<typeof setTimeout> | undefined
++    try { await Promise.race([closed, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('logout revalidation deadline')), 12000) })]) }
++    finally { clearTimeout(timer) }
++    assert.equal(await db.financeTransaction.count({ where: { ownerId: owner } }), 1)
++  } finally { socket.terminate(); stop(); await new Promise<void>(resolve => server.close(() => resolve())) }
++})
+
+diff --git a/apps/api/package.json b/apps/api/package.json
+index c0836dd..e5c90e9 100644
+--- a/apps/api/package.json
++++ b/apps/api/package.json
+@@ -23,6 +23,7 @@
+     "auth:test": "node --env-file-if-exists=../../.env.auth.test ../../scripts/tracker-auth-test.mjs"
+   },
+   "dependencies": {
++    "@better-auth/core": "1.7.7",
+     "@finntech/contracts": "0.1.0",
+     "@finntech/finance": "0.1.0",
+     "@prisma/adapter-pg": "7.10.0",
+
+diff --git a/apps/api/prisma/migrations/20261008000000_demo_workspaces/migration.sql b/apps/api/prisma/migrations/20261008000000_demo_workspaces/migration.sql
+new file mode 100644
+index 0000000..5187ae8
+--- /dev/null
++++ b/apps/api/prisma/migrations/20261008000000_demo_workspaces/migration.sql
+@@ -0,0 +1,12 @@
++CREATE TABLE "demo_workspaces" (
++  "request_hash" CHAR(64) NOT NULL,
++  "user_id" UUID NOT NULL,
++  "session_id" UUID NOT NULL,
++  "epoch" VARCHAR(64) NOT NULL,
++  "expires_at" TIMESTAMPTZ(3) NOT NULL,
++  "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
++  CONSTRAINT "demo_workspaces_pkey" PRIMARY KEY ("request_hash"),
++  CONSTRAINT "demo_workspaces_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth_users"("id") ON DELETE RESTRICT ON UPDATE CASCADE
++);
++CREATE UNIQUE INDEX "demo_workspaces_user_id_key" ON "demo_workspaces"("user_id");
++CREATE UNIQUE INDEX "demo_workspaces_session_id_key" ON "demo_workspaces"("session_id");
+
+diff --git a/apps/api/prisma/schema.prisma b/apps/api/prisma/schema.prisma
+index fb34882..3f33b45 100644
+--- a/apps/api/prisma/schema.prisma
++++ b/apps/api/prisma/schema.prisma
+@@ -121,9 +121,22 @@ model AuthUser {
+   identity AuthIdentity?
+   recovery AuthRecoveryEnrollment?
+   deliveryJobs AuthDeliveryJob[]
++  demoWorkspace DemoWorkspace?
+   @@map("auth_users")
+ }
+ 
++// Durable browser request receipt. No demo password store and no automatic retention deletion.
++model DemoWorkspace {
++  requestHash String @id @map("request_hash") @db.Char(64)
++  userId String @unique @map("user_id") @db.Uuid
++  user AuthUser @relation(fields: [userId], references: [id], onDelete: Restrict)
++  sessionId String @unique @map("session_id") @db.Uuid
++  epoch String @db.VarChar(64)
++  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
++  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
++  @@map("demo_workspaces")
++}
++
+ model AuthSession {
+   id String @id @default(uuid()) @db.Uuid
+   expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+
+diff --git a/apps/api/src/app.ts b/apps/api/src/app.ts
+index b49d5e7..9be6ccf 100644
+--- a/apps/api/src/app.ts
++++ b/apps/api/src/app.ts
+@@ -13,6 +13,7 @@ import type { ReferenceFxRelay } from './tracker/fx.js'
+ import type { RecoveryService } from './auth/recovery.js'
+ import { authSubjectAllowed } from './auth/authorization.js'
+ import { betaFor, createBetaAuthGuard } from './auth/beta.js'
++import { demoFor, createDemoRequestGuard } from './auth/demo.js'
+ 
+ const currentDirectory = path.dirname(fileURLToPath(import.meta.url))
+ 
+@@ -70,12 +71,13 @@ export function createApp(options: ApiAppOptions = {}): Express {
+   if (options.auth && options.database) {
+     const beta = betaFor(options.auth)
+     const betaGuard = beta ? createBetaAuthGuard(beta, options.auth.options.secret!) : undefined
++    const demoGuard = createDemoRequestGuard()
+     const authHandler = toNodeHandler(async (request) => {
+       try {
+-        const denied = await betaGuard?.(request)
++        const denied = await demoGuard(request) ?? await betaGuard?.(request)
+         if (denied) return denied
+         let result = await options.recovery?.handle(request) ?? await options.auth!.handler(request)
+-        if ((options.recovery || beta) && new URL(request.url).pathname === '/api/auth/get-session' && result.ok) {
++        if (new URL(request.url).pathname === '/api/auth/get-session' && result.ok) {
+           const snapshot = await result.clone().json() as { user?: { id?: string } } | null
+           if (snapshot?.user?.id && !await authSubjectAllowed(options.auth!, options.database!, snapshot.user.id)) result = globalThis.Response.json(null)
+         }
+@@ -100,6 +102,7 @@ export function createApp(options: ApiAppOptions = {}): Express {
+     app.all('/api/auth/{*path}', (request, response) => {
+       response.set('Cache-Control', 'no-store')
+       const supported = new Set(['/sign-up/email', '/sign-in/email', '/sign-out', '/get-session', '/ok'])
++      if (demoFor(options.auth!)) for (const route of ['/demo/prepare', '/demo/enter', '/demo/reset']) supported.add(route)
+       if (options.recovery) for (const route of ['/request-password-reset', '/reset-password', '/confirm-email', '/begin-verification']) supported.add(route)
+       if (!supported.has(request.path.slice('/api/auth'.length))) { sendApiNotFound(request, response); return }
+       if (request.method !== 'GET' && request.headers.origin !== options.auth!.options.baseURL) {
+@@ -108,10 +111,11 @@ export function createApp(options: ApiAppOptions = {}): Express {
+       }
+       return authHandler(request, response)
+     })
+-    app.get('/api/me', requireOwner(options.auth, options.database), (_request, response) => {
++    app.get('/api/me', requireOwner(options.auth, options.database), async (_request, response) => {
+       const owner = response.locals.owner as OwnerContext
+       response.set('Cache-Control', 'no-store')
+-      response.json({ ownerId: owner.ownerId })
++      const workspace = await options.database!.demoWorkspace.findFirst({ where: { user: { identity: { ownerId: owner.ownerId } } }, select: { expiresAt: true } })
++      response.json({ ownerId: owner.ownerId, ...(workspace ? { demo: true, demoExpiresAt: workspace.expiresAt.toISOString() } : {}) })
+     })
+   }
+   if (options.auth && options.database) app.use('/api', trackerRouter(options.auth, options.database, options.market, options.stocks, options.fx))
+@@ -128,6 +132,7 @@ export function createApp(options: ApiAppOptions = {}): Express {
+       },
+       ...(options.recovery ? { capabilities: { recovery: true, verification: true } } : {}),
+       ...(options.auth && betaFor(options.auth) ? { beta: { dataMode: 'synthetic', access: betaFor(options.auth)!.access, recovery: false } } : {}),
++      ...(options.auth && demoFor(options.auth)?.enabled ? { demo: { enabled: true } } : {}),
+     })
+   })
+   app.get('/api/ready', async (_request, response) => {
+
+diff --git a/apps/api/src/auth/authorization.ts b/apps/api/src/auth/authorization.ts
+index f43df5e..543f01d 100644
+--- a/apps/api/src/auth/authorization.ts
++++ b/apps/api/src/auth/authorization.ts
+@@ -3,12 +3,14 @@ import type { RequestHandler } from 'express'
+ import { Prisma, type PrismaClient } from '../generated/prisma/client.js'
+ import type { AuthRuntime } from './runtime.js'
+ import { betaFor, betaEmailAllowed } from './beta.js'
++import { demoSubjectAllowed } from './demo.js'
+ 
+ export interface OwnerContext { ownerId: string }
+ 
+ export async function authSubjectAllowed(auth: AuthRuntime, database: PrismaClient, authUserId: string): Promise<boolean> {
++  if (!await demoSubjectAllowed(auth, database, authUserId)) return false
+   const beta = betaFor(auth)
+-  if (beta?.access === 'invited') {
++  if (beta?.access === 'invited' && !await database.demoWorkspace.findUnique({ where: { userId: authUserId } })) {
+     const user = await database.authUser.findUnique({ where: { id: authUserId }, select: { email: true } })
+     if (!user || !betaEmailAllowed(beta, user.email)) return false
+   }
+
+diff --git a/apps/api/src/auth/config.ts b/apps/api/src/auth/config.ts
+index 5d2094d..176e720 100644
+--- a/apps/api/src/auth/config.ts
++++ b/apps/api/src/auth/config.ts
+@@ -1,10 +1,12 @@
+ import type { BetaConfiguration } from './beta.js'
++import type { DemoConfiguration } from './demo.js'
+ export interface AuthConfiguration {
+   databaseUrl: string
+   secret: string
+   origin: string
+   secureCookies: boolean
+   beta?: BetaConfiguration
++  demo?: DemoConfiguration
+   recovery?: { mode: 'synthetic-3a'; key: string; sinkDirectory: string; resetExpiresIn: number; verificationExpiresIn: number }
+ }
+ 
+@@ -49,6 +51,19 @@ export function readAuthConfiguration(environment: NodeJS.ProcessEnv): AuthConfi
+     config.beta = { access: access as 'public' | 'invited', registrationsOpen: environment.TRACKER_BETA_REGISTRATIONS_OPEN === 'true', invitedEmails }
+   }
+   const mode = environment.TRACKER_RECOVERY_MODE
++  if (environment.FINNTECH_DEMO_ENABLED !== undefined) {
++    const enabled = environment.FINNTECH_DEMO_ENABLED === 'true'
++    const code = environment.FINNTECH_DEMO_ACCESS_CODE ?? ''
++    const epoch = environment.FINNTECH_DEMO_SESSION_EPOCH ?? '1'
++    const ttl = environment.FINNTECH_DEMO_SESSION_SECONDS ?? '14400'
++    const limit = environment.FINNTECH_DEMO_ACCOUNT_LIMIT ?? '100'
++    if (!config.beta || !['true', 'false'].includes(environment.FINNTECH_DEMO_ENABLED)
++      || (enabled && (code.length < 12 || code.length > 128 || !code.trim()))
++      || !/^[a-zA-Z0-9._-]{1,64}$/.test(epoch)
++      || !/^\d+$/.test(ttl) || Number(ttl) < 60 || Number(ttl) > 86400
++      || !/^\d+$/.test(limit) || Number(limit) < 1 || Number(limit) > 5000) throw new Error('Invalid isolated demo configuration (values withheld)')
++    config.demo = { enabled, code, epoch, expiresIn: Number(ttl), accountLimit: Number(limit) }
++  }
+   if (mode && mode !== 'off') {
+     if (mode !== 'synthetic-3a' || environment.NODE_ENV === 'production'
+       || environment.TRACKER_RECOVERY_CONFIRM !== 'synthetic-only'
+
+diff --git a/apps/api/src/auth/demo.ts b/apps/api/src/auth/demo.ts
+new file mode 100644
+index 0000000..6fc1213
+--- /dev/null
++++ b/apps/api/src/auth/demo.ts
+@@ -0,0 +1,130 @@
++import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
++import { betterAuth, type BetterAuthPlugin } from 'better-auth'
++import { createAuthEndpoint, APIError } from 'better-auth/api'
++import { prismaAdapter } from 'better-auth/adapters/prisma'
++import { setSessionCookie } from 'better-auth/cookies'
++import { runWithAdapter } from '@better-auth/core/context'
++import { parseThbDecimal, serializeThb } from '@finntech/finance'
++import type { PrismaClient } from '../generated/prisma/client.js'
++import type { AuthRuntime } from './runtime.js'
++
++export interface DemoConfiguration { enabled: boolean; code: string; epoch: string; expiresIn: number; accountLimit: number }
++const configurations = new WeakMap<AuthRuntime, DemoConfiguration>()
++export function registerDemo(auth: AuthRuntime, configuration: DemoConfiguration): void { configurations.set(auth, configuration) }
++export function demoFor(auth: AuthRuntime): DemoConfiguration | undefined { return configurations.get(auth) }
++export function demoCodeMatches(input: unknown, code: string): boolean {
++  return typeof input === 'string' && input.length <= 128 && timingSafeEqual(createHash('sha256').update(input).digest(), createHash('sha256').update(code).digest())
++}
++export async function demoSubjectAllowed(auth: AuthRuntime, database: PrismaClient, userId: string): Promise<boolean> {
++  const workspace = await database.demoWorkspace.findUnique({ where: { userId } })
++  if (!workspace) return true
++  const configuration = demoFor(auth)
++  // Entry can be disabled without revoking sessions. Epoch changes revoke HTTP and WS.
++  return !!configuration && workspace.epoch === configuration.epoch && workspace.expiresAt.getTime() > Date.now()
++}
++
++/** Bound parsing before Better Auth's endpoint parser, including chunked bodies. No proxy-IP trust. */
++export function createDemoRequestGuard() {
++  const buckets = new Map<string, { window: number; hits: number }>()
++  return async (request: Request): Promise<Response | undefined> => {
++    if (!new URL(request.url).pathname.startsWith('/api/auth/demo/')) return undefined
++    if (request.method !== 'POST') return Response.json({ error: { code: 'METHOD_NOT_ALLOWED' } }, { status: 405 })
++    const window = Math.floor(Date.now() / 60000)
++    for (const [key, row] of buckets) if (row.window !== window) buckets.delete(key)
++    // Global ceiling intentionally includes prepare/reset and does not trust X-Forwarded-For.
++    const key = 'demo-service', row = buckets.get(key) ?? { window, hits: 0 }
++    row.hits++; buckets.set(key, row)
++    if (row.hits > 30) return Response.json({ error: { code: 'RATE_LIMITED' } }, { status: 429, headers: { 'Retry-After': '60' } })
++    let deadline: ReturnType<typeof setTimeout> | undefined
++    try {
++      const reader = request.clone().body?.getReader(); let bytes = 0
++      if (!reader) return Response.json({ error: { code: 'INVALID_REQUEST' } }, { status: 400 })
++      const timeout = new Promise<never>((_, reject) => { deadline = setTimeout(() => { reject(new Error('body_deadline')); void reader.cancel().catch(() => {}) }, 5000) })
++      while (true) {
++        const chunk = await Promise.race([reader.read(), timeout]); if (chunk.done) break
++        bytes += chunk.value.byteLength
++        if (bytes > 1024) { void reader.cancel().catch(() => {}); return Response.json({ error: { code: 'BODY_TOO_LARGE' } }, { status: 413 }) }
++      }
++    } catch { return Response.json({ error: { code: 'INVALID_REQUEST' } }, { status: 400 }) }
++    finally { clearTimeout(deadline) }
++    return undefined
++  }
++}
++
++/** Better Auth custom plugin: its adapter creates users/sessions, its cookie helper signs the genuine session. */
++export function demoPlugin(database: PrismaClient, configuration: DemoConfiguration): BetterAuthPlugin {
++  const cookieName = (secure: boolean) => `${secure ? '__Host-' : ''}finntech.demo_request`
++  const denied = (status: 'FORBIDDEN' | 'GONE' | 'TOO_MANY_REQUESTS', code: string): never => { throw new APIError(status, { code, message: code }) }
++  return { id: 'finntech-demo', endpoints: {
++    prepareDemo: createAuthEndpoint('/demo/prepare', { method: 'POST' }, async ctx => {
++      if (!configuration.enabled) denied('FORBIDDEN', 'DEMO_DISABLED')
++      const name = cookieName(!!ctx.context.options.advanced?.useSecureCookies)
++      if (!await ctx.getSignedCookie(name, ctx.context.secret)) await ctx.setSignedCookie(name, randomBytes(32).toString('hex'), ctx.context.secret,
++        { httpOnly: true, secure: !!ctx.context.options.advanced?.useSecureCookies, sameSite: 'strict', path: '/', maxAge: 86400 })
++      return ctx.json({ prepared: true })
++    }),
++    resetDemo: createAuthEndpoint('/demo/reset', { method: 'POST' }, async ctx => {
++      if (!configuration.enabled) denied('FORBIDDEN', 'DEMO_DISABLED')
++      const current = await ctx.context.internalAdapter.findSession((await ctx.getSignedCookie(ctx.context.authCookies.sessionToken.name, ctx.context.secret)) || '')
++      if (current && current.session.expiresAt.getTime() > Date.now()) denied('FORBIDDEN', 'LOGOUT_FIRST')
++      await ctx.setSignedCookie(cookieName(!!ctx.context.options.advanced?.useSecureCookies), randomBytes(32).toString('hex'), ctx.context.secret,
++        { httpOnly: true, secure: !!ctx.context.options.advanced?.useSecureCookies, sameSite: 'strict', path: '/', maxAge: 86400 })
++      return ctx.json({ prepared: true })
++    }),
++    enterDemo: createAuthEndpoint('/demo/enter', { method: 'POST' }, async ctx => {
++      if (!configuration.enabled) denied('FORBIDDEN', 'DEMO_DISABLED')
++      const body = ctx.body as unknown
++      if (!body || typeof body !== 'object' || !('code' in body) || Object.keys(body).length !== 1 || !demoCodeMatches(body.code, configuration.code)) denied('FORBIDDEN', 'DEMO_CODE_INVALID')
++      const nonce = await ctx.getSignedCookie(cookieName(!!ctx.context.options.advanced?.useSecureCookies), ctx.context.secret)
++      if (!nonce || !/^[a-f0-9]{64}$/.test(nonce)) denied('FORBIDDEN', 'DEMO_PREPARE_REQUIRED')
++      const requestHash = createHmac('sha256', ctx.context.secret).update(`demo:${nonce}`).digest('hex')
++      const current = await ctx.context.internalAdapter.findSession((await ctx.getSignedCookie(ctx.context.authCookies.sessionToken.name, ctx.context.secret)) || '')
++      if (current && current.session.expiresAt.getTime() > Date.now()) {
++        const prior = await database.demoWorkspace.findUnique({ where: { userId: current.user.id } })
++        if (!prior || prior.requestHash !== requestHash) denied('FORBIDDEN', 'LOGOUT_FIRST')
++      }
++      const result = await database.$transaction(async tx => {
++        await tx.$executeRaw`SET LOCAL lock_timeout = '3000ms'`
++        // One persistent lock protects replay and the total creation cap across workers/restarts.
++        await tx.$queryRaw`SELECT pg_advisory_xact_lock(70820261008::bigint)::text AS locked`
++        const prior = await tx.demoWorkspace.findUnique({ where: { requestHash } })
++        // Scoped Better Auth adapter uses this SAME transaction; failures leave no orphan user/session/seed.
++        const scoped = betterAuth({ ...ctx.context.options, plugins: [], databaseHooks: undefined,
++          database: prismaAdapter(tx, { provider: 'postgresql', transaction: false }) })
++        const scopedContext = await scoped.$context
++        const adapter = scopedContext.internalAdapter
++        if (prior) {
++          if (prior.epoch !== configuration.epoch || prior.expiresAt.getTime() <= Date.now()) denied('GONE', 'DEMO_EXPIRED')
++          const session = await tx.authSession.findUnique({ where: { id: prior.sessionId } })
++          if (!session || session.expiresAt.getTime() <= Date.now()) denied('GONE', 'DEMO_ENDED')
++          const snapshot = await runWithAdapter(scopedContext.adapter, () => adapter.findSession(session!.token))
++          if (!snapshot || snapshot.user.id !== prior.userId) denied('GONE', 'DEMO_ENDED')
++          return snapshot!
++        }
++        if (await tx.demoWorkspace.count() >= configuration.accountLimit) denied('TOO_MANY_REQUESTS', 'DEMO_CAPACITY')
++        // 1.7.7 uses ambient adapter storage: explicitly bind the transaction adapter,
++        // otherwise the outer HTTP adapter overrides the scoped adapter and commits separately.
++        const user = await runWithAdapter(scopedContext.adapter, () => adapter.createUser({ name: 'ผู้ทดลอง DEMO', email: `demo-${randomUUID()}@example.invalid`, emailVerified: false }, { method: 'anonymous' }))
++        const expiresAt = new Date(Date.now() + configuration.expiresIn * 1000)
++        const session = await runWithAdapter(scopedContext.adapter, () => adapter.createSession(user.id, false, { expiresAt }))
++        const owner = await tx.trackerUser.create({ data: { identityState: 'VERIFIED' } })
++        const identity = await tx.authIdentity.create({ data: { ownerId: owner.id, provider: 'better-auth', subject: user.id, authUserId: user.id, verifiedAt: new Date() } })
++        await tx.demoWorkspace.create({ data: { requestHash, userId: user.id, sessionId: session.id, epoch: configuration.epoch, expiresAt } })
++        // Only fictional THB seed records. No generated performance or market-price history.
++        const category = await tx.financeCategory.create({ data: { ownerId: owner.id, name: 'รายรับตัวอย่าง DEMO', type: 'INCOME' } })
++        await tx.financeCategory.create({ data: { ownerId: owner.id, name: 'ค่าใช้จ่ายตัวอย่าง DEMO', type: 'EXPENSE' } })
++        await tx.financeTransaction.create({ data: { ownerId: owner.id, categoryId: category.id, type: 'INCOME', currency: 'THB', amount: serializeThb(parseThbDecimal('12000.00')), occurredAt: new Date(), note: 'ข้อมูลสมมติ DEMO เท่านั้น' } })
++        await tx.cryptoPortfolio.create({ data: { ownerId: owner.id, name: 'พอร์ตตัวอย่าง DEMO', quoteCurrency: 'USDT' } })
++        await tx.auditEvent.create({ data: { ownerId: owner.id, actorIdentityId: identity.id, requestId: randomUUID(), eventType: 'demo.workspace.create', entityType: 'demo', entityId: user.id } })
++        return { user, session }
++      }, { maxWait: 5000, timeout: 10000 }).catch(error => {
++        if (error instanceof APIError) throw error
++        // Avoid framework logging of driver exceptions or request details.
++        throw new APIError('SERVICE_UNAVAILABLE', { code: 'DEMO_UNAVAILABLE', message: 'DEMO_UNAVAILABLE' })
++      })
++      // Replay uses the original session, never creates a new token or extends the workspace lifetime.
++      await setSessionCookie(ctx, result, false, { maxAge: Math.max(0, Math.floor((result.session.expiresAt.getTime() - Date.now()) / 1000)) })
++      return ctx.json({ demo: true })
++    }),
++  } }
++}
+
+diff --git a/apps/api/src/auth/runtime.ts b/apps/api/src/auth/runtime.ts
+index ff3e0ac..c871cc9 100644
+--- a/apps/api/src/auth/runtime.ts
++++ b/apps/api/src/auth/runtime.ts
+@@ -5,6 +5,7 @@ import { hashPassword } from 'better-auth/crypto'
+ import type { PrismaClient } from '../generated/prisma/client.js'
+ import type { AuthConfiguration } from './config.js'
+ import { registerBeta } from './beta.js'
++import { demoPlugin, registerDemo } from './demo.js'
+ 
+ export interface RecoveryIntegration {
+   transaction: boolean
+@@ -17,8 +18,10 @@ export interface RecoveryIntegration {
+ 
+ export function createAuthRuntime(database: PrismaClient, config: AuthConfiguration, recovery?: RecoveryIntegration) {
+   if (Boolean(config.recovery) !== Boolean(recovery)) throw new Error('Recovery requires its explicit isolated integration')
++  if (config.demo && config.recovery) throw new Error('Demo and recovery cannot share a runtime')
+   const auth = betterAuth({
+     telemetry: { enabled: false },
++    ...(config.demo ? { plugins: [demoPlugin(database, config.demo)] } : {}),
+     appName: 'FINNTECH',
+     secret: config.secret,
+     baseURL: config.origin,
+@@ -54,8 +57,10 @@ export function createAuthRuntime(database: PrismaClient, config: AuthConfigurat
+     rateLimit: { enabled: true, storage: 'memory', window: 60, max: 100 },
+     // Driver exceptions can contain credentials/PII. Log the event class only.
+     logger: { level: 'warn', log: (level) => { console.error(`Auth ${level}: details withheld`) } },
++    onAPIError: { onError: () => { /* The HTTP wrapper returns a generic failure; no raw driver/request logs. */ } },
+   })
+   if (config.beta) registerBeta(auth, config.beta)
++  if (config.demo) registerDemo(auth, config.demo)
+   return auth
+ }
+ 
+
+diff --git a/apps/api/src/tracker/stream.ts b/apps/api/src/tracker/stream.ts
+index fc4d59e..77f5fae 100644
+--- a/apps/api/src/tracker/stream.ts
++++ b/apps/api/src/tracker/stream.ts
+@@ -5,18 +5,28 @@ import type { AuthRuntime } from '../auth/runtime.js'
+ import type { MarketRelay } from './market.js'
+ import type { StockMarketRelay } from './stocks.js'
+ import { betaFor } from '../auth/beta.js'
++import { demoFor } from '../auth/demo.js'
+ 
+ /** Quotes only, with a session-checked same-origin upgrade; no client commands are accepted. */
+ export function attachMarketStream(server: Server, auth: AuthRuntime, market: MarketRelay, stocks?: StockMarketRelay,
+   stockOwner?: (authUserId: string) => Promise<string | null>, subjectGate?: (authUserId: string) => Promise<boolean>): () => void {
+   const sockets = new WebSocketServer({ noServer: true, maxPayload: 1024, perMessageDeflate: false })
+   const origins = new Map<WebSocket, IncomingMessage>()
++  const revoke = (client: WebSocket) => {
++    if (client.readyState !== WebSocket.OPEN) return
++    client.close(1008, 'session expired')
++    // A peer/proxy may not acknowledge the close frame. Bound transport shutdown
++    // independently of the WebSocket library's longer graceful-close timeout.
++    const deadline = setTimeout(() => client.terminate(), 1000)
++    deadline.unref()
++    client.once('close', () => clearTimeout(deadline))
++  }
+   const validSession = async (request: IncomingMessage) => {
+     try {
+       const session = await auth.api.getSession({ headers: fromNodeHeaders(request.headers) })
+       if (!session) return false
+       if (subjectGate && !await subjectGate(session.user.id)) return false
+-      if ((auth.options.emailAndPassword?.requireEmailVerification || betaFor(auth)?.access === 'invited') && !subjectGate) return false
++      if ((auth.options.emailAndPassword?.requireEmailVerification || betaFor(auth)?.access === 'invited' || demoFor(auth)) && !subjectGate) return false
+       if (request.url === '/ws/stocks' && stocks?.ownerId !== null) {
+         const ownerId = await stockOwner?.(session.user.id)
+         return !!ownerId && !!stocks?.allowsOwner(ownerId)
+@@ -55,7 +65,7 @@ export function attachMarketStream(server: Server, auth: AuthRuntime, market: Ma
+       const cryptoSnapshot = requests.some(request => request.url === '/ws/market') ? JSON.stringify(await market.snapshot()) : ''
+       const stockSnapshot = requests.some(request => request.url === '/ws/stocks') ? JSON.stringify(await stocks!.snapshot()) : ''
+       await Promise.all([...origins].map(async ([client, request]) => {
+-        if (!await validSession(request)) { client.close(1008, 'session expired'); return }
++        if (!await validSession(request)) { revoke(client); return }
+         if (client.readyState === WebSocket.OPEN) {
+           if (client.bufferedAmount > 65536) client.terminate()
+           else client.send(request.url === '/ws/stocks' ? stockSnapshot : cryptoSnapshot)
+
+diff --git a/apps/api/test/authorization.test.ts b/apps/api/test/authorization.test.ts
+index c6049c8..c4178a6 100644
+--- a/apps/api/test/authorization.test.ts
++++ b/apps/api/test/authorization.test.ts
+@@ -41,6 +41,7 @@ function harness() {
+   }))
+   const auth = { options: { baseURL: origin }, api: { getSession } } as unknown as AuthRuntime
+   const database = {
++    demoWorkspace: { findUnique: vi.fn(async () => null), findFirst: vi.fn(async () => null) },
+     authIdentity: { findUnique: findIdentity }, $transaction: transaction,
+   } as unknown as PrismaClient
+   return { app: createApp({ auth, database }), getSession, findIdentity, transaction, categories, entries, budgets }
+
+diff --git a/apps/api/test/beta.test.ts b/apps/api/test/beta.test.ts
+index 4dd5c44..7466ea0 100644
+--- a/apps/api/test/beta.test.ts
++++ b/apps/api/test/beta.test.ts
+@@ -56,7 +56,7 @@ it('denies invited subject before owner mapping, including /me/get-session; publ
+   const auth = { options: { baseURL: cloud.TRACKER_ORIGIN, secret: cloud.BETTER_AUTH_SECRET }, api: { getSession: vi.fn(async () => ({ user: { id: 'synthetic' } })) },
+     handler: vi.fn(async () => Response.json({ user: { id: 'synthetic' } })) } as unknown as AuthRuntime
+   registerBeta(auth, beta)
+-  const database = { authUser: { findUnique: vi.fn(async () => ({ email: 'outsider@example.invalid' })) }, authIdentity: { findUnique: identity } } as unknown as PrismaClient
++  const database = { demoWorkspace: { findUnique: vi.fn(async () => null) }, authUser: { findUnique: vi.fn(async () => ({ email: 'outsider@example.invalid' })) }, authIdentity: { findUnique: identity } } as unknown as PrismaClient
+   expect(await authSubjectAllowed(auth, database, 'synthetic')).toBe(false)
+   const app = createApp({ auth, database })
+   expect((await request(app).get('/api/me').set('X-Owner-Id', 'forged')).status).toBe(403)
+
+diff --git a/apps/api/test/cash.test.ts b/apps/api/test/cash.test.ts
+index f6514ca..609b369 100644
+--- a/apps/api/test/cash.test.ts
++++ b/apps/api/test/cash.test.ts
+@@ -10,7 +10,7 @@ function harness() {
+   const session = vi.fn(async () => ({ user: { id } }))
+   const updateMany = vi.fn(async () => ({ count: 1 })), create = vi.fn(async () => ({ id })), receipt = vi.fn(async () => null as unknown)
+   const tx = { $executeRaw: vi.fn(), $queryRaw: vi.fn(), trackerUser: { findUnique: vi.fn(async () => ({ id: owner })) }, authIdentity: { findFirst: vi.fn(async () => null) }, auditEvent: { create: vi.fn() }, idempotencyKey: { findUnique: receipt, create: vi.fn(async () => ({ id })) }, cashAccount: { create, updateMany } }
+-  const database = { $transaction: async (operation: (tx: unknown) => unknown) => operation(tx), authIdentity: { findUnique: async () => ({ ownerId: owner, provider: 'better-auth', subject: id, verifiedAt: new Date(), owner: { identityState: 'VERIFIED' } }) }, cashAccount: { findMany: vi.fn(async () => []) } } as unknown as PrismaClient
++  const database = { demoWorkspace: { findUnique: vi.fn(async () => null) }, $transaction: async (operation: (tx: unknown) => unknown) => operation(tx), authIdentity: { findUnique: async () => ({ ownerId: owner, provider: 'better-auth', subject: id, verifiedAt: new Date(), owner: { identityState: 'VERIFIED' } }) }, cashAccount: { findMany: vi.fn(async () => []) } } as unknown as PrismaClient
+   const auth = { options: { baseURL: 'http://127.0.0.1:4173' }, api: { getSession: session } } as unknown as AuthRuntime
+   return { database, session, updateMany, create, receipt, app: createApp({ auth, database }) }
+ }
+
+diff --git a/apps/api/test/demo.test.ts b/apps/api/test/demo.test.ts
+new file mode 100644
+index 0000000..47b6900
+--- /dev/null
++++ b/apps/api/test/demo.test.ts
+@@ -0,0 +1,58 @@
++import { randomBytes } from 'node:crypto'
++import { describe, it, expect, vi } from 'vitest'
++import { createDemoRequestGuard, demoCodeMatches, demoSubjectAllowed, registerDemo } from '../src/auth/demo.js'
++import { readAuthConfiguration } from '../src/auth/config.js'
++import type { AuthRuntime } from '../src/auth/runtime.js'
++import type { PrismaClient } from '../src/generated/prisma/client.js'
++
++describe('demo configuration and boundary', () => {
++  it('requires explicit isolated cloud Beta, validates limits, keeps code server-only and fails closed', () => {
++    const code = randomBytes(24).toString('hex')
++    const env = { NODE_ENV: 'production', TRACKER_RUNTIME_MODE: 'cloud-beta', TRACKER_ORIGIN: 'https://synthetic.onrender.com',
++      DATABASE_URL: `postgresql://beta_app:${randomBytes(24).toString('hex')}@ep-synthetic.neon.tech/finntech_beta?sslmode=verify-full`, BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
++      TRACKER_BETA_ACCESS: 'public', TRACKER_BETA_DATA_MODE: 'synthetic', TRACKER_BETA_REGISTRATIONS_OPEN: 'false', TRACKER_RECOVERY_MODE: 'off', TRACKER_BETA_DATABASE_HOST: 'ep-synthetic.neon.tech',
++      FINNTECH_DEMO_ENABLED: 'true', FINNTECH_DEMO_ACCESS_CODE: code }
++    const result = readAuthConfiguration(env)!
++    expect(result.demo).toMatchObject({ enabled: true, epoch: '1', expiresIn: 14400, accountLimit: 100 })
++    expect(result.beta?.registrationsOpen).toBe(false)
++    for (const change of [{ FINNTECH_DEMO_ACCESS_CODE: '' }, { FINNTECH_DEMO_SESSION_SECONDS: '0' }, { FINNTECH_DEMO_ACCOUNT_LIMIT: '5001' }, { FINNTECH_DEMO_ENABLED: 'yes' }]) {
++      expect(() => readAuthConfiguration({ ...env, ...change })).toThrow('Invalid isolated demo configuration')
++    }
++    expect(readAuthConfiguration({ ...env, FINNTECH_DEMO_ENABLED: 'false', FINNTECH_DEMO_ACCESS_CODE: '' })?.demo?.enabled).toBe(false)
++  })
++  it('checks exact code without trimming, coercion or oversized input', () => {
++    const code = randomBytes(24).toString('hex')
++    expect(demoCodeMatches(code, code)).toBe(true)
++    for (const wrong of [undefined, { code }, ` ${code}`, `${code} `, 'x'.repeat(1024), randomBytes(24).toString('hex')]) expect(demoCodeMatches(wrong, code)).toBe(false)
++  })
++  it('bounds chunked bodies before parsing and does not trust spoofed proxy IPs to evade the service limit', async () => {
++    const guard = createDemoRequestGuard(), make = (body: string) => new Request('https://synthetic.onrender.com/api/auth/demo/enter', { method: 'POST', body })
++    expect((await guard(make('x'.repeat(1025))))?.status).toBe(413)
++    for (let i = 0; i < 29; i++) await guard(make('{}'))
++    const forged = make('{}'); forged.headers.set('X-Forwarded-For', '203.0.113.9')
++    expect((await guard(forged))?.status).toBe(429)
++  })
++  it('preserves normal users; demo needs an unexpired matching epoch; entry disable is independent', async () => {
++    const auth = {} as AuthRuntime
++    const find = vi.fn(async () => null as { epoch: string; expiresAt: Date } | null)
++    const database = { demoWorkspace: { findUnique: find } } as unknown as PrismaClient
++    expect(await demoSubjectAllowed(auth, database, 'normal')).toBe(true)
++    const configuration = { enabled: false, code: '', epoch: '1', expiresIn: 60, accountLimit: 10 }
++    registerDemo(auth, configuration)
++    find.mockResolvedValue({ epoch: '1', expiresAt: new Date(Date.now() + 60000) })
++    expect(await demoSubjectAllowed(auth, database, 'demo')).toBe(true)
++    configuration.epoch = '2'; expect(await demoSubjectAllowed(auth, database, 'demo')).toBe(false)
++    find.mockResolvedValue({ epoch: '2', expiresAt: new Date(Date.now() - 1) }); expect(await demoSubjectAllowed(auth, database, 'demo')).toBe(false)
++    expect(await demoSubjectAllowed({} as AuthRuntime, database, 'demo')).toBe(false)
++  })
++  it('bounds a stalled upload before endpoint parsing and releases its timer', async () => {
++    vi.useFakeTimers()
++    try {
++      const request = new Request('https://synthetic.onrender.com/api/auth/demo/enter', { method: 'POST', body: new ReadableStream(), duplex: 'half' } as RequestInit)
++      const operation = createDemoRequestGuard()(request)
++      await vi.advanceTimersByTimeAsync(5000)
++      expect((await operation)?.status).toBe(400)
++      expect(vi.getTimerCount()).toBe(0)
++    } finally { vi.useRealTimers() }
++  })
++})
+
+diff --git a/apps/api/test/stocks.test.ts b/apps/api/test/stocks.test.ts
+index 450ea42..66442e9 100644
+--- a/apps/api/test/stocks.test.ts
++++ b/apps/api/test/stocks.test.ts
+@@ -125,7 +125,7 @@ describe('owner-bound HTTP and WebSocket transport (synthetic Auth fixture)', ()
+         return actor === 'fixture=owner' || actor === 'fixture=other' ? { user: { id: actor } } : null
+       },
+     } } as unknown as AuthRuntime
+-    const db = { authIdentity: { findUnique: async ({ where }: { where: { authUserId: string } }) => ({
++    const db = { demoWorkspace: { findUnique: async () => null }, authIdentity: { findUnique: async ({ where }: { where: { authUserId: string } }) => ({
+       ownerId: where.authUserId === 'fixture=owner' ? ownerId : otherOwner, provider: 'better-auth',
+       subject: where.authUserId, verifiedAt: new Date(), owner: { identityState: 'VERIFIED' },
+     }) } } as unknown as PrismaClient
+
+diff --git a/apps/api/test/stream.test.ts b/apps/api/test/stream.test.ts
+new file mode 100644
+index 0000000..2b270e4
+--- /dev/null
++++ b/apps/api/test/stream.test.ts
+@@ -0,0 +1,31 @@
++import assert from 'node:assert/strict'
++import { createServer } from 'node:http'
++import { connect } from 'node:net'
++import { once } from 'node:events'
++import { test } from 'vitest'
++import type { AuthRuntime } from '../src/auth/runtime.js'
++import { MarketRelay } from '../src/tracker/market.js'
++import { attachMarketStream } from '../src/tracker/stream.js'
++
++test('session revocation closes transport even when a peer never acknowledges the close frame', async () => {
++  let valid = true
++  const origin = 'https://synthetic.invalid'
++  const auth = { options: { baseURL: origin }, api: { getSession: async () => valid ? { user: { id: 'synthetic' } } : null } } as unknown as AuthRuntime
++  const server = createServer(); server.listen(0, '127.0.0.1'); await once(server, 'listening')
++  const address = server.address(); assert.ok(address && typeof address === 'object')
++  const market = new MarketRelay(async () => { throw new Error('synthetic provider disabled') })
++  const stop = attachMarketStream(server, auth, market)
++  const peer = connect(address.port, '127.0.0.1')
++  let timer: ReturnType<typeof setTimeout> | undefined
++  try {
++    await once(peer, 'connect')
++    const received: Buffer[] = []
++    peer.on('data', data => received.push(data)) // Deliberately never sends a close acknowledgement.
++    const initial = once(peer, 'data')
++    peer.write(`GET /ws/market HTTP/1.1\r\nHost: 127.0.0.1\r\nOrigin: ${origin}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: c3ludGhldGljLXRlc3QxMg==\r\n\r\n`)
++    await initial; assert.match(Buffer.concat(received).toString(), /101 Switching Protocols/)
++    const closed = once(peer, 'close'), started = Date.now(); valid = false
++    await Promise.race([closed, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('revoked transport remained open')), 7500) })])
++    assert.ok(Date.now() - started < 7500)
++  } finally { clearTimeout(timer); peer.destroy(); stop(); await new Promise<void>(resolve => server.close(() => resolve())) }
++}, 10000)
+
+diff --git a/apps/web/src/App.test.tsx b/apps/web/src/App.test.tsx
+index 1624e6f..0d10feb 100644
+--- a/apps/web/src/App.test.tsx
++++ b/apps/web/src/App.test.tsx
+@@ -1,22 +1,23 @@
+ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+ import { afterEach, describe, expect, it, vi } from 'vitest'
+ import App from './App'
++import { randomBytes } from 'node:crypto'
+ 
+ const healthy = { status: 'ok', service: 'tracker-api', checks: { process: 'ok', database: 'ok', auth: 'not_checked' } }
+ const session = { user: { name: 'ผู้ทดสอบ' } }
+ const reply = (body: unknown, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => body })
+ 
+-function fixture(initialSession: unknown = null) {
++function fixture(initialSession: unknown = null, demo = false) {
+   vi.stubGlobal('WebSocket', undefined)
+   let current = initialSession
+   const fetchMock = vi.fn(async (path: string, options?: RequestInit) => {
+-    if (path === '/api/health') return reply(healthy)
++    if (path === '/api/health') return reply({ ...healthy, ...(demo ? { demo: { enabled: true } } : {}) })
+     if (path === '/api/auth/get-session') return reply(current)
+-    if (path === '/api/me') return reply(current ? { ownerId: 'synthetic-server-owner' } : {}, current ? 200 : 401)
++    if (path === '/api/me') return reply(current ? { ownerId: 'synthetic-server-owner', ...(demo ? { demo: true } : {}) } : {}, current ? 200 : 401)
+     if (path.startsWith('/api/finance?')) return reply({ month: '2026-10', currency: 'THB', income: '0', expense: '0', balance: '0', categories: [], transactions: [], budgets: [] })
+     if (path === '/api/crypto') return reply({ quoteCurrency: 'USDT', portfolios: [], holdings: [], trades: [] })
+     if (path === '/api/crypto/market') return reply({ quotes: [] })
+-    if (options?.method === 'POST') { current = path.endsWith('sign-out') ? null : session; return reply({}) }
++    if (options?.method === 'POST') { if (!path.endsWith('/prepare') && !path.endsWith('/reset')) current = path.endsWith('sign-out') ? null : session; return reply({}) }
+     throw new Error('unexpected test route')
+   })
+   vi.stubGlobal('fetch', fetchMock)
+@@ -34,6 +35,29 @@ function fillLogin(form: HTMLElement) {
+ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
+ 
+ describe('Thai Auth UI', () => {
++  it('returning demo browser resumes its authenticated session without submitting a new demo code', async () => {
++    const mock = fixture(session, true); render(<App />)
++    await screen.findByText('สวัสดี ผู้ทดสอบ')
++    expect(screen.getByText('DEMO — ข้อมูลทดลอง', { exact: true })).toBeTruthy()
++    expect(mock.mock.calls.filter(([,options]) => options?.method === 'POST')).toHaveLength(0)
++  })
++  it('demo lost response prevents changing login mode or leaving via the brand; retry resumes the original attempt', async () => {
++    const mock = fixture(null, true)
++    render(<App />)
++    await waitFor(() => expect(screen.getByRole('button', { name: 'ทดลองใช้งาน' }).hasAttribute('disabled')).toBe(false))
++    fireEvent.click(screen.getByRole('button', { name: 'ทดลองใช้งาน' }))
++    const code = randomBytes(24).toString('hex')
++    fireEvent.change(screen.getByLabelText('รหัสทดลอง'), { target: { value: code } })
++    mock.mockResolvedValueOnce(reply({ prepared: true })).mockRejectedValueOnce(new Error('synthetic response loss'))
++    fireEvent.submit(screen.getByRole('form', { name: 'เข้า DEMO' }))
++    const retry = await screen.findByRole('button', { name: 'ตรวจผลคำขอ DEMO เดิม' })
++    for (const label of ['เข้าสู่ระบบ', 'สมัครบัญชี', 'ทดลองใช้งาน']) expect(screen.getByRole('button', { name: label }).hasAttribute('disabled')).toBe(true)
++    expect(screen.queryByRole('link', { name: 'FINNTECH หน้าหลัก' })).toBeNull()
++    fireEvent.click(retry); await screen.findByText('สวัสดี ผู้ทดสอบ')
++    const writes = mock.mock.calls.filter(([path]) => path === '/api/auth/demo/enter')
++    expect(writes).toHaveLength(2); expect(writes[0]![1]?.body).toBe(writes[1]![1]?.body)
++    expect(screen.getByText('DEMO — ข้อมูลทดลอง', { exact: true })).toBeTruthy()
++  })
+   it('shows working sign-in/signup controls, masked password and the disclaimer without balances', async () => {
+     fixture()
+     render(<App />)
+
+diff --git a/apps/web/src/App.tsx b/apps/web/src/App.tsx
+index 0093f4e..4ed0e12 100644
+--- a/apps/web/src/App.tsx
++++ b/apps/web/src/App.tsx
+@@ -1,11 +1,12 @@
+ import { useEffect, useRef, useState, type FormEvent } from 'react'
+-import { AuthRequestError, readAccount, submitAuth, type AccountSnapshot } from './auth/client'
++import { AuthRequestError, readAccount, submitAuth, submitDemo, type AccountSnapshot } from './auth/client'
++import DemoEntry from './auth/DemoEntry'
+ import Dashboard from './tracker/Dashboard'
+ import { Icon, PresentationControls, PresentationProvider, usePresentation } from './presentation'
+ import RecoveryPanel, { takeRecoveryLink, type RecoveryLink } from './auth/RecoveryPanel'
+ 
+-type ViewState = (AccountSnapshot | { status: 'checking' } | { status: 'unavailable' }) & { beta?: boolean }
+-type FormMode = 'sign-in' | 'sign-up'
++type ViewState = (AccountSnapshot | { status: 'checking' } | { status: 'unavailable' }) & { beta?: boolean; demoAvailable?: boolean }
++type FormMode = 'sign-in' | 'sign-up' | 'demo'
+ 
+ function AccountApp(): JSX.Element {
+   const { theme, hidden } = usePresentation()
+@@ -22,6 +23,7 @@ function AccountApp(): JSX.Element {
+   const inFlight = useRef(false)
+   const [recoveryLink, setRecoveryLink] = useState<RecoveryLink>()
+   const [recoveryOpen, setRecoveryOpen] = useState(false)
++  const [demoPending, setDemoPending] = useState(false)
+ 
+   useEffect(() => {
+     const link = takeRecoveryLink()
+@@ -55,11 +57,26 @@ function AccountApp(): JSX.Element {
+     } finally { inFlight.current = false; setBusy(false) }
+   }
+ 
++  async function freshDemo(): Promise<void> {
++    if (inFlight.current || busy || uncertain) return
++    inFlight.current = true; setBusy(true); setMessage('')
++    try {
++      await submitAuth('sign-out')
++      const snapshot = await readAccount()
++      if (snapshot.status !== 'signed-out') throw new AuthRequestError('ยังยืนยันการออกจากระบบไม่ได้', true)
++      setView(snapshot)
++      setMode(snapshot.demoAvailable ? 'demo' : 'sign-in')
++      await submitDemo('reset')
++    } catch (error) { setMessage(error instanceof Error ? error.message : 'ยังไม่ทราบผล'); setUncertain(!(error instanceof AuthRequestError) || error.outcomeUnknown) }
++    finally { inFlight.current = false; setBusy(false) }
++  }
++
+   async function handleAuth(event?: FormEvent<HTMLFormElement>): Promise<void> {
+     event?.preventDefault()
+     if (inFlight.current || uncertain || view.status === 'checking' || view.status === 'unavailable'
+       || (view.status !== 'signed-in' && mode === 'sign-up' && awaitingVerification)) return
+     const action = view.status === 'signed-in' ? 'sign-out' : mode
++    if (action === 'demo') return
+     if (action === 'sign-up' && (password !== confirmation || !name.trim())) {
+       setMessage(password !== confirmation ? 'รหัสผ่านทั้งสองช่องต้องตรงกัน' : 'กรุณาระบุชื่อที่ใช้แสดง')
+       return
+@@ -97,7 +114,7 @@ function AccountApp(): JSX.Element {
+   }
+ 
+   function switchMode(next: FormMode): void {
+-    if (busy || uncertain) return
++    if (busy || uncertain || demoPending) return
+     setMode(next)
+     setMessage('')
+     setPassword('')
+@@ -111,7 +128,7 @@ function AccountApp(): JSX.Element {
+       <a className="tracker-skip" href="#tracker-content">ข้ามไปยังเนื้อหา</a>
+       <header className="tracker-header border-b border-slate-200/80 bg-white">
+         <div className="tracker-header-inner flex items-center justify-between gap-3 px-5 py-4 sm:px-8">
+-          {view.status === 'signed-in' || busy || uncertain ? <div className="tracker-brand flex items-center gap-3 text-slate-900">
++          {view.status === 'signed-in' || busy || uncertain || demoPending ? <div className="tracker-brand flex items-center gap-3 text-slate-900">
+             <span className="journal-mark flex h-10 items-center justify-center">F</span><span className="text-lg font-bold tracking-[0.12em]">FINNTECH<small className="journal-brand-subtitle">PERSONAL MONEY JOURNAL</small></span>
+           </div> : <a href="/" className="tracker-brand flex items-center gap-3 text-slate-900" aria-label="FINNTECH หน้าหลัก">
+             <span className="journal-mark flex h-10 items-center justify-center">F</span>
+@@ -121,9 +138,10 @@ function AccountApp(): JSX.Element {
+         </div>
+       </header>
+       {view.beta && <p className="mx-auto max-w-6xl px-5 py-3 text-sm" role="note">Beta สำหรับข้อมูลสมมติเท่านั้น ห้ามบันทึกข้อมูลการเงินจริง ขณะนี้ยังไม่มีระบบกู้รหัสผ่าน เก็บไฟล์สำรองด้วยตนเอง บริการฟรีอาจพักหรือหยุดเมื่อเกินโควตา</p>}
++      {view.status === 'signed-in' && view.account.demo && <p className="mx-auto max-w-6xl px-5 py-3 text-sm" role="note">DEMO — ข้อมูลทดลอง</p>}
+       {hidden && <p className="tracker-privacy-note">ซ่อนเฉพาะยอดแสดงผล ช่องกรอก บันทึกช่วยจำ ไฟล์สำรอง และข้อมูลที่รับส่งยังเป็นข้อมูลเดิม ไม่ใช่การเข้ารหัส</p>}
+       {view.status === 'signed-in' && !recoveryLink ? <>
+-        <Dashboard name={view.account.name} recovery={!!view.recovery} authBusy={disabled} logout={() => { void handleAuth() }} expired={() => setView({ status: 'signed-out', ...(view.beta ? { beta: true } : {}), ...(view.recovery ? { recovery: true } : {}) })} />
++        <Dashboard name={view.account.name} demo={!!view.account.demo} freshDemo={() => { void freshDemo() }} recovery={!!view.recovery} authBusy={disabled} logout={() => { void handleAuth() }} expired={() => setView({ status: 'signed-out', ...(view.beta ? { beta: true } : {}), ...(view.demoAvailable ? { demoAvailable: true } : {}), ...(view.recovery ? { recovery: true } : {}) })} />
+         {message && <p role="alert" className="mx-auto max-w-6xl px-5 py-3 text-sm text-amber-900">{message}</p>}
+         {uncertain && <button className="auth-secondary mx-5 mb-5" disabled={busy} onClick={() => { void refresh() }}>ตรวจสอบสถานะอีกครั้ง</button>}
+       </> : <main id="tracker-content" tabIndex={-1} className="tracker-auth-main mx-auto grid max-w-6xl gap-6 px-5 py-7 sm:px-8 sm:py-12 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-20 lg:py-16">
+@@ -140,9 +158,9 @@ function AccountApp(): JSX.Element {
+         <section aria-label="บัญชี FINNTECH" aria-busy={busy || view.status === 'checking'} className="journal-auth-card tracker-card rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_18px_60px_-35px_rgba(15,23,42,0.3)] sm:p-9">
+           {('recovery' in view && view.recovery && (recoveryOpen || recoveryLink)) ? <RecoveryPanel {...(recoveryLink ? { link: recoveryLink } : {})} lock={setBusy} close={() => { setRecoveryOpen(false); setRecoveryLink(undefined); setMessage(''); setMode('sign-in'); history.replaceState(null, '', '/'); void refresh() }} /> : <>
+             <div className="journal-auth-tabs mb-7 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1" aria-label="เลือกการใช้งานบัญชี">
+-              {([['sign-in', 'เข้าสู่ระบบ'], ['sign-up', 'สมัครบัญชี']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={mode === value} disabled={busy || uncertain} onClick={() => switchMode(value)} className={`rounded-lg px-3 py-2.5 text-sm font-medium transition ${mode === value ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>{label}</button>)}
++              {([['sign-in', 'เข้าสู่ระบบ'], ['sign-up', 'สมัครบัญชี'], ...(view.demoAvailable ? [['demo', 'ทดลองใช้งาน']] : [])] as [FormMode, string][]).map(([value, label]) => <button key={value} type="button" aria-pressed={mode === value} disabled={busy || uncertain || demoPending} onClick={() => switchMode(value)} className={`rounded-lg px-3 py-2.5 text-sm font-medium transition ${mode === value ? 'bg-white text-teal-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>{label}</button>)}
+             </div>
+-            <h2 className="text-2xl font-semibold">{mode === 'sign-in' ? 'ยินดีต้อนรับกลับ' : 'สร้างบัญชีของคุณ'}</h2>
++            {mode === 'demo' ? <DemoEntry disabled={view.status === 'checking' || view.status === 'unavailable'} complete={snapshot => { setDemoPending(false); setView(snapshot) }} pendingLock={setDemoPending} lock={setBusy} /> : <><h2 className="text-2xl font-semibold">{mode === 'sign-in' ? 'ยินดีต้อนรับกลับ' : 'สร้างบัญชีของคุณ'}</h2>
+             <p className="mt-2 text-sm leading-6 text-slate-500">{view.beta ? 'ใช้บัญชีของคุณเองและข้อมูลสมมติสำหรับทดลอง Beta' : 'ใช้บัญชีและข้อมูลสังเคราะห์สำหรับทดสอบในเครื่อง'}</p>
+             <form onSubmit={(event) => { void handleAuth(event) }} className="mt-7 space-y-4" aria-label={mode === 'sign-in' ? 'ฟอร์มเข้าสู่ระบบ' : 'ฟอร์มสมัครบัญชี'}>
+               {mode === 'sign-up' && <label className="auth-label">ชื่อที่ใช้แสดง<input name="name" autoComplete="nickname" required maxLength={64} value={name} onChange={event => setName(event.target.value)} disabled={disabled} className="auth-input" /></label>}
+@@ -152,7 +170,7 @@ function AccountApp(): JSX.Element {
+               {mode === 'sign-up' && <label className="auth-label">ยืนยันรหัสผ่าน<input name="confirmation" type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={confirmation} onChange={event => setConfirmation(event.target.value)} disabled={disabled} className="auth-input" /></label>}
+               <button type="submit" disabled={disabled} className="auth-primary w-full">{busy ? 'กำลังดำเนินการ…' : mode === 'sign-in' ? 'เข้าสู่ระบบ' : 'สร้างบัญชี'}</button>
+             </form>
+-            {'recovery' in view && view.recovery && <button type="button" className="auth-secondary mt-4" disabled={disabled} onClick={() => { setRecoveryOpen(true); setMessage('') }}>ลืมรหัสผ่าน / เริ่มยืนยันอีเมล</button>}
++            {'recovery' in view && view.recovery && <button type="button" className="auth-secondary mt-4" disabled={disabled} onClick={() => { setRecoveryOpen(true); setMessage('') }}>ลืมรหัสผ่าน / เริ่มยืนยันอีเมล</button>}</>}
+           </>}
+           {view.status === 'checking' && <p role="status" className="mt-5 text-sm text-slate-500">กำลังตรวจสอบบัญชี…</p>}
+           {message && <p role="alert" className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">{message}</p>}
+
+diff --git a/apps/web/src/auth/DemoEntry.test.tsx b/apps/web/src/auth/DemoEntry.test.tsx
+new file mode 100644
+index 0000000..44ace5a
+--- /dev/null
++++ b/apps/web/src/auth/DemoEntry.test.tsx
+@@ -0,0 +1,52 @@
++import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
++import { afterEach, describe, it, expect, vi } from 'vitest'
++import { randomBytes } from 'node:crypto'
++import DemoEntry from './DemoEntry'
++import { AuthRequestError, readAccount, submitDemo } from './client'
++
++vi.mock('./client', async importOriginal => ({ ...await importOriginal<typeof import('./client')>(), readAccount: vi.fn(), submitDemo: vi.fn() }))
++afterEach(() => { cleanup(); vi.resetAllMocks() })
++describe('demo entry workflow', () => {
++  it('submits one prepared request despite double click, then verifies the authenticated account', async () => {
++    const code = randomBytes(24).toString('hex'), complete = vi.fn(), lock = vi.fn(), pendingLock = vi.fn()
++    let finish!: () => void
++    vi.mocked(submitDemo).mockImplementation(async route => { if (route === 'enter') await new Promise<void>(resolve => { finish = resolve }) })
++    vi.mocked(readAccount).mockResolvedValue({ status: 'signed-in', account: { name: 'ผู้ทดลอง', demo: true } })
++    render(<DemoEntry complete={complete} lock={lock} pendingLock={pendingLock} disabled={false} />)
++    const field = screen.getByLabelText('รหัสทดลอง'); expect(field.getAttribute('type')).toBe('password')
++    fireEvent.change(field, { target: { value: code } })
++    fireEvent.submit(screen.getByRole('form')); fireEvent.submit(screen.getByRole('form'))
++    await waitFor(() => expect(submitDemo).toHaveBeenCalledWith('enter', code))
++    expect(vi.mocked(submitDemo).mock.calls.filter(([route]) => route === 'enter')).toHaveLength(1)
++    expect(screen.getByRole('button', { name: 'เริ่มพื้นที่ทดลองใหม่' }).hasAttribute('disabled')).toBe(true)
++    finish(); await waitFor(() => expect(complete).toHaveBeenCalledOnce())
++    expect((field as HTMLInputElement).value).toBe('')
++  })
++  it('lost response locks fresh entry and edits, retry sends the same code without preparing/resetting again', async () => {
++    const code = randomBytes(24).toString('hex'), complete = vi.fn(), pendingLock = vi.fn()
++    vi.mocked(submitDemo).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new AuthRequestError('unknown', true)).mockResolvedValueOnce(undefined)
++    vi.mocked(readAccount).mockResolvedValue({ status: 'signed-in', account: { name: 'ผู้ทดลอง', demo: true } })
++    const storage = vi.spyOn(Storage.prototype, 'setItem')
++    render(<DemoEntry complete={complete} lock={vi.fn()} pendingLock={pendingLock} disabled={false} />)
++    fireEvent.change(screen.getByLabelText('รหัสทดลอง'), { target: { value: code } }); fireEvent.submit(screen.getByRole('form'))
++    await screen.findByRole('button', { name: 'ตรวจผลคำขอ DEMO เดิม' })
++    expect(screen.getByLabelText('รหัสทดลอง').hasAttribute('disabled')).toBe(true)
++    expect(screen.getByRole('button', { name: 'เริ่มพื้นที่ทดลองใหม่' }).hasAttribute('disabled')).toBe(true)
++    expect(pendingLock).toHaveBeenCalledWith(true)
++    fireEvent.click(screen.getByRole('button', { name: 'ตรวจผลคำขอ DEMO เดิม' }))
++    await waitFor(() => expect(complete).toHaveBeenCalledOnce())
++    const entries = vi.mocked(submitDemo).mock.calls.filter(([route]) => route === 'enter')
++    expect(entries).toEqual([['enter', code], ['enter', code]])
++    expect(vi.mocked(submitDemo).mock.calls.filter(([route]) => route === 'prepare')).toHaveLength(1)
++    expect(storage).not.toHaveBeenCalled(); storage.mockRestore()
++  })
++  it('rejection permits correction, while fresh explicitly resets only the browser request cookie', async () => {
++    vi.mocked(submitDemo).mockResolvedValueOnce(undefined).mockRejectedValueOnce(new AuthRequestError('รหัสไม่ถูกต้อง')).mockResolvedValueOnce(undefined)
++    render(<DemoEntry complete={vi.fn()} lock={vi.fn()} pendingLock={vi.fn()} disabled={false} />)
++    fireEvent.change(screen.getByLabelText('รหัสทดลอง'), { target: { value: randomBytes(24).toString('hex') } }); fireEvent.submit(screen.getByRole('form'))
++    await screen.findByText('รหัสไม่ถูกต้อง')
++    expect(screen.getByLabelText('รหัสทดลอง').hasAttribute('disabled')).toBe(false)
++    fireEvent.click(screen.getByRole('button', { name: 'เริ่มพื้นที่ทดลองใหม่' }))
++    await waitFor(() => expect(submitDemo).toHaveBeenCalledWith('reset'))
++  })
++})
+
+diff --git a/apps/web/src/auth/DemoEntry.tsx b/apps/web/src/auth/DemoEntry.tsx
+new file mode 100644
+index 0000000..c6f8bb1
+--- /dev/null
++++ b/apps/web/src/auth/DemoEntry.tsx
+@@ -0,0 +1,42 @@
++import { useRef, useState, type FormEvent } from 'react'
++import { AuthRequestError, readAccount, submitDemo, type AccountSnapshot } from './client'
++
++export default function DemoEntry({ complete, lock, pendingLock, disabled }: { complete: (snapshot: AccountSnapshot) => void; lock: (busy: boolean) => void; pendingLock: (pending: boolean) => void; disabled: boolean }): JSX.Element {
++  const [code, setCode] = useState(''), [message, setMessage] = useState(''), [pending, setPending] = useState(false)
++  const [busy, setBusy] = useState(false), sending = useRef(false), prepared = useRef(false)
++  async function enter(event?: FormEvent): Promise<void> {
++    event?.preventDefault()
++    if (sending.current) return
++    sending.current = true; setBusy(true); lock(true); setMessage('')
++    try {
++      if (!prepared.current) { await submitDemo('prepare'); prepared.current = true }
++      await submitDemo('enter', code)
++      const snapshot = await readAccount()
++      if (snapshot.status !== 'signed-in') throw new AuthRequestError('ยังยืนยัน session ไม่ได้ กรุณาตรวจผลคำขอเดิม', true)
++      setCode(''); setPending(false); pendingLock(false); complete(snapshot)
++    } catch (error) {
++      setMessage(error instanceof AuthRequestError ? error.message : 'ยังไม่ทราบผล กรุณาตรวจผลคำขอเดิม')
++      const unknown = !(error instanceof AuthRequestError) || error.outcomeUnknown
++      setPending(unknown); pendingLock(unknown)
++    } finally { sending.current = false; setBusy(false); lock(false) }
++  }
++  async function fresh(): Promise<void> {
++    if (sending.current || pending) return
++    sending.current = true; setBusy(true); lock(true)
++    try { await submitDemo('reset'); prepared.current = true; setCode(''); setMessage('พร้อมเริ่มพื้นที่ใหม่ กรอกรหัสทดลองอีกครั้ง') }
++    catch (error) { setMessage(error instanceof Error ? error.message : 'เริ่มพื้นที่ใหม่ไม่สำเร็จ') }
++    finally { sending.current = false; setBusy(false); lock(false) }
++  }
++  return <section aria-label="ทดลองใช้งาน DEMO">
++    <h2 className="text-2xl font-semibold">ทดลองใช้งาน</h2>
++    <p className="mt-3 text-sm leading-7">DEMO — ข้อมูลทดลอง · แยกพื้นที่ของแต่ละเบราว์เซอร์ ใช้ข้อมูลสมมติเท่านั้น ไม่ต้องสมัครบัญชี ไม่มีการกู้รหัสผ่าน</p>
++    <form onSubmit={event => { void enter(event) }} aria-label="เข้า DEMO" className="mt-5 space-y-4">
++      <label className="auth-label">รหัสทดลอง<input className="auth-input" type="password" autoComplete="off" required maxLength={128} value={code} disabled={disabled || busy || pending} onChange={event => setCode(event.target.value)} /></label>
++      <button className="auth-primary w-full" type="submit" disabled={disabled || busy || pending}>{busy ? 'กำลังตรวจสอบ…' : 'เข้าพื้นที่ทดลอง'}</button>
++    </form>
++    {message && <p role="alert" className="mt-4 text-sm leading-7">{message}</p>}
++    {pending && <><p role="status" className="mt-3 text-sm">คำขออาจสำเร็จแล้ว ลองคำขอเดิมเพื่อรับ session ของพื้นที่เดิม รหัสยังอยู่เฉพาะในหน่วยความจำหน้านี้</p><button className="auth-secondary mt-3" disabled={busy} onClick={() => { void enter() }}>ตรวจผลคำขอ DEMO เดิม</button></>}
++    <button type="button" className="auth-secondary mt-4" disabled={disabled || busy || pending} onClick={() => { void fresh() }}>เริ่มพื้นที่ทดลองใหม่</button>
++    <p className="mt-3 text-sm text-slate-500">พื้นที่เดิมยังเก็บอยู่ การเริ่มใหม่ไม่ลบข้อมูล หลังออกจากระบบหรือหมดอายุ ต้องเริ่มพื้นที่ใหม่</p>
++  </section>
++}
+
+diff --git a/apps/web/src/auth/client.ts b/apps/web/src/auth/client.ts
+index 589a14d..580f43b 100644
+--- a/apps/web/src/auth/client.ts
++++ b/apps/web/src/auth/client.ts
+@@ -1,7 +1,7 @@
+ import { healthResponseSchema } from '@finntech/contracts'
+ 
+-export interface SignedInAccount { name: string }
+-export type AccountSnapshot = ({ status: 'signed-out' } | { status: 'signed-in'; account: SignedInAccount }) & { recovery?: boolean; beta?: boolean }
++export interface SignedInAccount { name: string; demo?: boolean }
++export type AccountSnapshot = ({ status: 'signed-out' } | { status: 'signed-in'; account: SignedInAccount }) & { recovery?: boolean; beta?: boolean; demoAvailable?: boolean }
+ export type AuthAction = 'sign-in' | 'sign-up' | 'sign-out'
+ 
+ export class AuthRequestError extends Error {
+@@ -39,6 +39,7 @@ export async function readAccount(signal?: AbortSignal): Promise<AccountSnapshot
+   const capabilities = health.body && typeof health.body === 'object' && 'capabilities' in health.body
+     ? health.body.capabilities as { recovery?: unknown } : undefined
+   const feature = { ...(capabilities?.recovery === true ? { recovery: true } : {}),
++    ...(health.body && typeof health.body === 'object' && 'demo' in health.body ? { demoAvailable: true } : {}),
+     ...(health.body && typeof health.body === 'object' && 'beta' in health.body ? { beta: true } : {}) }
+   const response = await apiRequest('/api/auth/get-session', requestOptions)
+   if (!response.ok) throw new AuthRequestError('ตรวจสอบบัญชีไม่สำเร็จ กรุณาลองอีกครั้ง')
+@@ -56,7 +57,16 @@ export async function readAccount(signal?: AbortSignal): Promise<AccountSnapshot
+   if (!identity || typeof identity !== 'object' || !('ownerId' in identity) || typeof identity.ownerId !== 'string') {
+     throw new AuthRequestError('ตรวจสอบสิทธิ์บัญชีไม่สำเร็จ กรุณาลองอีกครั้ง')
+   }
+-  return { status: 'signed-in', account: { name: session.user.name }, ...feature }
++  return { status: 'signed-in', account: { name: session.user.name, ...('demo' in identity && identity.demo === true ? { demo: true } : {}) }, ...feature }
++}
++
++export async function submitDemo(route: 'prepare' | 'enter' | 'reset', code?: string): Promise<void> {
++  const response = await apiRequest(`/api/auth/demo/${route}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(route === 'enter' ? { code } : {}) })
++  if (response.ok) return
++  if (response.status >= 500) throw new AuthRequestError('ยังไม่ทราบผล กรุณาตรวจสอบหรือลองคำขอเดิมอีกครั้ง', true)
++  if (response.status === 429) throw new AuthRequestError('ทำรายการถี่เกินไปหรือพื้นที่ DEMO เต็ม กรุณาลองภายหลัง')
++  if (response.status === 410) throw new AuthRequestError('พื้นที่ทดลองเดิมสิ้นสุดแล้ว กรุณาเริ่มพื้นที่ทดลองใหม่')
++  throw new AuthRequestError('รหัสทดลองไม่ถูกต้อง หรือเจ้าของยังไม่เปิด DEMO')
+ }
+ 
+ export async function submitAuth(action: AuthAction, input: { email?: string; password?: string; name?: string } = {}): Promise<void | 'await-verification'> {
+
+diff --git a/apps/web/src/tracker/Account.tsx b/apps/web/src/tracker/Account.tsx
+index 68304ca..2542872 100644
+--- a/apps/web/src/tracker/Account.tsx
++++ b/apps/web/src/tracker/Account.tsx
+@@ -1,11 +1,12 @@
+-export default function Account({ name, locked, logout, backup, recovery = false }: {
+-  name: string; locked: boolean; logout: () => void; backup: () => void; recovery?: boolean
++export default function Account({ name, locked, logout, backup, recovery = false, demo = false, freshDemo }: {
++  name: string; locked: boolean; logout: () => void; backup: () => void; recovery?: boolean; demo?: boolean; freshDemo?: (() => void) | undefined
+ }): JSX.Element {
+   return <section aria-label="บัญชีและดูแลข้อมูล" className="journal-care-layout">
+     <div className="tracker-card rounded-2xl border border-slate-200 p-5 sm:p-6">
+       <h2 className="text-xl font-semibold">บัญชีของคุณ</h2>
+       <p className="mt-3 text-sm text-slate-500">ชื่อจากบัญชีที่เข้าสู่ระบบอยู่</p><p className="mt-1 break-words text-lg font-semibold">{name}</p>
+       <button type="button" className="auth-secondary mt-5" disabled={locked} onClick={logout}>ออกจากระบบบัญชีนี้</button>
++      {demo && <><p className="mt-4 text-sm">DEMO — ข้อมูลทดลอง · ใช้ข้อมูลสมมติเท่านั้น พื้นที่หมดอายุตามเวลาที่เจ้าของกำหนด</p><button type="button" className="auth-secondary mt-4" disabled={locked} onClick={freshDemo}>ออกและเริ่มพื้นที่ทดลองใหม่</button><p className="mt-3 text-sm">ออกจาก session เดิมก่อนเริ่มใหม่ ข้อมูลเดิมยังเก็บอยู่และไม่ลบพื้นที่ของผู้อื่น</p></>}
+       <p className="mt-4 text-sm leading-7 text-slate-500">{recovery ? 'บัญชีผ่านเงื่อนไขยืนยันอีเมลของ server แล้ว การกู้คืนเปิดเฉพาะพื้นที่ทดสอบสังเคราะห์นี้ ใช้หน้าลืมรหัสผ่านหลังออกจากระบบ ไม่ใช่อีเมล delivery จริง' : 'การกู้คืนบัญชีและยืนยันอีเมลยังไม่เปิดในรุ่นที่ตรวจ อย่าใช้รุ่นทดลองนี้เป็นพื้นที่เดียวสำหรับข้อมูลสำคัญ'}</p>
+     </div>
+     <div className="tracker-card rounded-2xl border border-slate-200 p-5 sm:p-6">
+
+diff --git a/apps/web/src/tracker/Dashboard.navigation.test.tsx b/apps/web/src/tracker/Dashboard.navigation.test.tsx
+index d6a6e60..3b5193b 100644
+--- a/apps/web/src/tracker/Dashboard.navigation.test.tsx
++++ b/apps/web/src/tracker/Dashboard.navigation.test.tsx
+@@ -131,6 +131,16 @@ it('uses the session name, links to backup and invokes the existing logout witho
+   await screen.findByRole('form', { name: 'ฟอร์มเข้าสู่ระบบ' })
+   expect(writes.map(row => row.path)).toEqual(['/api/auth/sign-out'])
+ })
++it('demo fresh/logout controls honor the same account navigation lock', () => {
++  const fresh = vi.fn(), logout = vi.fn(), backup = vi.fn()
++  const { rerender } = render(<Account name="DEMO" demo freshDemo={fresh} locked logout={logout} backup={backup} />)
++  const reset = screen.getByRole('button', { name: 'ออกและเริ่มพื้นที่ทดลองใหม่' })
++  expect(reset.hasAttribute('disabled')).toBe(true); fireEvent.click(reset)
++  fireEvent.click(screen.getByRole('button', { name: 'ออกจากระบบบัญชีนี้' }))
++  expect(fresh).not.toHaveBeenCalled(); expect(logout).not.toHaveBeenCalled()
++  rerender(<Account name="DEMO" demo freshDemo={fresh} locked={false} logout={logout} backup={backup} />)
++  fireEvent.click(reset); expect(fresh).toHaveBeenCalledOnce()
++})
+ it('keeps an already open sheet dismissible when its navigation becomes locked', () => {
+   const navigate = vi.fn(() => true)
+   const props = { section: 'finance' as const, locked: false, navigate }
+
+diff --git a/apps/web/src/tracker/Dashboard.tsx b/apps/web/src/tracker/Dashboard.tsx
+index 62bfb47..45b46df 100644
+--- a/apps/web/src/tracker/Dashboard.tsx
++++ b/apps/web/src/tracker/Dashboard.tsx
+@@ -24,8 +24,8 @@ const today = () => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slic
+ const card = 'tracker-card rounded-2xl border border-slate-200 bg-white p-5 sm:p-6'
+ const input = 'auth-input'
+ 
+-export default function Dashboard({ name, logout, expired, authBusy, recovery = false }: {
+-  name: string; logout: () => void; expired: () => void; authBusy: boolean; recovery?: boolean
++export default function Dashboard({ name, logout, expired, authBusy, recovery = false, demo = false, freshDemo }: {
++  name: string; logout: () => void; expired: () => void; authBusy: boolean; recovery?: boolean; demo?: boolean; freshDemo?: () => void
+ }): JSX.Element {
+   const { money } = usePresentation()
+   const [section, setSection] = useState<Section>('finance')
+@@ -224,7 +224,7 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery =
+       </form>
+       <div className="mt-4 space-y-3">{feedback}</div>
+     </ModalDialog>}
+-    {section === 'account' && <Account name={name} recovery={recovery} locked={navigationLocked} logout={logout} backup={() => { navigate('backup') }} />}
++    {section === 'account' && <Account name={name} demo={demo} freshDemo={freshDemo} recovery={recovery} locked={navigationLocked} logout={logout} backup={() => { navigate('backup') }} />}
+     {(section === 'finance' || section === 'budget') && <>
+       <div className="tracker-section-heading"><div><h2 className="text-xl font-semibold">ภาพรวมรายรับรายจ่าย</h2><p className="mt-1 text-sm text-slate-500">จากรายการที่บันทึก · ไม่ใช่ยอดบัญชีธนาคาร</p></div><label className="auth-label tracker-month">เดือนที่ดู<input className={input} type="month" value={month} disabled={busy || !!pending || loading} onChange={e => { if (e.target.value) setMonth(e.target.value) }} /></label></div>
+       {finance && <div className="tracker-summary grid gap-3 sm:grid-cols-3">{[['คงเหลือเดือนนี้', finance.balance], ['รายรับ', finance.income], ['รายจ่าย', finance.expense]].map(([label, value], index) => <div key={label} className={`${card} tracker-summary-card ${index === 0 ? 'tracker-balance-card' : ''}`}><div className="flex items-center justify-between"><p className="text-sm text-slate-500">{label}</p><span className="tracker-stat-icon"><Icon name={index === 0 ? 'budget' : 'finance'} /></span></div><p className="mt-3 break-all text-2xl font-semibold tabular-nums">{money(displayDecimal(value!))} <span className="text-xs text-slate-400">THB</span></p><p className="tracker-stat-caption">{index === 0 ? 'รายรับหักรายจ่ายในเดือนที่เลือก' : 'เฉพาะรายการที่ยังไม่ถูกยกเลิก'}</p></div>)}</div>}
+
+diff --git a/compose.demo-test.yaml b/compose.demo-test.yaml
+new file mode 100644
+index 0000000..fc2edc6
+--- /dev/null
++++ b/compose.demo-test.yaml
+@@ -0,0 +1,19 @@
++name: finntech-demo-test-20261008
++services:
++  postgres-demo-test:
++    image: postgres:16-alpine
++    environment:
++      POSTGRES_DB: finntech_demo_test_20261008
++      POSTGRES_USER: demo_fixture
++      POSTGRES_PASSWORD: ${DEMO_TEST_DATABASE_PASSWORD:?Synthetic password required}
++    ports:
++      - "127.0.0.1:5443:5432"
++    volumes:
++      - demo_test_20261008_pgdata:/var/lib/postgresql/data
++    healthcheck:
++      test: ["CMD-SHELL", "pg_isready -U demo_fixture -d finntech_demo_test_20261008"]
++      interval: 2s
++      timeout: 5s
++      retries: 20
++volumes:
++  demo_test_20261008_pgdata:
+
+diff --git a/docs/operations/demo-access.md b/docs/operations/demo-access.md
+new file mode 100644
+index 0000000..c6129ee
+--- /dev/null
++++ b/docs/operations/demo-access.md
+@@ -0,0 +1,56 @@
++# Shared-code DEMO access
++
++DEMO creates a separate synthetic Better Auth user, session and tracker owner for each browser request cookie. It never signs visitors into an owner account. Better Auth **1.7.7** and its existing **@better-auth/core 1.7.7** create the user/session; the latter is now explicitly declared as a direct dependency to use its exported transaction-context helper. No new password store, anonymous plugin endpoint, account linking, paid resource, or dependency version upgrade is introduced.
++
++## Owner setup in Render
++
++Keep the current `TRACKER_BETA_REGISTRATIONS_OPEN` value unchanged (currently `false`), `TRACKER_BETA_DATA_MODE=synthetic` and `TRACKER_RECOVERY_MODE=off`.
++
++In Render → **finntech-beta → Environment → Edit** set:
++
++| Server variable | Value / purpose |
++| --- | --- |
++| `FINNTECH_DEMO_ENABLED` | `true` to permit entry; `false` disables prepare/entry/reset |
++| `FINNTECH_DEMO_ACCESS_CODE` | Owner-entered secret, 12–128 characters; prefer at least 16 random characters |
++| `FINNTECH_DEMO_ACCOUNT_LIMIT` | `100` by default, allowed 1–5000; total retained demo workspaces, not concurrent users |
++| `FINNTECH_DEMO_SESSION_SECONDS` | `14400` (four hours) by default; allowed 60–86400 |
++| `FINNTECH_DEMO_SESSION_EPOCH` | `1` initially; 1–64 letters/digits/`.`/`_`/`-` |
++
++Enter the code directly in Render's secret store. Do not paste it into chat, source, `.env.example`, a VITE variable, a URL, screenshot, release artifact or logs. Use **Save only** until the verified release and additive migration are ready. Never select a paid plan. Code changes take effect after restart/deploy.
++
++## Deployment sequence
++
++1. Prepare/verify the release in an isolated checkout. Preserve the owner's original dirty/untracked checkout. Review the incremental patch and actual test report.
++2. Before changing the **existing** Beta DB, take a private PostgreSQL 18-compatible `pg_dump` backup and verify its archive with `pg_restore --list`. Keep auth data/secrets/private backup outside release files and never print or publish it. Do not use the old fresh-database-only migration helper: it intentionally refuses a nonempty database.
++3. Verify the selected direct Neon target remains `beta_app` / `finntech_beta` / the configured exact host with `sslmode=verify-full`. Run Prisma `migrate deploy` for the reviewed release. Migration `20261008000000_demo_workspaces` only adds the receipt table and foreign key/indexes. It does not rewrite existing accounts or finance rows. The new runtime requires that table even when demo entry is disabled. Never reset/drop/truncate.
++4. Set the owner secret as above and deploy the verified release with `Dockerfile.beta`. Same origin, health `/api/ready`, Free instance, existing deployment target.
++5. Verify real HTTPS health/readiness, login, correct/incorrect demo code, Secure cookies, separate sessions/data, retry, logout, expiry and WSS before announcing entry. Local harness Secure-cookie assertions are not proof of transport over public HTTPS.
++
++## Browser behavior and retry
++
++Select **ทดลองใช้งาน** and enter the common code. The server prepares an HttpOnly, signed, SameSite=Strict request cookie before entry. It is a browser capability for one request receipt, not a client owner ID. No code or generated credential is persisted in frontend storage. The code remains only in form memory while an unknown entry outcome is reconciled; reload requires entering the code again and the retained request cookie resumes the original receipt. A normal returning browser with a valid session needs no new code.
++
++One transaction holds a database advisory lock for the creation ceiling/replay, binds Better Auth's exported `runWithAdapter` to the transaction, creates the authentic user/session, maps a fresh VERIFIED tracker owner and seeds only labeled fictional data: THB income/category records and an empty USDT portfolio. No password-based account or recovery enrollment is created. No USD/USDT/THB conversion, generated P&L or market-history chart is added. Ledger and market freshness rules are unchanged.
++
++After a lost entry response, use **ตรวจผลคำขอ DEMO เดิม**. It keeps the same code and signed request cookie. It reissues the original session cookie and does not create a second user/session or extend the workspace lifetime. Parallel requests and runtime recreation use the durable receipt. Definite failures permit correction; unknown entry outcomes lock mode changes and fresh workspace actions.
++
++Logout uses Better Auth's existing sign-out. The receipt cannot resurrect a logged-out or expired session. **ออกและเริ่มพื้นที่ทดลองใหม่** in the account page obeys the existing tracker navigation locks, confirms logout, resets only that browser's request cookie, and requires code entry again. **เริ่มพื้นที่ทดลองใหม่** on the entry form has the same effect after logout/expiration. It does not delete any old dataset. Tabs in one browser share cookies; use distinct browser profiles for independent workspaces.
++
++## Disable, rotate and revoke
++
++- `FINNTECH_DEMO_ENABLED=false`: rejects new entry/reset/prepare. Existing unexpired sessions survive, preserving their access to their own records/backup/logout. Keep the epoch/configuration present.
++- Change only `FINNTECH_DEMO_ACCESS_CODE`: old code stops admitting/replaying entries. Existing valid sessions survive until logout, expiry or revocation. Demo entry does not depend on public signup.
++- Change `FINNTECH_DEMO_SESSION_EPOCH` and restart/deploy: invalidates all **previous demo** workspaces on HTTP owner checks and `get-session`, and closes existing WS connections on the existing five-second revalidation cycle. Normal accounts are unaffected. Request receipts for the old epoch cannot resurrect a session.
++- Removing the demo configuration denies existing demo subjects; retaining explicit disabled config is the supported way to stop only entry. Never rotate `BETTER_AUTH_SECRET` merely to revoke demos: that also affects normal accounts.
++
++The fixed workspace expiry is checked independently of Better Auth session refresh. Rate limiting allows **30 total demo requests per minute per process**, including preparation/reset, with no trust in `X-Forwarded-For`. Bodies are limited to 1024 bytes and five seconds before Better Auth parsing. The database-wide lifetime account ceiling survives restarts and concurrent workers. The in-memory rate counter resets on restart and is not a distributed limiter; this deployment remains one Render instance.
++
++## Retention
++
++No scheduled database cleanup is implemented. Retained workspaces count toward the ceiling even after expiry/logout. Expired records are not a way to access somebody else's workspace, nor a recovery credential. When the ceiling is reached, entry returns 429. Review a retention/export/deletion plan before deleting any workspace; otherwise increase the bounded ceiling deliberately or keep entry disabled. Fresh mode preserves the previous data and cannot delete another user's records.
++
++## Local verification
++
++`node scripts/demo-test-prepare.mjs` writes only a synthetic fixture credential under `.demo-20261008.local/`. Start `docker compose --env-file .demo-20261008.local/test.env -f compose.demo-test.yaml up -d --pull never --wait postgres-demo-test`. Build the API, then run `node --env-file=.demo-20261008.local/test.env scripts/demo-test.mjs`. The runner verifies exact loopback PostgreSQL database/role/port 5443 and applies forward migrations without clearing retained data. Tests generate their own codes/normal accounts; never use the owner's shared code.
++
++Stop only `postgres-demo-test` with the same Compose project after verification. Preserve the volume; do not run `down -v`, reset or cleanup against owner resources.
+
+diff --git a/package-lock.json b/package-lock.json
+index 1ba8418..550a329 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -42,7 +42,8 @@
+         "@prisma/client": "7.10.0",
+         "better-auth": "1.7.7",
+         "express": "^5.1.0",
+-        "ws": "8.21.3"
++        "ws": "8.21.3",
++        "@better-auth/core": "1.7.7"
+       },
+       "devDependencies": {
+         "@types/express": "^5.0.5",
+
+diff --git a/scripts/demo-release-prepare.mjs b/scripts/demo-release-prepare.mjs
+new file mode 100644
+index 0000000..f6ad513
+--- /dev/null
++++ b/scripts/demo-release-prepare.mjs
+@@ -0,0 +1,62 @@
++import fs from 'node:fs/promises'
++import path from 'node:path'
++import { createHash } from 'node:crypto'
++import { spawnSync } from 'node:child_process'
++const root = process.cwd(), local = '.demo-20261008.local', source = `${local}/release-source`, previous = '.beta-20261007.local/release-source'
++const added = ['apps/api/src/auth/demo.ts', 'apps/api/test/demo.test.ts', 'apps/api/test/stream.test.ts', 'apps/api/db-test/demo.integration.ts',
++  'apps/api/prisma/migrations/20261008000000_demo_workspaces/migration.sql', 'apps/web/src/auth/DemoEntry.tsx', 'apps/web/src/auth/DemoEntry.test.tsx',
++  'compose.demo-test.yaml', 'scripts/demo-test-prepare.mjs', 'scripts/demo-test.mjs', 'scripts/demo-release-prepare.mjs', 'docs/operations/demo-access.md']
++async function filesIn(folder) {
++  const files = []
++  for (const entry of await fs.readdir(folder, { withFileTypes: true })) {
++    const file = `${folder}/${entry.name}`
++    if (entry.name === '.git' || entry.name === 'node_modules' || entry.name === 'dist' || entry.name === 'generated') continue
++    if (entry.isSymbolicLink()) throw new Error('Unexpected release symlink')
++    if (entry.isDirectory()) files.push(...await filesIn(file)); else files.push(file)
++  }
++  return files
++}
++const before = `${local}/before`, modified = []
++for (const file of await filesIn(before)) {
++  const relative = file.slice(before.length + 1)
++  if (!Buffer.from(await fs.readFile(file)).equals(await fs.readFile(relative))) modified.push(relative)
++}
++// The baseline must match the actual prior release for every modified deployed file.
++for (const file of modified) {
++  try {
++    const bytes = await fs.readFile(`${previous}/${file}`)
++    if (!bytes.equals(await fs.readFile(`${before}/${file}`))) throw new Error(`Baseline differs from deployed release: ${file}`)
++  } catch (error) { if (error.code !== 'ENOENT') throw error }
++}
++const actualCommit = spawnSync('git', ['-C', previous, 'rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true })
++if (actualCommit.status !== 0 || actualCommit.stdout.trim() !== '2def6a6d4bb690ce28107c8bb3710390930edba9') throw new Error('Unexpected deployed release base')
++await fs.mkdir(source, { recursive: true })
++for (const file of await filesIn(previous)) {
++  const relative = file.slice(previous.length + 1), destination = `${source}/${relative}`
++  await fs.mkdir(path.dirname(destination), { recursive: true }); await fs.copyFile(file, destination)
++}
++const releaseOnly = file => file.startsWith('apps/') || file === 'package-lock.json' || file === 'docs/operations/demo-access.md'
++for (const file of [...modified, ...added].filter(releaseOnly)) {
++  await fs.mkdir(path.dirname(`${source}/${file}`), { recursive: true }); await fs.copyFile(file, `${source}/${file}`)
++}
++const changes = [...modified, ...added].sort(), diffs = []
++for (const file of changes) {
++  const old = added.includes(file) ? 'NUL' : `${before}/${file}`
++  const result = spawnSync('git', ['-c', 'core.autocrlf=false', 'diff', '--no-index', '--no-ext-diff', '--', old, file], { encoding: 'utf8', windowsHide: true })
++  if (result.status !== 1) throw new Error(`Could not produce incremental diff: ${file}`)
++  const lines = result.stdout.split('\n')
++  lines[0] = `diff --git a/${file} b/${file}`
++  diffs.push(lines.map(line => line.startsWith('--- ') ? (added.includes(file) ? '--- /dev/null' : `--- a/${file}`) : line.startsWith('+++ ') ? `+++ b/${file}` : line).join('\n'))
++}
++await fs.mkdir('docs/acceptance', { recursive: true })
++await fs.writeFile('docs/acceptance/demo-shared-access-20261008.patch', diffs.join('\n'))
++const forbidden = /(^|\/)(\.git|node_modules|dist|coverage|generated|[^/]*\.local)(\/|$)|(^|\/)\.env(?:\.|$)|(?:dump|mailbox|backup\.private)/i
++const manifest = []
++for (const file of (await filesIn(source)).sort()) {
++  const relative = file.slice(source.length + 1)
++  if (forbidden.test(relative)) throw new Error('Private file in release')
++  const data = await fs.readFile(file)
++  manifest.push({ file: relative, bytes: data.length, sha256: createHash('sha256').update(data).digest('hex') })
++}
++await fs.writeFile(`${local}/release-manifest.json`, JSON.stringify({ baselineCommit: actualCommit.stdout.trim(), sourceCommit: null, changes, files: manifest }, null, 2))
++console.log(JSON.stringify({ changedFiles: changes.length, releaseFiles: manifest.length, baselineVerified: true, releaseHasGitOrPrivatePaths: false }))
+
+diff --git a/scripts/demo-test-prepare.mjs b/scripts/demo-test-prepare.mjs
+new file mode 100644
+index 0000000..83cb0ab
+--- /dev/null
++++ b/scripts/demo-test-prepare.mjs
+@@ -0,0 +1,9 @@
++import { randomBytes } from 'node:crypto'
++import { mkdir, writeFile } from 'node:fs/promises'
++const password = randomBytes(32).toString('hex')
++await mkdir('.demo-20261008.local', { recursive: true })
++// Exclusive creation preserves a retained fixture's credentials on subsequent runs.
++try {
++  await writeFile('.demo-20261008.local/test.env', `DEMO_TEST_DATABASE_PASSWORD=${password}\nDATABASE_URL=postgresql://demo_fixture:${password}@127.0.0.1:5443/finntech_demo_test_20261008\n`, { flag: 'wx' })
++  console.log('Synthetic demo target prepared; credentials withheld')
++} catch (error) { if (error.code !== 'EEXIST') throw new Error('Fixture preparation failed (details withheld)'); console.log('Existing fixture configuration preserved') }
+
+diff --git a/scripts/demo-test.mjs b/scripts/demo-test.mjs
+new file mode 100644
+index 0000000..e258cfd
+--- /dev/null
++++ b/scripts/demo-test.mjs
+@@ -0,0 +1,25 @@
++import { spawn } from 'node:child_process'
++import { createTrackerDatabase } from '../apps/api/dist/persistence/database.js'
++const target = new URL(process.env.DATABASE_URL ?? 'http://invalid')
++if (target.protocol !== 'postgresql:' || target.hostname !== '127.0.0.1' || target.port !== '5443' || target.pathname !== '/finntech_demo_test_20261008' || target.username !== 'demo_fixture' || !target.password) throw new Error('Refused unexpected demo test target')
++const db = createTrackerDatabase(target.href)
++async function run(args) {
++  return new Promise((resolve, reject) => {
++    const child = spawn(process.execPath, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }); let output = ''
++    child.stdout.on('data', chunk => { output += chunk }); child.stderr.on('data', chunk => { output += chunk })
++    child.on('error', () => reject(new Error('Fixture command could not start')))
++    child.on('exit', code => {
++      output = output.replaceAll(target.href, '[DATABASE_URL_WITHHELD]').replaceAll(target.password, '[PASSWORD_WITHHELD]').replace(/postgres(?:ql)?:\/\/[^\s"']+/gi, '[DATABASE_URL_WITHHELD]')
++      process.stdout.write(output); resolve(code ?? 1)
++    })
++  })
++}
++try {
++  const result = await db.$queryRaw`SELECT current_database() AS name, current_user AS role`
++  if (result[0]?.name !== 'finntech_demo_test_20261008' || result[0]?.role !== 'demo_fixture') throw new Error('Refused unexpected database identity')
++  // Forward migration only. No fixture/database deletion, including repeated runs.
++  await db.$disconnect()
++  const migration = await run(['node_modules/prisma/build/index.js', 'migrate', 'deploy', '--config', 'apps/api/prisma.config.ts'])
++  process.exitCode = migration || await run(['--no-strip-types', '--import', 'tsx', '--test', 'apps/api/db-test/demo.integration.ts'])
++} catch { console.error('NOT TESTED: dedicated demo PostgreSQL unavailable; details withheld'); process.exitCode = 2 }
++finally { await db.$disconnect() }
+
+diff --git a/vite.config.js b/vite.config.js
+index ed6cf7a..0e0df63 100644
+--- a/vite.config.js
++++ b/vite.config.js
+@@ -1,5 +1,6 @@
+ import { defineConfig } from 'vite'
+ import react from '@vitejs/plugin-react'
++import { configDefaults } from 'vitest/config'
+ 
+ // https://vite.dev/config/
+ export default defineConfig({
+@@ -21,6 +22,8 @@ export default defineConfig({
+     }
+   },
+   test: {
++    // Saved release/baseline copies are artifacts, not runnable source tests.
++    exclude: [...configDefaults.exclude, '**/*.local/**'],
+     environment: 'happy-dom',
+     globals: true,
+   }

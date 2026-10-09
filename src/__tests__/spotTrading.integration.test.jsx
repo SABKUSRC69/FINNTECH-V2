@@ -13,7 +13,6 @@ import { calculateDashboardMetrics, formatMonthlyChange } from '../utils/dashboa
 import {
   calculatePortfolioValuation,
   calculateSpotWalletValuation,
-  getDemoSpotPriceTHB,
 } from '../utils/assetValuation'
 import {
   SPOT_FEE_RATE,
@@ -25,6 +24,22 @@ import {
   floorSpotAmount,
   validateSpotOrder,
 } from '../services/spotTradingService'
+
+function makeVerifiedTestRules(pair = TRADING_PAIRS.find((entry) => entry.symbol === 'BTC/THB')) {
+  const pricePrecision = pair.precision
+  const amountPrecision = pair.amountPrecision
+  return {
+    providerSymbol: pair.symbol.replace('/', '_'),
+    orderRulesVerified: true,
+    baseAssetScale: amountPrecision,
+    providerPriceScale: pricePrecision,
+    priceStep: 10 ** -pricePrecision,
+    providerQuantityScale: amountPrecision,
+    quantityStep: 10 ** -amountPrecision,
+    minQty: pair.minQty,
+    minQuoteSize: 0.00000001,
+  }
+}
 
 function makeOrder({ id = 'order-1', side = 'BUY', orderType = 'MARKET', price = 100, amount = 1, ...extra } = {}) {
   const total = price * amount
@@ -40,8 +55,15 @@ function makeOrder({ id = 'order-1', side = 'BUY', orderType = 'MARKET', price =
     baseAsset: 'BTC',
     quoteAsset: 'THB',
     ...(orderType === 'LIMIT' ? { targetPrice: price } : {}),
+    pairRules: makeVerifiedTestRules(),
     ...extra,
   }
+}
+
+function makeLiveSnapshot(prices = { 'BTC/THB': 2500000, 'USDT/THB': 35.5 }) {
+  const tickers = Object.fromEntries(Object.entries(prices).map(([symbol, last]) => [symbol, { last, status: 'LIVE' }]))
+  const symbolStatuses = Object.fromEntries(Object.entries(prices).map(([symbol]) => [symbol, { status: 'LIVE' }]))
+  return { prices, tickers, symbolStatuses }
 }
 
 describe('Spot trading integration', () => {
@@ -54,14 +76,33 @@ describe('Spot trading integration', () => {
     vi.useRealTimers()
   })
 
+  it('keeps an unavailable price input controlled and disables Market orders', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    render(
+      <OrderForm
+        pair={{ symbol: 'BTC/THB', baseAsset: 'BTC', quoteAsset: 'THB', precision: 2, amountPrecision: 8, minQty: 0.00000001 }}
+        currentPrice={null}
+        spotBalances={{ THB: 1000, BTC: 0 }}
+        onSubmitOrder={vi.fn()}
+      />,
+    )
+
+    const [priceInput] = screen.getAllByRole('spinbutton')
+    expect(priceInput.value).toBe('')
+    expect(screen.getByRole('button', { name: 'ราคาตลาด (Market)' }).disabled).toBe(true)
+    expect(consoleError.mock.calls.flat().join(' ')).not.toMatch(/value.*should not be null|uncontrolled input/)
+    consoleError.mockRestore()
+  })
+
   it('recalculates Limit total when its price changes after entering amount', () => {
     render(
       <OrderForm
         pair={{ symbol: 'BTC/THB', baseAsset: 'BTC', quoteAsset: 'THB', precision: 2 }}
+        marketRules={makeVerifiedTestRules()}
         currentPrice={100}
         spotBalances={{ THB: 1000, BTC: 0 }}
         onSubmitOrder={vi.fn()}
-        priceStatus="DEMO"
+        priceStatus="LIVE"
       />,
     )
 
@@ -72,14 +113,34 @@ describe('Spot trading integration', () => {
     expect(totalInput.value).toBe('240.6')
   })
 
+  it('disables Market, Limit, and submit buttons with the unverified pair-rule reason', () => {
+    const reason = 'ยังยืนยัน quantity_step ของ Bitkub ไม่ได้ จึงพักคำสั่ง PAPER'
+    render(
+      <OrderForm
+        pair={{ symbol: 'BTC/THB', baseAsset: 'BTC', quoteAsset: 'THB', precision: 2, amountPrecision: 8 }}
+        marketRules={{ providerSymbol: 'BTC_THB', orderRulesVerified: false, orderRulesReason: reason }}
+        currentPrice={100}
+        spotBalances={{ THB: 1000, BTC: 0 }}
+        onSubmitOrder={vi.fn()}
+        priceStatus="LIVE"
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'ลิมิต (Limit)' }).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: 'ราคาตลาด (Market)' }).disabled).toBe(true)
+    expect(screen.getByRole('button', { name: /ซื้อ BTC.*มาร์เก็ต/ }).disabled).toBe(true)
+    expect(screen.getByText(reason)).toBeTruthy()
+  })
+
   it('keeps the THB budget unchanged when the coin amount is floored to pair precision', () => {
     render(
       <OrderForm
         pair={{ symbol: 'BTC/THB', baseAsset: 'BTC', quoteAsset: 'THB', precision: 2, amountPrecision: 4, minQty: 0.0001 }}
+        marketRules={makeVerifiedTestRules({ ...TRADING_PAIRS.find((entry) => entry.symbol === 'BTC/THB'), amountPrecision: 4 })}
         currentPrice={1234567}
         spotBalances={{ THB: 10000, BTC: 0 }}
         onSubmitOrder={vi.fn()}
-        priceStatus="DEMO"
+        priceStatus="LIVE"
       />,
     )
 
@@ -98,7 +159,7 @@ describe('Spot trading integration', () => {
     const alertMock = vi.fn()
     vi.stubGlobal('alert', alertMock)
     const manual = render(
-      <OrderForm pair={pair} currentPrice={100} spotBalances={{ THB: 500, BTC: 0 }} onSubmitOrder={manualSubmit} priceStatus="DEMO" />,
+      <OrderForm pair={pair} marketRules={makeVerifiedTestRules({ ...TRADING_PAIRS.find((entry) => entry.symbol === 'BTC/THB'), amountPrecision: 4 })} currentPrice={100} spotBalances={{ THB: 500, BTC: 0 }} onSubmitOrder={manualSubmit} priceStatus="LIVE" />,
     )
     let [, , manualBudget] = screen.getAllByRole('spinbutton')
     fireEvent.change(manualBudget, { target: { value: '500' } })
@@ -115,7 +176,7 @@ describe('Spot trading integration', () => {
 
     const quickSubmit = vi.fn(() => ({ success: true }))
     render(
-      <OrderForm pair={pair} currentPrice={100} spotBalances={{ THB: 500, BTC: 0 }} onSubmitOrder={quickSubmit} priceStatus="DEMO" />,
+      <OrderForm pair={pair} marketRules={makeVerifiedTestRules({ ...TRADING_PAIRS.find((entry) => entry.symbol === 'BTC/THB'), amountPrecision: 4 })} currentPrice={100} spotBalances={{ THB: 500, BTC: 0 }} onSubmitOrder={quickSubmit} priceStatus="LIVE" />,
     )
     fireEvent.click(screen.getByRole('button', { name: '100%' }))
     expect(screen.getAllByRole('spinbutton')[2].value).toBe('500')
@@ -128,7 +189,7 @@ describe('Spot trading integration', () => {
 
   it('rejects BUY without quote funds for principal plus fee and leaves balances unchanged', () => {
     const account = createSpotAccount({ spotBalances: { THB: 100, BTC: 0 } })
-    const result = applySpotOrder(account, makeOrder(), { priceStatus: 'DEMO' })
+    const result = applySpotOrder(account, makeOrder(), { priceStatus: 'LIVE' })
     expect(result.success).toBe(false)
     expect(result.account.spotBalances).toEqual({ THB: 100, BTC: 0 })
     expect(result.account.tradeHistory).toHaveLength(0)
@@ -136,10 +197,40 @@ describe('Spot trading integration', () => {
 
   it('rejects SELL without enough base asset and leaves balances unchanged', () => {
     const account = createSpotAccount({ spotBalances: { THB: 0, BTC: 0.5 } })
-    const result = applySpotOrder(account, makeOrder({ side: 'SELL', id: 'sell-low', amount: 1 }), { priceStatus: 'DEMO' })
+    const result = applySpotOrder(account, makeOrder({ side: 'SELL', id: 'sell-low', amount: 1 }), { priceStatus: 'LIVE' })
     expect(result.success).toBe(false)
     expect(result.account.spotBalances).toEqual({ THB: 0, BTC: 0.5 })
     expect(result.account.tradeHistory).toHaveLength(0)
+  })
+
+  it('rejects PAPER Market and Limit orders in the service without verified Bitkub pair metadata', () => {
+    const unverifiedBitkubRules = {
+      providerSymbol: 'BTC_THB',
+      baseAssetScale: 8,
+      providerPriceScale: 2,
+      priceStep: 0.01,
+      providerQuantityScale: 0,
+      providerQuantityStep: 1,
+      quantityStep: null,
+      minQuoteSize: 10,
+      orderRulesVerified: false,
+      orderRulesReason: 'ยังยืนยันความหมาย quantity_scale / quantity_step ไม่ได้',
+    }
+    for (const orderType of ['MARKET', 'LIMIT']) {
+      for (const pairRules of [undefined, unverifiedBitkubRules]) {
+        const account = createSpotAccount({ spotBalances: { THB: 500, BTC: 1 } })
+        const result = applySpotOrder(account, makeOrder({
+          id: `unverified-${orderType}-${pairRules ? 'partial' : 'missing'}`,
+          orderType,
+          ...(pairRules ? { pairRules } : { pairRules: undefined }),
+        }), { priceStatus: 'LIVE' })
+        expect(result.success).toBe(false)
+        expect(result.error).toMatch(/ยืนยันความหมาย|ไม่มี metadata/)
+        expect(result.account.spotBalances).toEqual({ THB: 500, BTC: 1 })
+        expect(result.account.openOrders).toHaveLength(0)
+        expect(result.account.tradeHistory).toHaveLength(0)
+      }
+    }
   })
 
   it('validates finite positive values and requires total to equal price times amount', () => {
@@ -166,7 +257,7 @@ describe('Spot trading integration', () => {
   it('enforces the configured minimum amount and price/amount precision for every Spot pair', () => {
     for (const pair of TRADING_PAIRS) {
       const buildPairOrder = (amount) => {
-        const price = pair.priceInTHB
+        const price = 100000
         const total = price * amount
         return {
           id: `precision-${pair.symbol}`,
@@ -177,6 +268,7 @@ describe('Spot trading integration', () => {
           amount,
           total,
           fee: total * SPOT_FEE_RATE,
+          pairRules: makeVerifiedTestRules(pair),
         }
       }
 
@@ -184,13 +276,31 @@ describe('Spot trading integration', () => {
       expect(validateSpotOrder(buildPairOrder(pair.minQty / 10)).success).toBe(false)
       const extraDecimal = pair.minQty + 10 ** -(pair.amountPrecision + 1)
       expect(validateSpotOrder(buildPairOrder(extraDecimal)).success).toBe(false)
-      const invalidPrice = pair.priceInTHB + 10 ** -(pair.precision + 1)
+      const invalidPrice = 100000 + 10 ** -(pair.precision + 1)
       const invalidPriceOrder = buildPairOrder(pair.minQty)
       invalidPriceOrder.price = invalidPrice
       invalidPriceOrder.total = invalidPrice * invalidPriceOrder.amount
       invalidPriceOrder.fee = invalidPriceOrder.total * SPOT_FEE_RATE
       expect(validateSpotOrder(invalidPriceOrder).success).toBe(false)
     }
+  })
+
+  it('validates price/amount steps and min_quote_size from the mapped provider symbol', () => {
+    const providerRules = {
+      providerSymbol: 'BTC_THB',
+      orderRulesVerified: true,
+      baseAssetScale: 2,
+      providerPriceScale: 2,
+      priceStep: 0.05,
+      providerQuantityScale: 2,
+      quantityStep: 0.05,
+      minQuoteSize: 10,
+    }
+    expect(validateSpotOrder(makeOrder({ price: 100.05, amount: 0.1 }), providerRules).success).toBe(true)
+    expect(validateSpotOrder(makeOrder({ price: 100.05, amount: 0.12 }), providerRules).error).toMatch(/step ของ Bitkub/)
+    expect(validateSpotOrder(makeOrder({ price: 100.001, amount: 0.1 }), providerRules).error).toMatch(/ทศนิยมไม่เกิน 2/)
+    expect(validateSpotOrder(makeOrder({ price: 100.05, amount: 0.05 }), providerRules).error).toMatch(/min_quote_size 10/)
+    expect(validateSpotOrder(makeOrder(), { providerSymbol: 'BTC_THB', providerPriceScale: 2 }).error).toMatch(/ยังยืนยันความหมาย precision\/step\/min_quote_size/)
   })
 
   it('migrates and cancels an old open order without refunding an unproven THB reserve', () => {
@@ -219,7 +329,7 @@ describe('Spot trading integration', () => {
 
     const oldAccount = authService.getUserData(user.id)
     expect(oldAccount.openOrders[0].lockedAmount).toBeUndefined()
-    const attemptedTick = applyLimitPriceTick(oldAccount, 'BTC/THB', 100000, 'DEMO')
+    const attemptedTick = applyLimitPriceTick(oldAccount, 'BTC/THB', 100000, 'LIVE')
     expect(attemptedTick.filledOrders).toHaveLength(0)
     expect(attemptedTick.account.openOrders).toHaveLength(1)
     expect(attemptedTick.account.spotBalances.THB).toBe(500000)
@@ -244,15 +354,29 @@ describe('Spot trading integration', () => {
     expect(onCancelOpenOrder).toHaveBeenCalledWith('legacy-ui-order')
   })
 
+  it('says Limit orders are paused when pair rules are unverified', () => {
+    render(<PositionsTable orderRulesVerified={false} />)
+
+    expect(screen.getByText('ไม่มีคำสั่งรอจับคู่ในขณะนี้ — คำสั่ง PAPER พักอยู่ จึงยังตั้ง Limit ใหม่ไม่ได้')).toBeTruthy()
+    expect(screen.queryByText(/สามารถตั้งราคาซื้อ-ขายล่วงหน้า/)).toBeNull()
+  })
+
+  it('keeps the Limit prompt when pair rules are verified', () => {
+    render(<PositionsTable orderRulesVerified />)
+
+    expect(screen.getByText('ไม่มีคำสั่งรอจับคู่ในขณะนี้ (สามารถตั้งราคาซื้อ-ขายล่วงหน้าด้วยคำสั่ง Limit ได้)')).toBeTruthy()
+    expect(screen.queryByText(/คำสั่ง PAPER พักอยู่/)).toBeNull()
+  })
+
   it('charges BUY and SELL fees that match the wallet movements and trade history', () => {
     let account = createSpotAccount({ spotBalances: { THB: 500, BTC: 1 } })
-    const buy = applySpotOrder(account, makeOrder({ id: 'buy-1' }), { priceStatus: 'DEMO' })
+    const buy = applySpotOrder(account, makeOrder({ id: 'buy-1' }), { priceStatus: 'LIVE' })
     expect(buy.success).toBe(true)
     expect(buy.account.spotBalances).toEqual({ THB: 399.75, BTC: 2 })
     expect(buy.account.tradeHistory[0].fee).toBe(0.25)
 
     account = buy.account
-    const sell = applySpotOrder(account, makeOrder({ id: 'sell-1', side: 'SELL', price: 120, amount: 0.5 }), { priceStatus: 'DEMO' })
+    const sell = applySpotOrder(account, makeOrder({ id: 'sell-1', side: 'SELL', price: 120, amount: 0.5 }), { priceStatus: 'LIVE' })
     expect(sell.success).toBe(true)
     expect(sell.account.spotBalances).toEqual({ THB: 459.6, BTC: 1.5 })
     expect(sell.account.tradeHistory[0].fee).toBe(0.15)
@@ -282,12 +406,12 @@ describe('Spot trading integration', () => {
       createSpotAccount({ spotBalances: { THB: 500, BTC: 0 } }),
       makeOrder({ id: 'limit-fill', orderType: 'LIMIT' }),
     )
-    const firstTick = applyLimitPriceTick(placed.account, 'BTC/THB', 99, 'DEMO')
+    const firstTick = applyLimitPriceTick(placed.account, 'BTC/THB', 99, 'LIVE')
     expect(firstTick.filledOrders).toHaveLength(1)
     expect(firstTick.account.spotBalances).toEqual({ THB: 399.75, BTC: 1 })
     expect(firstTick.account.tradeHistory).toHaveLength(1)
 
-    const duplicateTick = applyLimitPriceTick(firstTick.account, 'BTC/THB', 99, 'DEMO')
+    const duplicateTick = applyLimitPriceTick(firstTick.account, 'BTC/THB', 99, 'LIVE')
     expect(duplicateTick.filledOrders).toHaveLength(0)
     expect(duplicateTick.account.spotBalances).toEqual(firstTick.account.spotBalances)
     expect(duplicateTick.account.tradeHistory).toHaveLength(1)
@@ -334,7 +458,7 @@ describe('Spot trading integration', () => {
         amount,
         total,
         fee: total * SPOT_FEE_RATE,
-      }), { priceStatus: 'DEMO' })
+      }), { priceStatus: 'LIVE' })
       if (result.success) account = result.account
       return result.success ? { success: true } : { success: false, reason: result.error }
     })
@@ -377,7 +501,7 @@ describe('Spot trading integration', () => {
     const bought = applySpotOrder(
       authService.getUserData(user.id),
       makeOrder({ id: 'earned-btc', price: 1000 }),
-      { priceStatus: 'DEMO' },
+      { priceStatus: 'LIVE' },
     )
     expect(bought.success).toBe(true)
     expect(bought.account.spotBalances.BTC).toBe(1)
@@ -444,21 +568,27 @@ describe('Spot trading integration', () => {
     expect(formatMonthlyChange(0, 0)).toBe('N/A')
   })
 
-  it('uses the same THB DEMO portfolio and Spot prices for Dashboard and Portfolio totals', () => {
+  it('uses the same LIVE portfolio and Spot prices for Dashboard and Portfolio totals', () => {
     const portfolio = [{
       id: 'btc-holding', symbol: 'BTC', currency: 'THB', shares: 0.001,
       avgBuyPrice: 2000000, currentPrice: 1,
     }]
     const balances = { THB: 100, BTC: 0.001 }
-    const holdings = calculatePortfolioValuation(portfolio)
-    const wallet = calculateSpotWalletValuation(balances, [])
+    const marketSnapshot = makeLiveSnapshot()
+    const holdings = calculatePortfolioValuation(portfolio, marketSnapshot)
+    const wallet = calculateSpotWalletValuation(balances, [], marketSnapshot)
     const dashboard = calculateDashboardMetrics({
-      transactions: [], portfolio, spotBalances: balances, openOrders: [],
+      transactions: [], portfolio, spotBalances: balances, openOrders: [], marketSnapshot,
     })
-    expect(getDemoSpotPriceTHB('BTC')).toBe(TRADING_PAIRS.find((pair) => pair.symbol === 'BTC/THB').priceInTHB)
-    expect(holdings.assets[0].valuation.currentValueTHB).toBe(holdings.assets[0].shares * getDemoSpotPriceTHB('BTC'))
-    expect(wallet.rows.find((row) => row.asset === 'BTC').valueTHB).toBe(0.001 * getDemoSpotPriceTHB('BTC'))
+    expect(holdings.assets[0].valuation.currentValueTHB).toBe(0.001 * 2500000)
+    expect(wallet.rows.find((row) => row.asset === 'BTC').valueTHB).toBe(0.001 * 2500000)
     expect(dashboard.netWorth).toBe(holdings.totalValueTHB + wallet.totalValueTHB)
+  })
+
+  it('does not value a Spot asset from a placeholder price when the public feed is unavailable', () => {
+    const wallet = calculateSpotWalletValuation({ THB: 100, BTC: 0.001 }, [], { prices: {}, tickers: {}, symbolStatuses: {} })
+    expect(wallet.totalValueTHB).toBeNull()
+    expect(wallet.rows.find((row) => row.asset === 'BTC').valueTHB).toBeNull()
   })
 
   it('returns N/A valuation when an asset currency is missing or has no THB conversion', () => {

@@ -1,0 +1,10 @@
+{
+  "target": "synthetic PostgreSQL:5441",
+  "processes": 2,
+  "distinctAccountRequests": 61,
+  "generic": 60,
+  "limited": 1,
+  "accountBucketHits": 1,
+  "peerBucketAtLeast": 61,
+  "forwardedPeerRejectedByMainSuite": true
+}

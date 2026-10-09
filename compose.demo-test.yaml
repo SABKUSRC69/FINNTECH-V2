@@ -1,0 +1,19 @@
+name: finntech-demo-test-20261008
+services:
+  postgres-demo-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: finntech_demo_test_20261008
+      POSTGRES_USER: demo_fixture
+      POSTGRES_PASSWORD: ${DEMO_TEST_DATABASE_PASSWORD:?Synthetic password required}
+    ports:
+      - "127.0.0.1:5443:5432"
+    volumes:
+      - demo_test_20261008_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo_fixture -d finntech_demo_test_20261008"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+volumes:
+  demo_test_20261008_pgdata:

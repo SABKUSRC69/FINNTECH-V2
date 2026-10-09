@@ -1,0 +1,6 @@
+{
+  "input": "0.00000001",
+  "masked": true,
+  "missingPricePreserved": true,
+  "stalePreserved": true
+}

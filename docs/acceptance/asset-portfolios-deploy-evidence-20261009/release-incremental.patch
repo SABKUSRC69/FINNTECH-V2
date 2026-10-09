@@ -1,0 +1,1225 @@
+diff --git a/apps/api/prisma/migrations/20261009000000_owned_asset_ledgers/migration.sql b/apps/api/prisma/migrations/20261009000000_owned_asset_ledgers/migration.sql
+new file mode 100644
+index 0000000..8934559
+--- /dev/null
++++ b/apps/api/prisma/migrations/20261009000000_owned_asset_ledgers/migration.sql
+@@ -0,0 +1,170 @@
++-- CreateTable
++CREATE TABLE "stock_instruments" (
++    "symbol" VARCHAR(15) NOT NULL,
++    "name" VARCHAR(100) NOT NULL,
++    "kind" VARCHAR(8) NOT NULL,
++    "currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
++
++    CONSTRAINT "stock_instruments_pkey" PRIMARY KEY ("symbol")
++);
++
++-- CreateTable
++CREATE TABLE "stock_portfolios" (
++    "id" UUID NOT NULL,
++    "owner_id" UUID NOT NULL,
++    "name" VARCHAR(100) NOT NULL,
++    "quote_currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
++
++    CONSTRAINT "stock_portfolios_pkey" PRIMARY KEY ("id")
++);
++
++-- CreateTable
++CREATE TABLE "stock_trades" (
++    "id" UUID NOT NULL,
++    "owner_id" UUID NOT NULL,
++    "portfolio_id" UUID NOT NULL,
++    "quote_currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
++    "symbol" VARCHAR(15) NOT NULL,
++    "side" "TradeSide" NOT NULL,
++    "quantity" DECIMAL(38,18) NOT NULL,
++    "price" DECIMAL(38,18) NOT NULL,
++    "fee" DECIMAL(38,18) NOT NULL,
++    "gross" DECIMAL(38,18) NOT NULL,
++    "cost_removed" DECIMAL(38,18) NOT NULL,
++    "realized_pnl" DECIMAL(38,18) NOT NULL,
++    "occurred_at" TIMESTAMPTZ(3) NOT NULL,
++    "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
++    "voided_at" TIMESTAMPTZ(3),
++    "void_reason" VARCHAR(500),
++    "note" VARCHAR(500) NOT NULL DEFAULT '',
++
++    CONSTRAINT "stock_trades_pkey" PRIMARY KEY ("id")
++);
++
++-- CreateTable
++CREATE TABLE "stock_holdings" (
++    "owner_id" UUID NOT NULL,
++    "portfolio_id" UUID NOT NULL,
++    "quote_currency" VARCHAR(3) NOT NULL DEFAULT 'USD',
++    "symbol" VARCHAR(15) NOT NULL,
++    "quantity" DECIMAL(38,18) NOT NULL,
++    "total_cost" DECIMAL(38,18) NOT NULL,
++    "realized_pnl" DECIMAL(38,18) NOT NULL,
++
++    CONSTRAINT "stock_holdings_pkey" PRIMARY KEY ("owner_id","portfolio_id","symbol")
++);
++
++-- CreateTable
++CREATE TABLE "manual_assets" (
++    "id" UUID NOT NULL,
++    "owner_id" UUID NOT NULL,
++    "name" VARCHAR(100) NOT NULL,
++    "type" VARCHAR(8) NOT NULL,
++    "currency" VARCHAR(4) NOT NULL,
++    "quantity" DECIMAL(38,18),
++    "unit" VARCHAR(32) NOT NULL,
++    "cost" DECIMAL(38,18),
++    "value" DECIMAL(38,18) NOT NULL,
++    "date" VARCHAR(10) NOT NULL,
++    "note" VARCHAR(500) NOT NULL,
++    "version" INTEGER NOT NULL DEFAULT 1,
++
++    CONSTRAINT "manual_assets_pkey" PRIMARY KEY ("id")
++);
++
++-- CreateIndex
++CREATE UNIQUE INDEX "stock_portfolios_owner_id_name_key" ON "stock_portfolios"("owner_id", "name");
++
++-- CreateIndex
++CREATE UNIQUE INDEX "stock_portfolios_owner_id_id_quote_currency_key" ON "stock_portfolios"("owner_id", "id", "quote_currency");
++
++-- CreateIndex
++CREATE INDEX "stock_trades_owner_id_portfolio_id_symbol_occurred_at_creat_idx" ON "stock_trades"("owner_id", "portfolio_id", "symbol", "occurred_at", "created_at", "id");
++
++-- CreateIndex
++CREATE UNIQUE INDEX "manual_assets_owner_id_name_key" ON "manual_assets"("owner_id", "name");
++
++-- AddForeignKey
++ALTER TABLE "stock_portfolios" ADD CONSTRAINT "stock_portfolios_owner_id_fkey" FOREIGN KEY ("owner_id") REFERENCES "tracker_users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
++
++-- AddForeignKey
++ALTER TABLE "stock_trades" ADD CONSTRAINT "stock_trades_owner_id_fkey" FOREIGN KEY ("owner_id") REFERENCES "tracker_users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
++
++-- AddForeignKey
++ALTER TABLE "stock_trades" ADD CONSTRAINT "stock_trades_owner_id_portfolio_id_quote_currency_fkey" FOREIGN KEY ("owner_id", "portfolio_id", "quote_currency") REFERENCES "stock_portfolios"("owner_id", "id", "quote_currency") ON DELETE RESTRICT ON UPDATE CASCADE;
++
++-- AddForeignKey
++ALTER TABLE "stock_trades" ADD CONSTRAINT "stock_trades_symbol_fkey" FOREIGN KEY ("symbol") REFERENCES "stock_instruments"("symbol") ON DELETE RESTRICT ON UPDATE CASCADE;
++
++-- AddForeignKey
++ALTER TABLE "stock_holdings" ADD CONSTRAINT "stock_holdings_owner_id_fkey" FOREIGN KEY ("owner_id") REFERENCES "tracker_users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
++
++-- AddForeignKey
++ALTER TABLE "stock_holdings" ADD CONSTRAINT "stock_holdings_owner_id_portfolio_id_quote_currency_fkey" FOREIGN KEY ("owner_id", "portfolio_id", "quote_currency") REFERENCES "stock_portfolios"("owner_id", "id", "quote_currency") ON DELETE RESTRICT ON UPDATE CASCADE;
++
++-- AddForeignKey
++ALTER TABLE "stock_holdings" ADD CONSTRAINT "stock_holdings_symbol_fkey" FOREIGN KEY ("symbol") REFERENCES "stock_instruments"("symbol") ON DELETE RESTRICT ON UPDATE CASCADE;
++
++-- AddForeignKey
++ALTER TABLE "manual_assets" ADD CONSTRAINT "manual_assets_owner_id_fkey" FOREIGN KEY ("owner_id") REFERENCES "tracker_users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
++
++-- USD ledger/currency/valuation boundaries; owner reassignment is forbidden.
++ALTER TABLE stock_portfolios ADD CONSTRAINT stock_quote CHECK (quote_currency='USD');
++ALTER TABLE stock_instruments ADD CONSTRAINT instrument_identity CHECK(currency='USD' AND kind IN ('STOCK','ETF'));
++ALTER TABLE stock_trades ADD CONSTRAINT stock_trade_rules CHECK(quote_currency='USD' AND quantity>0 AND price>0 AND fee>=0 AND gross>=0 AND cost_removed>=0 AND ((voided_at IS NULL)=(void_reason IS NULL)));
++ALTER TABLE stock_holdings ADD CONSTRAINT stock_holding_rules CHECK(quote_currency='USD' AND quantity>=0 AND total_cost>=0 AND (quantity<>0 OR total_cost=0));
++ALTER TABLE manual_assets ADD CONSTRAINT manual_asset_rules CHECK(currency IN ('THB','USD','USDT') AND type IN ('GOLD','PROPERTY','OTHER') AND value>=0 AND (cost IS NULL OR cost>=0) AND (quantity IS NULL OR quantity>=0) AND version>0 AND (currency<>'THB' OR (value=round(value,2) AND (cost IS NULL OR cost=round(cost,2)))));
++DO $$ DECLARE t text; BEGIN FOREACH t IN ARRAY ARRAY['stock_portfolios','stock_trades','stock_holdings','manual_assets'] LOOP EXECUTE format('CREATE TRIGGER preserve_owner BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION tracker_preserve_owner()',t); END LOOP; END $$;
++INSERT INTO stock_instruments(symbol,name,kind,currency) VALUES ('AAPL','Apple Inc.','STOCK','USD'),('MSFT','Microsoft Corporation','STOCK','USD'),('NVDA','NVIDIA Corporation','STOCK','USD'),('AMZN','Amazon.com Inc.','STOCK','USD'),('GOOGL','Alphabet Class A','STOCK','USD'),('TSLA','Tesla Inc.','STOCK','USD'),('SPY','SPDR S&P 500 ETF Trust','ETF','USD'),('QQQ','Invesco QQQ Trust','ETF','USD');
++-- Preserve all existing privacy operator/archive checks; include new owner datasets.
++CREATE OR REPLACE FUNCTION tracker_purge_owner_case(case_id UUID) RETURNS TEXT
++LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
++DECLARE c public.account_deletion_cases; b public.runtime_boundaries;
++BEGIN
++  SELECT * INTO STRICT b FROM public.runtime_boundaries WHERE id='singleton';
++  IF b.mode NOT IN ('real','real-rehearsal') OR b.database_role=session_user::text
++    OR NOT EXISTS(SELECT 1 FROM public.privacy_operators WHERE role_name=session_user::text) THEN
++    RAISE EXCEPTION 'privacy operator required' USING ERRCODE='42501';
++  END IF;
++  SELECT * INTO STRICT c FROM public.account_deletion_cases WHERE id=case_id FOR UPDATE;
++  IF c.status='PURGED' THEN RETURN 'PURGED'; END IF;
++  IF c.status<>'REQUESTED' OR c.archived_at IS NULL OR c.archive_id IS NULL OR c.archive_sha256 IS NULL THEN RAISE EXCEPTION 'off-device case receipt required'; END IF;
++  PERFORM id FROM public.auth_users WHERE id=c.user_id FOR UPDATE;
++  PERFORM pg_advisory_xact_lock(hashtextextended('tracker-dataset:'||c.owner_id::text,0));
++  IF EXISTS(SELECT 1 FROM public.legacy_imports WHERE owner_id=c.owner_id)
++    OR EXISTS(SELECT 1 FROM public.demo_workspaces WHERE user_id=c.user_id)
++    OR NOT EXISTS(SELECT 1 FROM public.auth_identities WHERE owner_id=c.owner_id AND auth_user_id=c.user_id)
++    OR NOT EXISTS(SELECT 1 FROM public.auth_recovery_enrollments WHERE user_id=c.user_id AND blocked) THEN
++    RAISE EXCEPTION 'owner case boundary rejected';
++  END IF;
++  UPDATE public.account_deletion_cases SET status='PURGING',purge_transaction=txid_current() WHERE id=case_id;
++  PERFORM set_config('finntech.purge_case',case_id::text,true);
++  DELETE FROM public.auth_sessions WHERE user_id=c.user_id;
++  DELETE FROM public.auth_verifications WHERE value=c.user_id::text;
++  DELETE FROM public.auth_delivery_jobs WHERE user_id=c.user_id;
++  DELETE FROM public.audit_events WHERE owner_id=c.owner_id;
++  DELETE FROM public.idempotency_keys WHERE owner_id=c.owner_id;
++  DELETE FROM public.stock_holdings WHERE owner_id=c.owner_id;
++  DELETE FROM public.stock_trades WHERE owner_id=c.owner_id;
++  DELETE FROM public.stock_portfolios WHERE owner_id=c.owner_id;
++  DELETE FROM public.manual_assets WHERE owner_id=c.owner_id;
++  DELETE FROM public.portfolio_holdings WHERE owner_id=c.owner_id;
++  DELETE FROM public.crypto_trades WHERE owner_id=c.owner_id;
++  DELETE FROM public.crypto_portfolios WHERE owner_id=c.owner_id;
++  DELETE FROM public.budgets WHERE owner_id=c.owner_id;
++  DELETE FROM public.finance_transactions WHERE owner_id=c.owner_id;
++  DELETE FROM public.finance_categories WHERE owner_id=c.owner_id;
++  DELETE FROM public.cash_accounts WHERE owner_id=c.owner_id;
++  DELETE FROM public.source_dataset_namespaces WHERE owner_id=c.owner_id;
++  DELETE FROM public.auth_identities WHERE owner_id=c.owner_id AND auth_user_id=c.user_id;
++  DELETE FROM public.tracker_users WHERE id=c.owner_id;
++  DELETE FROM public.auth_recovery_enrollments WHERE user_id=c.user_id;
++  DELETE FROM public.auth_accounts WHERE user_id=c.user_id;
++  DELETE FROM public.auth_users WHERE id=c.user_id;
++  UPDATE public.account_deletion_cases SET status='PURGED',purged_at=clock_timestamp(),purge_transaction=NULL WHERE id=case_id;
++  PERFORM set_config('finntech.purge_case','',true);
++  RETURN 'PURGED';
++END;
++$$;
++
++REVOKE ALL ON FUNCTION tracker_purge_owner_case(UUID) FROM PUBLIC;
+diff --git a/apps/api/prisma/migrations/20261009000001_asset_history_guards/migration.sql b/apps/api/prisma/migrations/20261009000001_asset_history_guards/migration.sql
+new file mode 100644
+index 0000000..872c654
+--- /dev/null
++++ b/apps/api/prisma/migrations/20261009000001_asset_history_guards/migration.sql
+@@ -0,0 +1,23 @@
++-- Corrections retain immutable original history; only replay accounting and first void are allowed.
++CREATE FUNCTION tracker_preserve_stock_history() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++ IF (to_jsonb(NEW)-ARRAY['gross','cost_removed','realized_pnl','voided_at','void_reason'])
++   IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['gross','cost_removed','realized_pnl','voided_at','void_reason'])
++   OR (OLD.voided_at IS NOT NULL AND NEW IS DISTINCT FROM OLD) THEN
++   RAISE EXCEPTION 'stock history is immutable; append a correction' USING ERRCODE='23514';
++ END IF;
++ RETURN NEW;
++END;
++$$;
++CREATE TRIGGER preserve_history BEFORE UPDATE ON stock_trades FOR EACH ROW EXECUTE FUNCTION tracker_preserve_stock_history();
++CREATE FUNCTION tracker_owned_asset_delete() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++ IF public.tracker_case_delete_allowed(OLD.owner_id) THEN RETURN OLD; END IF;
++ RAISE EXCEPTION 'asset deletion requires approved owner case' USING ERRCODE='23514';
++END;
++$$;
++DO $$ DECLARE t text; BEGIN
++ FOREACH t IN ARRAY ARRAY['stock_holdings','stock_trades','stock_portfolios','manual_assets'] LOOP
++  EXECUTE format('CREATE TRIGGER owner_case_delete BEFORE DELETE ON %I FOR EACH ROW EXECUTE FUNCTION tracker_owned_asset_delete()',t);
++ END LOOP;
++END $$;
+diff --git a/apps/api/prisma/migrations/20261009000002_asset_numeric_invariants/migration.sql b/apps/api/prisma/migrations/20261009000002_asset_numeric_invariants/migration.sql
+new file mode 100644
+index 0000000..b37e5b9
+--- /dev/null
++++ b/apps/api/prisma/migrations/20261009000002_asset_numeric_invariants/migration.sql
+@@ -0,0 +1,13 @@
++-- PostgreSQL NaN compares above finite numbers, so ordinary nonnegative checks are insufficient.
++ALTER TABLE stock_trades ADD CONSTRAINT stock_finite CHECK (
++ quantity<>'NaN'::numeric AND price<>'NaN'::numeric AND fee<>'NaN'::numeric
++ AND gross<>'NaN'::numeric AND cost_removed<>'NaN'::numeric AND realized_pnl<>'NaN'::numeric
++);
++ALTER TABLE stock_holdings ADD CONSTRAINT stock_holding_finite CHECK (
++ quantity<>'NaN'::numeric AND total_cost<>'NaN'::numeric AND realized_pnl<>'NaN'::numeric
++);
++ALTER TABLE manual_assets ADD CONSTRAINT manual_finite_units CHECK (
++ value<>'NaN'::numeric AND (cost IS NULL OR cost<>'NaN'::numeric)
++ AND (quantity IS NULL OR (quantity<>'NaN'::numeric AND length(btrim(unit))>0))
++ AND length(btrim(name))>0
++);
+diff --git a/apps/api/prisma/schema.prisma b/apps/api/prisma/schema.prisma
+index bef96c8..d7ea25b 100644
+--- a/apps/api/prisma/schema.prisma
++++ b/apps/api/prisma/schema.prisma
+@@ -74,6 +74,10 @@ model TrackerUser {
+   legacySummaries LegacyDemoSummary[]
+   auditEvents AuditEvent[]
+   idempotencyKeys IdempotencyKey[]
++  stockPortfolios StockPortfolio[]
++  stockTrades StockTrade[]
++  stockHoldings StockHolding[]
++  manualAssets ManualAsset[]
+   @@map("tracker_users")
+ }
+ 
+@@ -481,3 +485,79 @@ model AuditEvent {
+   @@index([ownerId, createdAt])
+   @@map("audit_events")
+ }
++model StockInstrument {
++  symbol String @id @db.VarChar(15)
++  name String @db.VarChar(100)
++  kind String @db.VarChar(8)
++  currency String @default("USD") @db.VarChar(3)
++  trades StockTrade[]
++  holdings StockHolding[]
++  @@map("stock_instruments")
++}
++model StockPortfolio {
++  id String @id @default(uuid()) @db.Uuid
++  ownerId String @map("owner_id") @db.Uuid
++  owner TrackerUser @relation(fields:[ownerId], references:[id], onDelete:Restrict)
++  name String @db.VarChar(100)
++  quoteCurrency String @default("USD") @map("quote_currency") @db.VarChar(3)
++  trades StockTrade[]
++  holdings StockHolding[]
++  @@unique([ownerId,name])
++  @@unique([ownerId,id,quoteCurrency])
++  @@map("stock_portfolios")
++}
++model StockTrade {
++  id String @id @default(uuid()) @db.Uuid
++  ownerId String @map("owner_id") @db.Uuid
++  owner TrackerUser @relation(fields:[ownerId], references:[id], onDelete:Restrict)
++  portfolioId String @map("portfolio_id") @db.Uuid
++  quoteCurrency String @default("USD") @map("quote_currency") @db.VarChar(3)
++  portfolio StockPortfolio @relation(fields:[ownerId,portfolioId,quoteCurrency], references:[ownerId,id,quoteCurrency], onDelete:Restrict)
++  symbol String @db.VarChar(15)
++  instrument StockInstrument @relation(fields:[symbol], references:[symbol], onDelete:Restrict)
++  side TradeSide
++  quantity Decimal @db.Decimal(38,18)
++  price Decimal @db.Decimal(38,18)
++  fee Decimal @db.Decimal(38,18)
++  gross Decimal @db.Decimal(38,18)
++  costRemoved Decimal @map("cost_removed") @db.Decimal(38,18)
++  realizedPnl Decimal @map("realized_pnl") @db.Decimal(38,18)
++  occurredAt DateTime @map("occurred_at") @db.Timestamptz(3)
++  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
++  voidedAt DateTime? @map("voided_at") @db.Timestamptz(3)
++  voidReason String? @map("void_reason") @db.VarChar(500)
++  note String @default("") @db.VarChar(500)
++  @@index([ownerId,portfolioId,symbol,occurredAt,createdAt,id])
++  @@map("stock_trades")
++}
++model StockHolding {
++  ownerId String @map("owner_id") @db.Uuid
++  owner TrackerUser @relation(fields:[ownerId], references:[id], onDelete:Restrict)
++  portfolioId String @map("portfolio_id") @db.Uuid
++  quoteCurrency String @default("USD") @map("quote_currency") @db.VarChar(3)
++  portfolio StockPortfolio @relation(fields:[ownerId,portfolioId,quoteCurrency], references:[ownerId,id,quoteCurrency], onDelete:Restrict)
++  symbol String @db.VarChar(15)
++  instrument StockInstrument @relation(fields:[symbol], references:[symbol], onDelete:Restrict)
++  quantity Decimal @db.Decimal(38,18)
++  totalCost Decimal @map("total_cost") @db.Decimal(38,18)
++  realizedPnl Decimal @map("realized_pnl") @db.Decimal(38,18)
++  @@id([ownerId,portfolioId,symbol])
++  @@map("stock_holdings")
++}
++model ManualAsset {
++  id String @id @default(uuid()) @db.Uuid
++  ownerId String @map("owner_id") @db.Uuid
++  owner TrackerUser @relation(fields:[ownerId], references:[id], onDelete:Restrict)
++  name String @db.VarChar(100)
++  type String @db.VarChar(8)
++  currency String @db.VarChar(4)
++  quantity Decimal? @db.Decimal(38,18)
++  unit String @db.VarChar(32)
++  cost Decimal? @db.Decimal(38,18)
++  value Decimal @db.Decimal(38,18)
++  date String @db.VarChar(10)
++  note String @db.VarChar(500)
++  version Int @default(1)
++  @@unique([ownerId,name])
++  @@map("manual_assets")
++}
+diff --git a/apps/api/src/server.ts b/apps/api/src/server.ts
+index 80e5bb2..fd553af 100644
+--- a/apps/api/src/server.ts
++++ b/apps/api/src/server.ts
+@@ -35,6 +35,7 @@ const auth = recovery?.auth ?? (database && authConfig ? createAuthRuntime(datab
+ const market = authConfig?.recovery?.mode === 'synthetic-3a' || authConfig?.real?.boundary === 'real-rehearsal'
+   ? new MarketRelay(async () => { throw new Error('synthetic_provider_disabled') }) : new MarketRelay()
+ const stocks = new StockMarketRelay(readStockConfiguration(process.env))
++market.start()
+ const app = createApp({ market, stocks, ...(recovery ? { recovery } : {}), ...(webDistDir ? { webDistDir } : {}), ...(database && auth ? { database, auth } : {}) })
+ const server = app.listen(port, host, () => {
+   console.log(`FINNTECH tracker API listening at http://${host}:${port}`)
+@@ -78,6 +79,7 @@ function shutdown(signal: string): void {
+   stopMarket?.()
+   if (deliveryTimer) clearInterval(deliveryTimer)
+   stocks.stop()
++  market.stop()
+   console.log(`Received ${signal}; stopping tracker API`)
+   server.close(() => { void (database?.$disconnect() ?? Promise.resolve()).finally(() => process.exit(0)) })
+ }
+diff --git a/apps/api/src/tracker/backup.ts b/apps/api/src/tracker/backup.ts
+index 681c0ad..ba0a7ee 100644
+--- a/apps/api/src/tracker/backup.ts
++++ b/apps/api/src/tracker/backup.ts
+@@ -1,9 +1,10 @@
+ import { createHash, randomUUID } from 'node:crypto'
+ import { BACKUP_MAX_BYTES, BACKUP_MAX_ROWS, backupDocumentSchema, backupRestoreSchema, type BackupDocument, type BackupSummary } from '@finntech/contracts'
+-import { parseThbDecimal, parseCryptoDecimal, serializeThb, replayCryptoTrades } from '@finntech/finance'
++import { parseThbDecimal, parseCryptoDecimal, serializeThb, serializeCrypto,replayCryptoTrades } from '@finntech/finance'
+ import { Prisma, type PrismaClient } from '../generated/prisma/client.js'
+ import { thbForApi, cryptoForApi } from '../persistence/decimal.js'
+ import { ownedMutation, thaiDay, TrackerError } from './service.js'
++import { replayStockScope } from './stock-ledger.js'
+ 
+ type Tx = Prisma.TransactionClient
+ export function prepareBackup(input: unknown) {
+@@ -34,34 +35,48 @@ export function prepareBackup(input: unknown) {
+     const [portfolioId, asset] = scope.split('|') as [string, string]
+     return { portfolioId, asset, result, rows }
+   })
++  const stockScopes=new Map<string,Extract<BackupDocument,{version:3}>['stockTrades']>()
++  for(const row of backup.version===3?backup.stockTrades:[]){const scope=`${row.portfolioId}|${row.symbol}`;if(!stockScopes.has(scope))stockScopes.set(scope,[]);if(!row.voidedAt)stockScopes.get(scope)!.push(row)}
++  const stockResults=[...stockScopes].sort(([a],[b])=>a.localeCompare(b)).map(([scope,rows])=>{
++    rows.sort((a,b)=>a.date.localeCompare(b.date)||a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id));const result=replayCryptoTrades(rows)
++    for(const row of result.trades){const input=rows.find(t=>t.id===row.id)!;for(const field of ['gross','costRemoved','realizedPnl'] as const)if(!parseCryptoDecimal(input.accounting[field]).eq(row[field]))throw new TrackerError('BACKUP_INCONSISTENT',409)}
++    const [portfolioId,symbol]=scope.split('|') as [string,string];return {portfolioId,symbol,result}
++  })
+   const summary: BackupSummary = {
+     counts: { categories: backup.categories.length, transactions: backup.transactions.length, cancelledTransactions: backup.transactions.filter(row => row.voidedAt).length,
+       budgets: backup.budgets.length, portfolios: backup.portfolios.length, trades: backup.trades.length, cancelledTrades: backup.trades.filter(row => row.voidedAt).length },
+     months: [...months].sort(([a], [b]) => a.localeCompare(b)).map(([month, totals]) => ({ month, income: serializeThb(totals.income), expense: serializeThb(totals.expense), balance: serializeThb(totals.income.minus(totals.expense)) })),
+     holdings: results.map(({ portfolioId, asset, result }) => ({ portfolioId, asset, quantity: result.quantity, totalCost: result.totalCost, realizedPnl: result.realizedPnl })),
+-    cash: (backup.version === 2 ? backup.cashAccounts : []).map(({ name, balance, currency, asOf }) => ({ name, balance: serializeThb(parseThbDecimal(balance)), currency, asOf })).sort((a, b) => a.name.localeCompare(b.name)),
++    cash: (backup.version !== 1 ? backup.cashAccounts : []).map(({ name, balance, currency, asOf }) => ({ name, balance: serializeThb(parseThbDecimal(balance)), currency, asOf })).sort((a, b) => a.name.localeCompare(b.name)),
++    stockCounts:{portfolios:backup.version===3?backup.stockPortfolios.length:0,trades:backup.version===3?backup.stockTrades.length:0,cancelledTrades:backup.version===3?backup.stockTrades.filter(row=>row.voidedAt).length:0,manualAssets:backup.version===3?backup.manualAssets.length:0},
++    stockHoldings:stockResults.map(({portfolioId,symbol,result})=>({portfolioId,symbol,quantity:result.quantity,totalCost:result.totalCost,realizedPnl:result.realizedPnl})),
++    manual:(backup.version===3?backup.manualAssets:[]).map(({asset})=>({...asset,value:serializeCrypto(parseCryptoDecimal(asset.value)),cost:asset.cost===null?null:serializeCrypto(parseCryptoDecimal(asset.cost)),quantity:asset.quantity===null?null:serializeCrypto(parseCryptoDecimal(asset.quantity))})).sort((a,b)=>a.name.localeCompare(b.name)),
+   }
+   const digest = createHash('sha256').update(JSON.stringify(backup)).digest('hex')
+-  return { backup, summary, digest, results }
++  return { backup, summary, digest, results,stockResults }
+ }
+ 
+ async function emptyDataset(tx: Tx, ownerId: string): Promise<boolean> {
+   const counts = await Promise.all([tx.financeCategory.count({ where: { ownerId } }), tx.financeTransaction.count({ where: { ownerId } }),
+-    tx.budget.count({ where: { ownerId } }), tx.cryptoPortfolio.count({ where: { ownerId } }), tx.cryptoTrade.count({ where: { ownerId } }), tx.portfolioHolding.count({ where: { ownerId } }), tx.cashAccount.count({ where: { ownerId } })])
++    tx.budget.count({ where: { ownerId } }), tx.cryptoPortfolio.count({ where: { ownerId } }), tx.cryptoTrade.count({ where: { ownerId } }), tx.portfolioHolding.count({ where: { ownerId } }), tx.cashAccount.count({ where: { ownerId } }),tx.stockPortfolio.count({where:{ownerId}}),tx.stockTrade.count({where:{ownerId}}),tx.stockHolding.count({where:{ownerId}}),tx.manualAsset.count({where:{ownerId}})])
+   return counts.every(count => count === 0)
+ }
+ 
+ async function readDocument(tx: Tx, ownerId: string): Promise<BackupDocument> {
+   const orderBy = { id: 'asc' as const }, take = BACKUP_MAX_ROWS + 1
+-  const [categories, transactions, budgets, portfolios, trades, cashAccounts] = await Promise.all([
++  const [categories, transactions, budgets, portfolios, trades, cashAccounts,stockPortfolios,stockTrades,manualAssets] = await Promise.all([
+     tx.financeCategory.findMany({ where: { ownerId }, orderBy, take }), tx.financeTransaction.findMany({ where: { ownerId, provenance: 'USER_ENTERED' }, orderBy, take }),
+     tx.budget.findMany({ where: { ownerId }, orderBy, take }), tx.cryptoPortfolio.findMany({ where: { ownerId }, orderBy, take }),
+     tx.cryptoTrade.findMany({ where: { ownerId, provenance: 'USER_ENTERED' }, include: { asset: true }, orderBy, take }),
+     tx.cashAccount.findMany({ where: { ownerId }, orderBy, take }),
++    tx.stockPortfolio.findMany({where:{ownerId},orderBy,take}),tx.stockTrade.findMany({where:{ownerId},orderBy,take}),tx.manualAsset.findMany({where:{ownerId},orderBy,take}),
+   ])
+-  if ([categories, transactions, budgets, portfolios, trades, cashAccounts].reduce((sum, rows) => sum + rows.length, 0) > BACKUP_MAX_ROWS) throw new TrackerError('BACKUP_TOO_LARGE', 413)
++  if ([categories, transactions, budgets, portfolios, trades, cashAccounts,stockPortfolios,stockTrades,manualAssets].reduce((sum, rows) => sum + rows.length, 0) > BACKUP_MAX_ROWS) throw new TrackerError('BACKUP_TOO_LARGE', 413)
+   return backupDocumentSchema.parse({
+-    format: 'FINNTECH_TRACKER_BACKUP', version: 2, provenance: 'USER_ENTERED', exportedAt: new Date().toISOString(),
++    format: 'FINNTECH_TRACKER_BACKUP', version: 3, provenance: 'USER_ENTERED', exportedAt: new Date().toISOString(),
++    stockPortfolios:stockPortfolios.map(row=>({id:row.id,name:row.name,quoteCurrency:'USD'})),
++    stockTrades:stockTrades.map(row=>({id:row.id,portfolioId:row.portfolioId,symbol:row.symbol,side:row.side==='BUY'?'buy':'sell',quantity:cryptoForApi(row.quantity),price:cryptoForApi(row.price),fee:cryptoForApi(row.fee),quoteCurrency:'USD',date:thaiDay(row.occurredAt),createdAt:row.createdAt.toISOString(),note:row.note,voidedAt:row.voidedAt?.toISOString()??null,voidReason:row.voidReason,accounting:{gross:cryptoForApi(row.gross),costRemoved:cryptoForApi(row.costRemoved),realizedPnl:cryptoForApi(row.realizedPnl)}})),
++    manualAssets:manualAssets.map(row=>({id:row.id,asset:{name:row.name,type:row.type,currency:row.currency,quantity:row.quantity===null?null:cryptoForApi(row.quantity),unit:row.unit,cost:row.cost===null?null:cryptoForApi(row.cost),value:cryptoForApi(row.value),date:row.date,note:row.note}})),
+     cashAccounts: cashAccounts.map(row => ({ id: row.id, name: row.name, balance: thbForApi(row.balance), currency: 'THB', asOf: row.asOf })),
+     categories: categories.map(row => ({ id: row.id, name: row.name, type: row.type === 'INCOME' ? 'income' : 'expense' })),
+     transactions: transactions.map(row => ({ id: row.id, categoryId: row.categoryId, type: row.type === 'INCOME' ? 'income' : 'expense', amount: thbForApi(row.amount), currency: 'THB', date: thaiDay(row.occurredAt), note: row.note ?? '', createdAt: row.createdAt.toISOString(), voidedAt: row.voidedAt?.toISOString() ?? null, voidReason: row.voidReason })),
+@@ -82,6 +97,9 @@ export async function exportBackup(db: PrismaClient, owner: string): Promise<Bac
+         || cryptoForApi(row.quantity) !== holding.quantity || cryptoForApi(row.totalCost) !== holding.totalCost || cryptoForApi(row.realizedPnl) !== holding.realizedPnl) throw new TrackerError('BACKUP_INCONSISTENT', 409)
+     }
+     if (stored.length !== plan.summary.holdings.length) throw new TrackerError('BACKUP_INCONSISTENT', 409)
++    const stockStored=await tx.stockHolding.findMany({where:{ownerId:owner}})
++    if(stockStored.length!==plan.summary.stockHoldings.length)throw new TrackerError('BACKUP_INCONSISTENT',409)
++    for(const holding of plan.summary.stockHoldings){const row=stockStored.find(h=>h.portfolioId===holding.portfolioId&&h.symbol===holding.symbol);if(!row||cryptoForApi(row.quantity)!==holding.quantity||cryptoForApi(row.totalCost)!==holding.totalCost||cryptoForApi(row.realizedPnl)!==holding.realizedPnl)throw new TrackerError('BACKUP_INCONSISTENT',409)}
+     return plan.backup
+   }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 15000 })
+ }
+@@ -104,7 +122,14 @@ export async function restoreBackup(db: PrismaClient, owner: string, key: unknow
+   return ownedMutation(db, owner, 'backup.restore', key, { digest: plan.digest, consent: true }, async tx => {
+     if (!await emptyDataset(tx, owner)) throw new TrackerError('BACKUP_TARGET_NOT_EMPTY', 409)
+     const backup = plan.backup, categories = idMap(backup.categories), entries = idMap(backup.transactions), budgets = idMap(backup.budgets), portfolios = idMap(backup.portfolios), trades = idMap(backup.trades)
+-    if (backup.version === 2 && backup.cashAccounts.length) await tx.cashAccount.createMany({ data: backup.cashAccounts.map(({ id: _sourceId, ...row }) => ({ id: randomUUID(), ownerId: owner, ...row })) })
++    if (backup.version !== 1 && backup.cashAccounts.length) await tx.cashAccount.createMany({ data: backup.cashAccounts.map(({ id: _sourceId, ...row }) => ({ id: randomUUID(), ownerId: owner, ...row })) })
++    const stockPortfolios=idMap(backup.version===3?backup.stockPortfolios:[]),stockTrades=idMap(backup.version===3?backup.stockTrades:[])
++    if(backup.version===3){
++      if(backup.manualAssets.length)await tx.manualAsset.createMany({data:backup.manualAssets.map(row=>({id:randomUUID(),ownerId:owner,...row.asset}))})
++      if(backup.stockPortfolios.length)await tx.stockPortfolio.createMany({data:backup.stockPortfolios.map(row=>({id:stockPortfolios.get(row.id)!,ownerId:owner,name:row.name,quoteCurrency:'USD'}))})
++      if(backup.stockTrades.length)await tx.stockTrade.createMany({data:backup.stockTrades.map(row=>({id:stockTrades.get(row.id)!,ownerId:owner,portfolioId:stockPortfolios.get(row.portfolioId)!,symbol:row.symbol,quoteCurrency:'USD',side:row.side==='buy'?'BUY':'SELL',quantity:row.quantity,price:row.price,fee:row.fee,note:row.note,...row.accounting,occurredAt:new Date(`${row.date}T00:00:00+07:00`),createdAt:new Date(row.createdAt),voidedAt:row.voidedAt?new Date(row.voidedAt):null,voidReason:row.voidReason}))})
++      for(const scope of plan.stockResults)await replayStockScope(tx,owner,stockPortfolios.get(scope.portfolioId)!,scope.symbol)
++    }
+     if (backup.categories.length) await tx.financeCategory.createMany({ data: backup.categories.map(row => ({ id: categories.get(row.id)!, ownerId: owner, name: row.name, type: row.type === 'income' ? 'INCOME' : 'EXPENSE' })) })
+     if (backup.transactions.length) await tx.financeTransaction.createMany({ data: backup.transactions.map(row => ({ id: entries.get(row.id)!, ownerId: owner, categoryId: categories.get(row.categoryId)!, type: row.type === 'income' ? 'INCOME' : 'EXPENSE', amount: row.amount, currency: 'THB', note: row.note, occurredAt: new Date(`${row.date}T00:00:00+07:00`), createdAt: new Date(row.createdAt), voidedAt: row.voidedAt ? new Date(row.voidedAt) : null, voidReason: row.voidReason })) })
+     if (backup.budgets.length) await tx.budget.createMany({ data: backup.budgets.map(row => ({ id: budgets.get(row.id)!, ownerId: owner, categoryId: categories.get(row.categoryId)!, month: new Date(`${row.month}-01T00:00:00Z`), amount: row.amount, currency: 'THB' })) })
+@@ -121,6 +146,8 @@ export async function restoreBackup(db: PrismaClient, owner: string, key: unknow
+     const verified = prepareBackup(await readDocument(tx, owner)).summary
+     const inversePortfolios = new Map([...portfolios].map(([source, target]) => [target, source]))
+     verified.holdings = verified.holdings.map(row => ({ ...row, portfolioId: inversePortfolios.get(row.portfolioId)! })).sort((a, b) => `${a.portfolioId}|${a.asset}`.localeCompare(`${b.portfolioId}|${b.asset}`))
++    const inverseStock=new Map([...stockPortfolios].map(([source,target])=>[target,source]))
++    verified.stockHoldings=verified.stockHoldings.map(row=>({...row,portfolioId:inverseStock.get(row.portfolioId)!})).sort((a,b)=>`${a.portfolioId}|${a.symbol}`.localeCompare(`${b.portfolioId}|${b.symbol}`))
+     if (JSON.stringify(verified) !== JSON.stringify(plan.summary)) throw new TrackerError('BACKUP_VERIFY_FAILED', 409)
+     return { digest: plan.digest, summary: plan.summary }
+   }, 'exclusive')
+diff --git a/apps/api/src/tracker/crypto-stream.ts b/apps/api/src/tracker/crypto-stream.ts
+new file mode 100644
+index 0000000..9855bf8
+--- /dev/null
++++ b/apps/api/src/tracker/crypto-stream.ts
+@@ -0,0 +1,98 @@
++import { WebSocket } from 'ws'
++import { providerMetadataSchema, providerPriceSchema, type MarketSnapshot } from '@finntech/contracts'
++import { parseCryptoDecimal, serializeCrypto } from '@finntech/finance'
++
++const upstream = 'https://data-api.binance.vision/api/v3'
++export const CRYPTO_CATALOG = ['BTC','ETH','SOL','XRP','BNB','DOGE','ADA'] as const
++const symbols = CRYPTO_CATALOG.map(asset=>asset+'USDT')
++type Quote = { price:string; received:number; observed:number|null; sequence:number; kind:'TRADE'|'REST_SNAPSHOT' }
++type Factory = (url:string)=>WebSocket
++/** One bounded public upstream socket per server, never per owner/browser. */
++export class MarketRelay {
++ private quotes = new Map<string,Quote>()
++ private approved = new Set<string>()
++ private checkedAt = 0
++ private nextAttempt = 0
++ private pending:Promise<void>|null = null
++ private failures = 0
++ private socket:WebSocket|null = null
++ private socketAttempt = 0
++ private socketFailures = 0
++ private heartbeat = 0
++ private openedAt = 0
++ private lastAccess = 0
++ private timer:ReturnType<typeof setInterval>|null = null
++ private stopped = false
++ constructor(private readonly request:typeof fetch=fetch,private readonly now:()=>number=Date.now,
++  private readonly socketFactory:Factory=url=>new WebSocket(url,{handshakeTimeout:5000,maxPayload:16_384,perMessageDeflate:false,followRedirects:false})) {}
++ start():void {
++  if(this.timer)return
++  this.stopped=false
++  this.timer=setInterval(()=>{
++   if(this.socket&&(this.now()-this.heartbeat>60_000||this.now()-this.openedAt>23*60*60*1000||this.now()-this.lastAccess>60_000))this.disconnect(false)
++   if(this.now()-this.lastAccess<=60_000)void this.snapshot(false)
++  },5000);this.timer.unref()
++ }
++ stop():void {this.stopped=true;if(this.timer)clearInterval(this.timer);this.timer=null;this.disconnect(false)}
++ private disconnect(failed:boolean):void {
++  const socket=this.socket;this.socket=null
++  if(failed){this.socketFailures=Math.min(this.socketFailures+1,6);this.socketAttempt=this.now()+Math.min(1000*2**this.socketFailures,60_000)}
++  socket?.terminate()
++ }
++ private connect():void {
++  if(!this.timer||this.stopped||this.socket||!this.approved.size||this.now()<this.socketAttempt)return
++  const streams=[...this.approved].sort().map(symbol=>symbol.toLowerCase()+'@aggTrade').join('/')
++  const socket=this.socketFactory('wss://data-stream.binance.vision/stream?streams='+streams);this.socket=socket;this.heartbeat=this.now();this.openedAt=this.now()
++  socket.on('open',()=>{if(this.socket===socket)this.heartbeat=this.now()})
++  // ws automatically echoes provider ping payloads as pong. No extra subscription chatter.
++  socket.on('ping',()=>{if(this.socket===socket)this.heartbeat=this.now()})
++  socket.on('message',bytes=>{
++   if(this.socket!==socket)return
++   this.heartbeat=this.now()
++   try{
++    const body=JSON.parse(String(bytes)),data=body.data??body
++    if(data.e==='serverShutdown'){this.disconnect(true);return}
++    if(data.e!=='aggTrade'||typeof data.s!=='string'||!this.approved.has(data.s)||!Number.isSafeInteger(data.T)||data.T<=0||data.T>this.now()||!Number.isSafeInteger(data.a)||data.a<0)return
++    const parsed=providerPriceSchema.parse({symbol:data.s,price:data.p}),previous=this.quotes.get(data.s)
++    if(previous?.observed!==null&&previous?.observed!==undefined&&(data.T<previous.observed||(data.T===previous.observed&&data.a<=previous.sequence)))return
++    this.quotes.set(data.s,{price:serializeCrypto(parseCryptoDecimal(parsed.price)),received:this.now(),observed:data.T,sequence:data.a,kind:'TRADE'});this.socketFailures=0
++   }catch{/* Invalid observations never refresh a quote's age. */}
++  })
++  socket.on('error',()=>{if(this.socket===socket)this.disconnect(true)})
++  socket.on('close',()=>{if(this.socket===socket)this.disconnect(true)})
++ }
++ private async refresh():Promise<void> {
++  try{
++   if(this.now()-this.checkedAt>60*60*1000||this.checkedAt===0){
++    const result=await this.request(`${upstream}/exchangeInfo?symbols=${encodeURIComponent(JSON.stringify(symbols))}`,{signal:AbortSignal.timeout(5000),redirect:'error'})
++    if(!result.ok)throw Error('metadata_unavailable')
++    const metadata=providerMetadataSchema.parse(await result.json()),approved=new Set<string>()
++    for(const symbol of symbols)if(metadata.symbols.some(s=>s.symbol===symbol&&s.baseAsset===symbol.slice(0,-4)&&s.quoteAsset==='USDT'&&s.status==='TRADING'&&s.isSpotTradingAllowed!==false))approved.add(symbol)
++    const changed=[...approved].join(',')!==[...this.approved].join(',');this.approved=approved;this.checkedAt=this.now();if(changed)this.disconnect(false)
++   }
++   this.connect()
++   for(const symbol of this.approved){
++    const previous=this.quotes.get(symbol)
++    if(previous?.kind==='TRADE'&&this.now()-previous.observed!<=30_000)continue
++    const before=this.quotes.get(symbol),result=await this.request(`${upstream}/ticker/price?symbol=${symbol}`,{signal:AbortSignal.timeout(5000),redirect:'error'})
++    if(!result.ok)throw Error('price_unavailable')
++    const quote=providerPriceSchema.parse(await result.json());if(quote.symbol!==symbol)throw Error('symbol_mismatch')
++    // Object identity also catches a trade arriving in the same millisecond as REST.
++    if(this.quotes.get(symbol)!==before)continue
++    this.quotes.set(symbol,{price:serializeCrypto(parseCryptoDecimal(quote.price)),received:this.now(),observed:null,sequence:0,kind:'REST_SNAPSHOT'})
++   }
++   this.failures=0
++  }catch{this.failures=Math.min(this.failures+1,5)}
++  finally{this.nextAttempt=this.now()+Math.min(15_000*2**this.failures,300_000)}
++ }
++ async snapshot(touch=true):Promise<MarketSnapshot>{
++  if(touch)this.lastAccess=this.now()
++  if(!this.stopped&&!this.pending&&this.now()>=this.nextAttempt)this.pending=this.refresh().finally(()=>{this.pending=null})
++  this.connect()
++  return {catalog:CRYPTO_CATALOG.map(asset=>({asset,symbol:asset+'USDT',quoteCurrency:'USDT',available:this.approved.has(asset+'USDT')&&this.now()-this.checkedAt<=3600000})),quotes:CRYPTO_CATALOG.map(asset=>{
++   const symbol=asset+'USDT',quote=this.quotes.get(symbol),age=quote?this.now()-(quote.observed??quote.received):Infinity
++   return {asset,price:quote?.price??null,status:!quote||!this.approved.has(symbol)||this.now()-this.checkedAt>3600000?'UNAVAILABLE':age>30000||age<0?'STALE':'LIVE',
++    receivedAt:quote?new Date(quote.received).toISOString():null,observedAt:quote?.observed?new Date(quote.observed).toISOString():null,kind:quote?.kind??'REST_SNAPSHOT',quoteCurrency:'USDT',source:'Binance public'}
++  })}
++ }
++}
+diff --git a/apps/api/src/tracker/manual-assets.ts b/apps/api/src/tracker/manual-assets.ts
+new file mode 100644
+index 0000000..026a404
+--- /dev/null
++++ b/apps/api/src/tracker/manual-assets.ts
+@@ -0,0 +1,20 @@
++import { manualAssetInputSchema,manualAssetUpdateSchema,resourceIdSchema } from '@finntech/contracts'
++import type { PrismaClient } from '../generated/prisma/client.js'
++import { cryptoForApi } from '../persistence/decimal.js'
++import { ownedMutation,TrackerError } from './service.js'
++export async function manualAssets(db:PrismaClient,ownerId:string){
++ const assets=await db.manualAsset.findMany({where:{ownerId},orderBy:{name:'asc'}})
++ return {assets:assets.map(({ownerId:_owner,...row})=>({...row,quantity:row.quantity===null?null:cryptoForApi(row.quantity),cost:row.cost===null?null:cryptoForApi(row.cost),value:cryptoForApi(row.value)}))}
++}
++export async function createManualAsset(db:PrismaClient,ownerId:string,key:unknown,body:unknown){
++ const value=manualAssetInputSchema.parse(body)
++ return ownedMutation(db,ownerId,'assets.manual.create',key,value,async tx=>({id:(await tx.manualAsset.create({data:{ownerId,...value}})).id}))
++}
++export async function updateManualAsset(db:PrismaClient,ownerId:string,id:unknown,key:unknown,body:unknown){
++ const assetId=resourceIdSchema.parse(id),value=manualAssetUpdateSchema.parse(body)
++ return ownedMutation(db,ownerId,'assets.manual.update',key,{assetId,...value},async tx=>{
++  const result=await tx.manualAsset.updateMany({where:{ownerId,id:assetId,version:value.expectedVersion},data:{...value.asset,version:{increment:1}}})
++  if(result.count!==1)throw new TrackerError('ASSET_CHANGED_OR_NOT_FOUND',409)
++  return {id:assetId}
++ })
++}
+diff --git a/apps/api/src/tracker/market.ts b/apps/api/src/tracker/market.ts
+index 5072db9..c9ba544 100644
+--- a/apps/api/src/tracker/market.ts
++++ b/apps/api/src/tracker/market.ts
+@@ -1,50 +1 @@
+-import { providerMetadataSchema, providerPriceSchema, type MarketSnapshot } from '@finntech/contracts'
+-import { parseCryptoDecimal, serializeCrypto } from '@finntech/finance'
+-
+-const upstream = 'https://api.binance.com/api/v3'
+-const symbols = ['BTCUSDT', 'ETHUSDT'] as const
+-export class MarketRelay {
+-  private quotes = new Map<string, { price: string; received: number }>()
+-  private approved = new Set<string>()
+-  private checkedAt = 0
+-  private nextAttempt = 0
+-  private pending: Promise<void> | null = null
+-  private failures = 0
+-  constructor(private readonly request: typeof fetch = fetch, private readonly now: () => number = Date.now) {}
+-
+-  private async refresh(): Promise<void> {
+-    try {
+-      if (this.now() - this.checkedAt > 60 * 60 * 1000 || this.checkedAt === 0) {
+-        const result = await this.request(`${upstream}/exchangeInfo?symbols=${encodeURIComponent(JSON.stringify(symbols))}`, { signal: AbortSignal.timeout(5000) })
+-        if (!result.ok) throw new Error('metadata_unavailable')
+-        const metadata = providerMetadataSchema.parse(await result.json())
+-        this.approved.clear()
+-        for (const symbol of symbols) {
+-          if (metadata.symbols.some(s => s.symbol === symbol && s.baseAsset === symbol.slice(0, -4) && s.quoteAsset === 'USDT' && s.status === 'TRADING')) this.approved.add(symbol)
+-        }
+-        this.checkedAt = this.now()
+-      }
+-      for (const symbol of this.approved) {
+-        const result = await this.request(`${upstream}/ticker/price?symbol=${symbol}`, { signal: AbortSignal.timeout(5000) })
+-        if (!result.ok) throw new Error('price_unavailable')
+-        const quote = providerPriceSchema.parse(await result.json())
+-        if (quote.symbol !== symbol) throw new Error('symbol_mismatch')
+-        this.quotes.set(symbol, { price: serializeCrypto(parseCryptoDecimal(quote.price)), received: this.now() })
+-      }
+-      this.failures = 0
+-    } catch {
+-      // Preserve last validated observation, mark it stale by age; never invent prices.
+-      this.failures = Math.min(this.failures + 1, 5)
+-    } finally { this.nextAttempt = this.now() + Math.min(15_000 * 2 ** this.failures, 300_000) }
+-  }
+-  async snapshot(): Promise<MarketSnapshot> {
+-    if (!this.pending && this.now() >= this.nextAttempt) this.pending = this.refresh().finally(() => { this.pending = null })
+-    // HTTP stays responsive while a shared refresh is in flight.
+-    return { quotes: symbols.map(symbol => {
+-      const quote = this.quotes.get(symbol)
+-      return { asset: symbol === 'BTCUSDT' ? 'BTC' as const : 'ETH' as const, price: quote?.price ?? null,
+-        status: !quote || !this.approved.has(symbol) ? 'UNAVAILABLE' as const : this.now() - quote.received > 30_000 ? 'STALE' as const : 'LIVE' as const,
+-        receivedAt: quote ? new Date(quote.received).toISOString() : null, source: 'Binance public' as const }
+-    }) }
+-  }
+-}
++export { MarketRelay, CRYPTO_CATALOG } from './crypto-stream.js'
+diff --git a/apps/api/src/tracker/routes.ts b/apps/api/src/tracker/routes.ts
+index d1fbf72..5a9cf69 100644
+--- a/apps/api/src/tracker/routes.ts
++++ b/apps/api/src/tracker/routes.ts
+@@ -10,6 +10,8 @@ import { BACKUP_MAX_BYTES } from '@finntech/contracts'
+ import { exportBackup, previewBackup, restoreBackup } from './backup.js'
+ import { cashOverview, createCash, updateCash } from './cash.js'
+ import { ReferenceFxRelay } from './fx.js'
++import { createStockPortfolio,createStockTrade,correctStockTrade,stockOverview } from './stock-ledger.js'
++import { manualAssets,createManualAsset,updateManualAsset } from './manual-assets.js'
+ 
+ export function trackerRouter(auth: AuthRuntime, database: PrismaClient, market = new MarketRelay(), stocks?: StockMarketRelay, fx = new ReferenceFxRelay()): Router {
+   const router = Router()
+@@ -19,7 +21,11 @@ export function trackerRouter(auth: AuthRuntime, database: PrismaClient, market
+     const writable = req.method === 'POST' && ['/finance/categories', '/finance/transactions', '/finance/budgets', '/crypto/portfolios', '/crypto/trades', '/backup/preview', '/backup/restore', '/cash'].includes(req.path)
+     const rename = req.method === 'PATCH' && /^\/finance\/categories\/[^/]+$/.test(req.path)
+     const correction = req.method === 'POST' && /^\/(finance\/transactions|crypto\/trades)\/[^/]+\/corrections$/.test(req.path)
+-    if (readable || writable || rename || correction || (req.method === 'PATCH' && /^\/cash\/[^/]+$/.test(req.path))) next()
++    const assetRead=req.method==='GET'&&['/stocks','/assets/manual'].includes(req.path)
++    const assetWrite=req.method==='POST'&&['/stocks/portfolios','/stocks/trades','/assets/manual'].includes(req.path)
++    const stockCorrection=req.method==='POST'&&/^\/stocks\/trades\/[^/]+\/corrections$/.test(req.path)
++    const manualUpdate=req.method==='PATCH'&&/^\/assets\/manual\/[^/]+$/.test(req.path)
++    if (readable || writable || rename || correction || assetRead||assetWrite||stockCorrection||manualUpdate||(req.method === 'PATCH' && /^\/cash\/[^/]+$/.test(req.path))) next()
+     else next('router')
+   })
+   router.use(requireOwner(auth, database))
+@@ -41,6 +47,11 @@ export function trackerRouter(auth: AuthRuntime, database: PrismaClient, market
+   router.get('/crypto', async (_req, res) => { res.json(await cryptoOverview(database, (res.locals.owner as OwnerContext).ownerId)) })
+   router.get('/crypto/market', async (_req, res) => { res.json(await market.snapshot()) })
+   router.get('/cash', async (_req, res) => { res.json(await cashOverview(database, (res.locals.owner as OwnerContext).ownerId)) })
++  router.get('/stocks',async(_req,res)=>{res.json(await stockOverview(database,(res.locals.owner as OwnerContext).ownerId))})
++  router.get('/assets/manual',async(_req,res)=>{res.json(await manualAssets(database,(res.locals.owner as OwnerContext).ownerId))})
++  router.post('/assets/manual',async(req,res)=>{res.json(await createManualAsset(database,(res.locals.owner as OwnerContext).ownerId,req.headers['idempotency-key'],req.body))})
++  router.patch('/assets/manual/:id',async(req,res)=>{res.json(await updateManualAsset(database,(res.locals.owner as OwnerContext).ownerId,req.params.id,req.headers['idempotency-key'],req.body))})
++  router.post('/stocks/trades/:id/corrections',async(req,res)=>{res.json(await correctStockTrade(database,(res.locals.owner as OwnerContext).ownerId,req.params.id,req.headers['idempotency-key'],req.body))})
+   router.post('/cash', async (req, res) => { res.json(await createCash(database, (res.locals.owner as OwnerContext).ownerId, req.headers['idempotency-key'], req.body)) })
+   router.patch('/cash/:id', async (req, res) => { res.json(await updateCash(database, (res.locals.owner as OwnerContext).ownerId, req.params.id, req.headers['idempotency-key'], req.body)) })
+   router.get('/reference-rate', (_req, res) => { res.json(fx.snapshot()) })
+@@ -54,6 +65,7 @@ export function trackerRouter(auth: AuthRuntime, database: PrismaClient, market
+   for (const [path, operation] of [
+     ['/finance/categories', createCategory], ['/finance/transactions', createEntry], ['/finance/budgets', setBudget],
+     ['/crypto/portfolios', createPortfolio], ['/crypto/trades', createTrade],
++    ['/stocks/portfolios',createStockPortfolio],['/stocks/trades',createStockTrade],
+   ] as const) {
+     router.post(path, async (req, res) => { res.json(await operation(database, (res.locals.owner as OwnerContext).ownerId, req.headers['idempotency-key'], req.body)) })
+   }
+diff --git a/apps/api/src/tracker/stock-ledger.ts b/apps/api/src/tracker/stock-ledger.ts
+new file mode 100644
+index 0000000..4130858
+--- /dev/null
++++ b/apps/api/src/tracker/stock-ledger.ts
+@@ -0,0 +1,56 @@
++import { stockPortfolioInputSchema,stockTradeEntrySchema,stockCorrectionSchema,resourceIdSchema,STOCK_INSTRUMENTS } from '@finntech/contracts'
++import { replayCryptoTrades } from '@finntech/finance'
++import { Prisma,type PrismaClient } from '../generated/prisma/client.js'
++import { cryptoForApi } from '../persistence/decimal.js'
++import { ownedMutation,TrackerError,thaiDay } from './service.js'
++type Tx=Prisma.TransactionClient
++async function lock(tx:Tx,owner:string,portfolioId:string){
++ const rows=await tx.$queryRaw<{id:string}[]>`SELECT id FROM stock_portfolios WHERE owner_id=${owner}::uuid AND id=${portfolioId}::uuid FOR UPDATE`
++ if(rows.length!==1)throw new TrackerError('PORTFOLIO_NOT_FOUND',404)
++}
++export async function replayStockScope(tx:Tx,owner:string,portfolioId:string,symbol:string){
++ const rows=await tx.stockTrade.findMany({where:{ownerId:owner,portfolioId,symbol,voidedAt:null},orderBy:[{occurredAt:'asc'},{createdAt:'asc'},{id:'asc'}]})
++ // Same Decimal weighted-average kernel; USD scopes never mix with crypto USDT scopes.
++ const result=replayCryptoTrades(rows.map(t=>({id:t.id,side:t.side==='BUY'?'buy':'sell',quantity:cryptoForApi(t.quantity),price:cryptoForApi(t.price),fee:cryptoForApi(t.fee)})))
++ for(const row of result.trades)await tx.stockTrade.update({where:{id:row.id},data:{gross:row.gross,costRemoved:row.costRemoved,realizedPnl:row.realizedPnl}})
++ const scope={ownerId:owner,portfolioId,symbol},data={quantity:result.quantity,totalCost:result.totalCost,realizedPnl:result.realizedPnl}
++ await tx.stockHolding.upsert({where:{ownerId_portfolioId_symbol:scope},create:{...scope,...data,quoteCurrency:'USD'},update:data})
++}
++export async function createStockPortfolio(db:PrismaClient,owner:string,key:unknown,body:unknown){
++ const value=stockPortfolioInputSchema.parse(body)
++ return ownedMutation(db,owner,'stocks.portfolios.create',key,value,async tx=>({id:(await tx.stockPortfolio.create({data:{ownerId:owner,...value}})).id}))
++}
++export async function createStockTrade(db:PrismaClient,owner:string,key:unknown,body:unknown){
++ const value=stockTradeEntrySchema.parse(body)
++ return ownedMutation(db,owner,'stocks.trades.create',key,value,async tx=>{
++  await lock(tx,owner,value.portfolioId)
++  const identity=await tx.stockInstrument.findUnique({where:{symbol:value.symbol}})
++  if(!identity||identity.currency!=='USD'||!STOCK_INSTRUMENTS.some(row=>row.symbol===identity.symbol))throw new TrackerError('INSTRUMENT_UNAVAILABLE',422)
++  const prior=await tx.stockTrade.findFirst({where:{ownerId:owner,portfolioId:value.portfolioId},orderBy:{createdAt:'desc'}})
++  const {date,...entry}=value
++  const inserted=await tx.stockTrade.create({data:{ownerId:owner,...entry,side:value.side==='buy'?'BUY':'SELL',gross:'0',costRemoved:'0',realizedPnl:'0',occurredAt:new Date(`${date}T00:00:00+07:00`),createdAt:new Date(Math.max(Date.now(),(prior?.createdAt.getTime()??0)+1))}})
++  await replayStockScope(tx,owner,value.portfolioId,value.symbol);return {id:inserted.id}
++ })
++}
++export async function correctStockTrade(db:PrismaClient,owner:string,id:unknown,key:unknown,body:unknown){
++ const tradeId=resourceIdSchema.parse(id),value=stockCorrectionSchema.parse(body)
++ return ownedMutation(db,owner,'stocks.trades.correct',key,{tradeId,...value},async tx=>{
++  const row=await tx.stockTrade.findFirst({where:{ownerId:owner,id:tradeId}});if(!row)throw new TrackerError('TRADE_NOT_FOUND',404)
++  await lock(tx,owner,row.portfolioId)
++  const original=await tx.stockTrade.findUniqueOrThrow({where:{id:tradeId}})
++  if(original.voidedAt)throw new TrackerError('RECORD_ALREADY_CORRECTED',409)
++  await tx.stockTrade.update({where:{id:tradeId},data:{voidedAt:new Date(),voidReason:value.reason}})
++  let replacementId:string|null=null
++  if(value.action==='replace'){
++   const {date,...entry}=value.entry
++   replacementId=(await tx.stockTrade.create({data:{ownerId:owner,portfolioId:original.portfolioId,symbol:original.symbol,...entry,side:entry.side==='buy'?'BUY':'SELL',gross:'0',costRemoved:'0',realizedPnl:'0',occurredAt:new Date(`${date}T00:00:00+07:00`),createdAt:original.createdAt}})).id
++  }
++  await replayStockScope(tx,owner,original.portfolioId,original.symbol);return {id:tradeId,replacementId,action:value.action}
++ })
++}
++export async function stockOverview(db:PrismaClient,owner:string){
++ return db.$transaction(async tx=>{
++  const [portfolios,holdings,trades]=await Promise.all([tx.stockPortfolio.findMany({where:{ownerId:owner},orderBy:{name:'asc'}}),tx.stockHolding.findMany({where:{ownerId:owner}}),tx.stockTrade.findMany({where:{ownerId:owner},orderBy:[{occurredAt:'desc'},{createdAt:'desc'},{id:'desc'}]})])
++  return {quoteCurrency:'USD',portfolios:portfolios.map(row=>({id:row.id,name:row.name})),holdings:holdings.map(row=>({portfolioId:row.portfolioId,symbol:row.symbol,quantity:cryptoForApi(row.quantity),totalCost:cryptoForApi(row.totalCost),realizedPnl:cryptoForApi(row.realizedPnl)})),trades:trades.map(row=>({id:row.id,portfolioId:row.portfolioId,symbol:row.symbol,side:row.side==='BUY'?'buy':'sell',quantity:cryptoForApi(row.quantity),price:cryptoForApi(row.price),fee:cryptoForApi(row.fee),quoteCurrency:'USD',note:row.note,date:thaiDay(row.occurredAt),realizedPnl:cryptoForApi(row.realizedPnl),voidedAt:row.voidedAt?.toISOString()??null,voidReason:row.voidReason}))}
++ },{isolationLevel:Prisma.TransactionIsolationLevel.RepeatableRead})
++}
+diff --git a/apps/api/src/tracker/stocks.ts b/apps/api/src/tracker/stocks.ts
+index ab86c26..b6cdf08 100644
+--- a/apps/api/src/tracker/stocks.ts
++++ b/apps/api/src/tracker/stocks.ts
+@@ -67,7 +67,7 @@ export class StockMarketRelay {
+     // Provider time, not receipt time, determines freshness (including weekends/closed markets).
+     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(timestamp)) return
+     const observed = Date.parse(timestamp)
+-    if (!Number.isFinite(observed) || observed > this.now() + 5000) return
++    if (!Number.isFinite(observed) || observed > this.now()) return
+     const amount = parseCryptoDecimal(price)
+     if (!amount.greaterThan('0')) throw new Error('invalid_provider_price')
+     const previous = this.quotes.get(symbol)
+diff --git a/apps/web/src/tracker/Assets.tsx b/apps/web/src/tracker/Assets.tsx
+index 85b5e38..fe1a6b9 100644
+--- a/apps/web/src/tracker/Assets.tsx
++++ b/apps/web/src/tracker/Assets.tsx
+@@ -1,26 +1,32 @@
+ import { useEffect, useRef, useState, type FormEvent } from 'react'
+-import { cashOverviewSchema, cashInputSchema, referenceRateSchema, type CashOverview, type CryptoOverview, type MarketSnapshot, type ReferenceRate } from '@finntech/contracts'
+-import { valueAssets } from '@finntech/finance'
++import { cashOverviewSchema, cashInputSchema, referenceRateSchema, stockOverviewSchema,manualAssetOverviewSchema,stockMarketSnapshotSchema,type StockOverview,type ManualAssetOverview,type StockMarketSnapshot,type CashOverview, type CryptoOverview, type MarketSnapshot, type ReferenceRate } from '@finntech/contracts'
++import { valueAssets,valueMixedAssets } from '@finntech/finance'
+ import { displayDecimal, trackerRequest, TrackerRequestError } from './client'
+ import { isFreshCryptoQuote } from './marketFreshness'
+ import { usePresentation } from '../presentation'
++import ManualAssets from './ManualAssets'
+ 
+ type Pending = { path: string; method: string; body: unknown; key: string }
+ const today = () => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10)
+ export default function Assets({ crypto, market, now, expired, lock }: { crypto: CryptoOverview | null; market: MarketSnapshot; now: number; expired: () => void; lock: (value: boolean) => void }): JSX.Element {
+   const { money } = usePresentation()
+   const [cash, setCash] = useState<CashOverview | null>(null), [rate, setRate] = useState<ReferenceRate | null>(null)
++  const [stocks,setStocks]=useState<StockOverview|null>(null),[manual,setManual]=useState<ManualAssetOverview|null>(null),[stockPrices,setStockPrices]=useState<StockMarketSnapshot|null>(null),[manualLocked,setManualLocked]=useState(false)
+   const [name, setName] = useState(''), [balance, setBalance] = useState(''), [asOf, setAsOf] = useState(today())
+   const [editing, setEditing] = useState<CashOverview['accounts'][number] | null>(null)
+   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [pending, setPending] = useState<Pending | null>(null), [message, setMessage] = useState('')
+   const [loadFailed, setLoadFailed] = useState(false)
+   const writing = useRef(false), mounted = useRef(true)
+-  useEffect(() => { lock(busy || !!pending); return () => lock(false) }, [busy, pending, lock])
++  useEffect(() => { lock(busy || !!pending||manualLocked); return () => lock(false) }, [busy, pending,manualLocked,lock])
+   async function load(): Promise<void> {
+     setLoading(true)
+     try {
+       const [accounts, fx] = await Promise.all([trackerRequest('cash'), trackerRequest('reference-rate')])
+       if (mounted.current) { setCash(cashOverviewSchema.parse(accounts)); setRate(referenceRateSchema.parse(fx)); setLoadFailed(false) }
++      // Independent reads: failed pricing never prevents viewing recorded USD costs/manual assets.
++      const extra=await Promise.allSettled([trackerRequest('stocks'),trackerRequest('assets/manual'),trackerRequest('stocks/market')])
++      if(extra.some(result=>result.status==='rejected'&&result.reason instanceof TrackerRequestError&&result.reason.expired))expired()
++      if(mounted.current){setStocks(extra[0].status==='fulfilled'?stockOverviewSchema.parse(extra[0].value):null);setManual(extra[1].status==='fulfilled'?manualAssetOverviewSchema.parse(extra[1].value):null);setStockPrices(extra[2].status==='fulfilled'?stockMarketSnapshotSchema.parse(extra[2].value):null)}
+     } catch (error) {
+       if (mounted.current) { setCash(null); setRate(null); setLoadFailed(true) }
+       if (error instanceof TrackerRequestError && error.expired) expired()
+@@ -47,7 +53,7 @@ export default function Assets({ crypto, market, now, expired, lock }: { crypto:
+   }
+   function submit(event: FormEvent): void {
+     event.preventDefault()
+-    if (busy || pending || !cash || loading) return
++    if (writing.current || busy || pending || manualLocked || !cash || loading) return
+     const input = cashInputSchema.safeParse({ name, balance, currency: 'THB', asOf })
+     if (!input.success) { setMessage('ตรวจชื่อ ยอดเงินบาทที่ไม่ติดลบ (ทศนิยมไม่เกิน 2 ตำแหน่ง) และวันที่อีกครั้ง'); return }
+     void send({ path: editing ? `cash/${editing.id}` : 'cash', method: editing ? 'PATCH' : 'POST', body: editing ? { ...input.data, expectedVersion: editing.version } : input.data, key: globalThis.crypto.randomUUID() })
+@@ -56,12 +62,17 @@ export default function Assets({ crypto, market, now, expired, lock }: { crypto:
+   const prices = new Map(market.quotes.filter(quote => isFreshCryptoQuote(quote, now)).map(quote => [quote.asset, quote.price!]))
+   let valued: ReturnType<typeof valueAssets> | null = null
+   try { if (cash && crypto) valued = valueAssets(cash.accounts.map(row => row.balance), crypto.holdings, prices, freshRate ? rate!.rate : null) } catch { /* Invalid/overflow totals must remain unavailable. */ }
+-  const disabled = busy || !!pending || loading || !cash
++  const eligibleStocks=new Map((stockPrices?.quotes??[]).filter(q=>q.status==='LIVE'&&q.price&&q.observedAt&&q.receivedAt&&now-Date.parse(q.observedAt)>=0&&now-Date.parse(q.observedAt)<=30000&&now-Date.parse(q.receivedAt)>=0&&now-Date.parse(q.receivedAt)<=30000).map(q=>[q.symbol,q.price!]))
++  let mixed:ReturnType<typeof valueMixedAssets>|null=null
++  try{if(valued&&stocks&&manual)mixed=valueMixedAssets(valued,stocks.holdings,eligibleStocks,manual.assets,freshRate?rate!.rate:null,null)}catch{/* Incomplete or unrepresentable aggregate remains N/A. */}
++  const disabled = busy || !!pending ||manualLocked||loading || !cash
+   const display = (value: string | null | undefined) => value == null ? 'N/A' : money(displayDecimal(value))
+   return <section className="journal-assets" aria-label="สินทรัพย์รวม">
+-    <div className="journal-assets-heading"><h2 className="text-xl font-semibold">สินทรัพย์รวมของคุณ</h2><p className="mt-2 text-sm text-slate-500">เงินสดที่บันทึกเอง + พอร์ตคริปโตทั้งหมด · มูลค่าบาทเป็นค่าประมาณ</p></div>
+-    <div className="journal-assets-summary"><div className="tracker-card tracker-balance-card rounded-2xl p-5"><p className="text-sm">สินทรัพย์รวมเทียบบาท</p><p className="mt-3 break-all text-3xl font-semibold tabular-nums">{display(valued?.totalThb)} <span className="text-sm">THB</span></p><p className="mt-2 text-xs">{valued?.complete ? 'ครบเฉพาะเงินสดและคริปโตที่บันทึกในระบบ' : 'ข้อมูลยังไม่ครบ · ราคา/อัตราไม่พร้อม หรือยอดเกินขอบเขต'}</p></div>
+-      <div className="tracker-card rounded-2xl p-5"><p className="text-sm">เงินสดที่บันทึก</p><p className="mt-3 break-all text-2xl font-semibold">{display(valued?.cashThb)} THB</p>{!valued?.complete && <p className="mt-2 break-all text-sm">ยอดที่ประเมินได้บางส่วน: {display(valued?.knownThb)} THB · ไม่ใช่ยอดรวมทั้งหมด</p>}</div></div>
++    <div className="journal-assets-heading"><h2 className="text-xl font-semibold">สินทรัพย์รวมของคุณ</h2><p className="mt-2 text-sm text-slate-500">เงินสด + คริปโต + หุ้น/ETF + สินทรัพย์ประเมินเอง · แยกสกุลและวันที่ประเมิน</p></div>
++    <div className="journal-assets-summary"><div className="tracker-card tracker-balance-card rounded-2xl p-5"><p className="text-sm">สินทรัพย์รวมเทียบบาท</p><p className="mt-3 break-all text-3xl font-semibold tabular-nums">{display(mixed?.totalThb)} <span className="text-sm">THB</span></p><p className="mt-2 text-xs">{mixed?.complete ? 'ครบตามสินทรัพย์ที่บันทึก ใช้มูลค่าประเมินเองตามวันที่ระบุ' : 'ข้อมูลยังไม่ครบ · ราคา/อัตราไม่พร้อม หรือยอดเกินขอบเขต'}</p></div>
++      <div className="tracker-card rounded-2xl p-5"><p className="text-sm">เงินสดที่บันทึก</p><p className="mt-3 break-all text-2xl font-semibold">{display(valued?.cashThb)} THB</p>{!mixed?.complete && <p className="mt-2 break-all text-sm">ยอดที่ประเมินได้บางส่วน: {display(mixed?.knownThb)} THB · ไม่ใช่ยอดรวมทั้งหมด</p>}</div></div>
++    <section className="tracker-card rounded-2xl p-5 space-y-3"><h3 className="font-semibold">ยอดตามสกุล · ไม่ใช่ยอดที่บวกข้ามสกุลได้</h3><p className="break-all">เงินสดและสินทรัพย์ประเมินเอง THB: {display(mixed?.native.THB)} THB</p><p className="break-all">คริปโตและสินทรัพย์ประเมินเอง USDT: {display(mixed?.native.USDT)} USDT</p><p className="break-all">หุ้นและสินทรัพย์ประเมินเอง USD: {display(mixed?.native.USD)} USD</p><p className="break-all text-sm">USD ที่ประเมินได้บางส่วน: {display(mixed?.knownNative.USD)} USD · ยังไม่มีอัตรา USD/THB ที่รองรับ จึงไม่ใช้ USDT/THB แทน</p>{stocks?.holdings.map(row=><p className="break-all text-sm" key={row.portfolioId+row.symbol}>{row.symbol} · {money(row.quantity)} หุ้น · ต้นทุน {display(row.totalCost)} USD · ดูรายละเอียดที่เมนูหุ้น</p>)}</section>
++    <ManualAssets expired={expired} lock={setManualLocked} blocked={busy||!!pending} changed={()=>{void load()}}/>
+     <div className="tracker-card journal-asset-portfolios rounded-2xl p-5"><h3 className="font-semibold">พอร์ตทั้งหมด</h3>{crypto?.portfolios.length === 0 && <p className="mt-3 text-sm text-slate-500">ยังไม่มีพอร์ต ไปที่พอร์ตคริปโตเพื่อบันทึกประวัติด้วยมือ</p>}
+       {crypto?.portfolios.map(portfolio => <div className="mt-4 border-t border-slate-100 pt-4" key={portfolio.id}><h4 className="font-medium">{portfolio.name}</h4>{crypto.holdings.filter(row => row.portfolioId === portfolio.id).length === 0 && <p className="mt-2 text-sm text-slate-500">ยังไม่มีสินทรัพย์ในพอร์ตนี้</p>}{valued?.holdings.filter(row => row.portfolioId === portfolio.id).map(row => <p className="mt-2 break-all text-sm" key={row.asset}>{row.asset} · {money(row.quantity)} หน่วย · {display(row.usdt)} USDT ≈ {display(row.thb)} THB</p>)}</div>)}
+       <p className="mt-4 text-xs leading-6 text-slate-500">ราคาคริปโต: Binance public · รวมทุกพอร์ตตามจำนวนที่ถือ ไม่ใช้ต้นทุนซื้อเป็นราคาปัจจุบัน หุ้นที่ดูราคาอย่างเดียวยังไม่ถือเป็นสินทรัพย์ของคุณ</p></div>
+diff --git a/apps/web/src/tracker/Backup.tsx b/apps/web/src/tracker/Backup.tsx
+index 23434d9..f90c6ed 100644
+--- a/apps/web/src/tracker/Backup.tsx
++++ b/apps/web/src/tracker/Backup.tsx
+@@ -67,7 +67,7 @@ export default function Backup({ lock, restored, expired }: { lock: (value: bool
+   return <section className="journal-backup-layout" aria-label="สำรองและกู้คืน">
+     <div className="tracker-card notebook-export rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><p className="journal-kicker">เก็บสำเนา · EXPORT</p><h2 className="text-xl font-semibold">สำรองและกู้คืนข้อมูล</h2>
+       <p className="mt-3 text-sm leading-7 text-slate-600">สำรองรายรับรายจ่ายทุกเดือน หมวดหมู่ งบประมาณ พอร์ต ประวัติคริปโตและยอดเงินสด รวมรายการที่ยกเลิก เก็บไฟล์ไว้ในที่ส่วนตัว เพราะมีข้อมูลการเงินและบันทึกช่วยจำของคุณ</p>
+-      <p className="mt-2 text-sm leading-7 text-slate-600">ไฟล์นี้ไม่มีข้อมูลบัญชีล็อกอินหรือการตั้งค่า server ไม่รวม legacy DEMO ราคาตลาด หรือพอร์ตหุ้น เป็นสำเนาข้อมูล tracker สูงสุด 2,000 รายการ / 2 MiB</p>
++      <p className="mt-2 text-sm leading-7 text-slate-600">ไฟล์นี้ไม่มีข้อมูลบัญชีล็อกอินหรือการตั้งค่า server ไม่รวม legacy DEMO ราคาตลาด หรือ credentials · v3 รวมพอร์ตหุ้นและสินทรัพย์ประเมินเอง อ่าน v1/v2 เดิมได้ เป็นสำเนาข้อมูล tracker สูงสุด 2,000 รายการ / 2 MiB</p>
+       <button className="auth-primary mt-4" disabled={disabled} onClick={() => { void download() }}>ดาวน์โหลดไฟล์สำรอง</button>
+     </div>
+     <div className="tracker-card notebook-import rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><p className="journal-kicker">ตรวจแล้วค่อยนำเข้า · RESTORE</p><h3 className="font-semibold">ตรวจไฟล์ก่อนกู้คืน</h3>
+@@ -75,8 +75,10 @@ export default function Backup({ lock, restored, expired }: { lock: (value: bool
+       <label className="auth-label mt-4">ไฟล์สำรอง JSON<input className="auth-input" type="file" accept="application/json,.json" disabled={disabled} onChange={event => { void selectFile(event) }} /></label>
+       {preview && <div className="mt-5 space-y-3">
+         <h4 className="font-semibold">ผลตรวจไฟล์ · ยังไม่บันทึกข้อมูล</h4>
+-        <dl className="grid gap-2 text-sm sm:grid-cols-2">{[['บัญชีเงินสด', preview.summary.cash.length], ['หมวดหมู่', preview.summary.counts.categories], ['รายรับรายจ่าย', preview.summary.counts.transactions], ['รายการการเงินยกเลิก', preview.summary.counts.cancelledTransactions], ['งบประมาณ', preview.summary.counts.budgets], ['พอร์ตคริปโต', preview.summary.counts.portfolios], ['ประวัติคริปโต', preview.summary.counts.trades], ['ประวัติคริปโตยกเลิก', preview.summary.counts.cancelledTrades]].map(([label, count]) => <div key={String(label)}>{label}: {count}</div>)}</dl>
++        <dl className="grid gap-2 text-sm sm:grid-cols-2">{[['บัญชีเงินสด', preview.summary.cash.length],['พอร์ตหุ้น',preview.summary.stockCounts.portfolios],['ประวัติหุ้น',preview.summary.stockCounts.trades],['สินทรัพย์ประเมินเอง',preview.summary.stockCounts.manualAssets], ['หมวดหมู่', preview.summary.counts.categories], ['รายรับรายจ่าย', preview.summary.counts.transactions], ['รายการการเงินยกเลิก', preview.summary.counts.cancelledTransactions], ['งบประมาณ', preview.summary.counts.budgets], ['พอร์ตคริปโต', preview.summary.counts.portfolios], ['ประวัติคริปโต', preview.summary.counts.trades], ['ประวัติคริปโตยกเลิก', preview.summary.counts.cancelledTrades]].map(([label, count]) => <div key={String(label)}>{label}: {count}</div>)}</dl>
+         {preview.summary.cash.map(row => <p className="break-all text-sm" key={row.name}>{row.name}: {money(displayDecimal(row.balance))} THB · ยอด ณ {row.asOf}</p>)}
++        {preview.summary.stockHoldings.map(row=><p className="break-all text-sm" key={row.portfolioId+row.symbol}>{row.symbol}: {money(row.quantity)} หุ้น · ต้นทุน {money(row.totalCost)} · P&amp;L รับรู้ {money(row.realizedPnl)} USD</p>)}
++        {preview.summary.manual.map(row=><p className="break-all text-sm" key={row.name}>{row.name}: ประเมินด้วยตนเอง ณ {row.date} · {money(displayDecimal(row.value))} {row.currency} · ต้นทุน {row.cost===null?'ไม่ทราบ':money(displayDecimal(row.cost))} {row.currency}</p>)}
+         {preview.summary.months.map(row => <p className="break-all text-sm" key={row.month}>{row.month}: รายรับ {money(displayDecimal(row.income))} · รายจ่าย {money(displayDecimal(row.expense))} · คงเหลือ {money(displayDecimal(row.balance))} THB</p>)}
+         {preview.summary.holdings.map(row => <p className="break-all text-sm" key={`${row.portfolioId}|${row.asset}`}>{backup?.portfolios.find(p => p.id === row.portfolioId)?.name} · {row.asset}: {money(row.quantity)} · ต้นทุน {money(row.totalCost)} · P&amp;L รับรู้ {money(row.realizedPnl)} USDT</p>)}
+         {!preview.canRestore && <p role="alert" className="text-sm text-rose-700">บัญชีนี้มีข้อมูลแล้ว กู้คืนไม่ได้ ระบบจะไม่เขียนทับข้อมูลเดิม</p>}
+diff --git a/apps/web/src/tracker/Dashboard.tsx b/apps/web/src/tracker/Dashboard.tsx
+index 1bc646a..17fee48 100644
+--- a/apps/web/src/tracker/Dashboard.tsx
++++ b/apps/web/src/tracker/Dashboard.tsx
+@@ -5,7 +5,7 @@ import {
+   financeCorrectionSchema, tradeCorrectionSchema,
+   type FinanceOverview, type CryptoOverview, type MarketSnapshot,
+ } from '@finntech/contracts'
+-import { parseCryptoDecimal, serializeCrypto } from '@finntech/finance'
++import { parseCryptoDecimal, serializeCrypto, serializeThb } from '@finntech/finance'
+ import { displayDecimal, trackerRequest, TrackerRequestError } from './client'
+ import StockPrices from './StockPrices'
+ import Backup from './Backup'
+@@ -123,7 +123,7 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery =
+   useEffect(() => {
+     const now = Date.now()
+     const expiries = market.quotes.filter(quote => isFreshCryptoQuote(quote, now))
+-      .map(quote => Date.parse(quote.receivedAt!) + CRYPTO_PRICE_MAX_AGE_MS + 1)
++      .map(quote => Math.min(Date.parse(quote.receivedAt!),quote.observedAt?Date.parse(quote.observedAt):Infinity) + CRYPTO_PRICE_MAX_AGE_MS + 1)
+     if (expiries.length === 0) return
+     const timer = setTimeout(() => setMarketTime(Date.now()), Math.min(...expiries) - now)
+     return () => clearTimeout(timer)
+@@ -265,22 +265,22 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery =
+         const fresh = isFreshCryptoQuote(quote, marketTime)
+         let average = 'N/A', allocation = 'N/A'
+         try { if (h.totalCost && !parseCryptoDecimal(h.quantity).isZero()) average = `${money(displayDecimal(serializeCrypto(parseCryptoDecimal(h.totalCost).div(h.quantity))))} USDT`; if (completePrices && h.value && !total.isZero()) allocation = `${money(displayDecimal(serializeCrypto(parseCryptoDecimal(h.value).div(total).times('100'))))}%` } catch { /* Keep unavailable calculations N/A. */ }
+-        return <article key={h.asset} className="rounded-xl border border-slate-200 p-4"><div className="flex justify-between"><h4 className="font-semibold">{h.asset}</h4><span className="text-xs text-slate-500">{fresh ? 'ราคาอ้างอิงพร้อม' : quote?.price && quote.status !== 'UNAVAILABLE' ? 'ราคาล้าสมัย' : 'ราคาไม่พร้อม'}</span></div><dl className="mt-3 space-y-2 break-all text-sm"><div>ปริมาณ {money(displayDecimal(h.quantity, 0))}</div><div>ต้นทุน {h.totalCost === null ? 'N/A' : `${money(displayDecimal(h.totalCost))} USDT`}</div><div>ต้นทุนเฉลี่ย {money(average)}</div><div>{fresh ? 'ราคาอ้างอิง' : 'ราคาล่าสุดที่ได้รับ (ไม่ใช้คำนวณ)'} {quote?.price ? `${money(displayDecimal(quote.price))} USDT` : 'N/A'}</div><div>กำไร/ขาดทุนรับรู้ {h.realizedPnl === null ? 'N/A' : `${money(displayDecimal(h.realizedPnl))} USDT`}</div><div>กำไร/ขาดทุนยังไม่รับรู้ {h.unrealized === null ? 'N/A' : `${money(displayDecimal(h.unrealized))} USDT`}</div><div>สัดส่วนพอร์ต {money(allocation)}</div></dl></article>
++        return <article key={h.asset} className="rounded-xl border border-slate-200 p-4"><div className="flex justify-between"><h4 className="font-semibold">{h.asset}</h4><span className="text-xs text-slate-500">{fresh ? 'ราคาอ้างอิงพร้อม' : quote?.price && quote.status !== 'UNAVAILABLE' ? 'ราคาล้าสมัย' : 'ราคาไม่พร้อม'}</span></div><dl className="mt-3 space-y-2 break-all text-sm"><div>ปริมาณ {money(displayDecimal(h.quantity, 0))}</div><div>ต้นทุน {h.totalCost === null ? 'N/A' : `${money(displayDecimal(h.totalCost))} USDT`}</div><div>ต้นทุนเฉลี่ย {money(average)}</div><div>{fresh ? 'ราคาอ้างอิง' : 'ราคาล่าสุดที่ได้รับ (ไม่ใช้คำนวณ)'} {quote?.price ? `${money(displayDecimal(quote.price))} USDT` : 'N/A'}</div><div>มูลค่าประเมิน {h.value===null?'N/A':money(displayDecimal(h.value))} USDT</div><div>กำไร/ขาดทุนรับรู้ {h.realizedPnl === null ? 'N/A' : `${money(displayDecimal(h.realizedPnl))} USDT`}</div><div>กำไร/ขาดทุนยังไม่รับรู้ {h.unrealized === null ? 'N/A' : `${money(displayDecimal(h.unrealized))} USDT`}</div><div>ผลตอบแทนต้นทุน {h.unrealized!==null&&h.totalCost&&parseCryptoDecimal(h.totalCost).gt('0')?money(displayDecimal(serializeThb(parseCryptoDecimal(h.unrealized).div(h.totalCost).times('100')))):'N/A'}% · ไม่ใช่การเปลี่ยนแปลงราคาตลาด</div><div>สัดส่วนพอร์ต {money(allocation)}</div><div className="text-xs">Binance public · USDT · {quote?.kind==='TRADE'?'รายการซื้อขายต้นทาง':'snapshot ที่ดึงล่าสุด (ไม่มีเวลาซื้อขาย)'}<br/>เวลาต้นทาง: {quote?.observedAt??'N/A'}<br/>เวลารับ: {quote?.receivedAt??'N/A'} · ไม่มี feed/ไม่รองรับแสดง N/A</div></dl></article>
+       })}</div><p className="mt-4 text-xs text-slate-500">ราคาผ่าน backend · เกิน 30 วินาทีถือว่าล้าสมัย · ไม่รวมยอดกับ THB</p></section>
+       <div className="journal-crypto-editor"><section className={card}><h3 className="font-semibold">{editingTrade ? 'แก้ไขประวัติคริปโต' : 'บันทึกซื้อ/ขายในประวัติ'}</h3><form ref={tradeForm} aria-label="บันทึกคริปโต" className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={e => {
+         const entry = { side, quantity, price, fee, quoteCurrency: 'USDT', date: tradeDate }
+         if (editingTrade) submit(e, `crypto/trades/${editingTrade}/corrections`, tradeCorrectionSchema, { action: 'replace', reason: correctionReason, entry })
+         else submit(e, 'crypto/trades', tradeEntrySchema, { ...entry, portfolioId, asset })
+       }}>
+-        <label className="auth-label">สินทรัพย์<input className={input} required maxLength={32} value={asset} disabled={disabled || !portfolioId || !!editingTrade} onChange={e => setAsset(e.target.value)} /></label><label className="auth-label">ชนิดประวัติ<select className={input} value={side} disabled={disabled || !portfolioId} onChange={e => setSide(e.target.value as typeof side)}><option value="buy">ซื้อ</option><option value="sell">ขาย</option></select></label>
++        <label className="auth-label">สินทรัพย์<input className={input} required maxLength={32} list="crypto-asset-catalog" value={asset} disabled={disabled || !portfolioId || !!editingTrade} onChange={e => setAsset(e.target.value)} /></label><datalist id="crypto-asset-catalog">{market.catalog?.filter(row=>row.available).map(row=><option key={row.asset} value={row.asset}>{row.symbol} · USDT</option>)}</datalist><label className="auth-label">ชนิดประวัติ<select className={input} value={side} disabled={disabled || !portfolioId} onChange={e => setSide(e.target.value as typeof side)}><option value="buy">ซื้อ</option><option value="sell">ขาย</option></select></label>
+         <label className="auth-label">ปริมาณ<input className={input} inputMode="decimal" required value={quantity} disabled={disabled || !portfolioId} onChange={e => setQuantity(e.target.value)} /></label><label className="auth-label">ราคาต่อหน่วย USDT<input className={input} inputMode="decimal" required value={price} disabled={disabled || !portfolioId} onChange={e => setPrice(e.target.value)} /></label><label className="auth-label">ค่าธรรมเนียม USDT<input className={input} inputMode="decimal" required value={fee} disabled={disabled || !portfolioId} onChange={e => setFee(e.target.value)} /></label><label className="auth-label">วันที่ในประวัติ<input className={input} type="date" required value={tradeDate} disabled={disabled || !portfolioId} onChange={e => setTradeDate(e.target.value)} /></label>
+         {editingTrade && <label className="auth-label sm:col-span-2">เหตุผลการแก้ไข<input className={input} required maxLength={500} value={correctionReason} disabled={disabled} onChange={e => setCorrectionReason(e.target.value)} /></label>}
+         <button disabled={disabled || !portfolioId || !!voiding} className="auth-primary sm:col-span-2">{editingTrade ? 'บันทึกการแก้ไข' : 'บันทึกประวัติ'}</button>
+         {editingTrade && <button type="button" className="auth-secondary sm:col-span-2" disabled={disabled} onClick={cancelCorrection}>เลิกแก้ไข</button>}
+-      </form></section><section className={card}><h3 className="font-semibold">สร้างพอร์ตแยก</h3><form aria-label="สร้างพอร์ต" className="mt-5 space-y-4" onSubmit={e => submit(e, 'crypto/portfolios', portfolioInputSchema, { name: portfolioName, quoteCurrency: 'USDT' })}><label className="auth-label">ชื่อพอร์ต<input className={input} required maxLength={100} value={portfolioName} disabled={disabled} onChange={e => setPortfolioName(e.target.value)} /></label><button className="auth-secondary w-full" disabled={disabled}>สร้างพอร์ต</button></form><p className="mt-6 text-sm leading-7 text-slate-500">ต้นทุนแยกต่อพอร์ตและสินทรัพย์ ราคาปัจจุบันมีเฉพาะ BTC/ETH ที่ backend ยืนยันจาก Binance แล้ว สินทรัพย์อื่นยังบันทึกต้นทุนได้ แต่ราคาจะเป็น N/A</p></section></div>
++      </form></section><section className={card}><h3 className="font-semibold">สร้างพอร์ตแยก</h3><form aria-label="สร้างพอร์ต" className="mt-5 space-y-4" onSubmit={e => submit(e, 'crypto/portfolios', portfolioInputSchema, { name: portfolioName, quoteCurrency: 'USDT' })}><label className="auth-label">ชื่อพอร์ต<input className={input} required maxLength={100} value={portfolioName} disabled={disabled} onChange={e => setPortfolioName(e.target.value)} /></label><button className="auth-secondary w-full" disabled={disabled}>สร้างพอร์ต</button></form><p className="mt-6 text-sm leading-7 text-slate-500">ต้นทุนแยกต่อพอร์ตและสินทรัพย์ ค้นหา BTC, ETH, SOL, XRP, BNB, DOGE และ ADA จากรายชื่อที่ backend ยืนยันคู่ spot USDT แล้ว สินทรัพย์ไม่รองรับ/ถูกถอดยังเก็บประวัติไว้ แต่การประเมินเป็น N/A เริ่มถือครองเดิมด้วยประวัติซื้อและต้นทุนที่ทราบ ไม่หักเงินสดอัตโนมัติ</p></section></div>
+       <section className={`${card} journal-trade-history`}><h3 className="font-semibold">ประวัติของพอร์ต</h3><p className="mt-2 text-xs text-slate-500">การแก้ไขรักษาพอร์ตและสินทรัพย์เดิม เก็บต้นฉบับและคำนวณต้นทุนใหม่ทั้งประวัติ</p><div className="mt-4 space-y-3">{crypto?.trades.filter(t => t.portfolioId === portfolioId).map(t => <div key={t.id} className="flex flex-wrap justify-between gap-2 border-t border-slate-100 py-3 text-sm"><div><p className={`font-medium ${t.voidedAt ? 'text-slate-400 line-through' : ''}`}>{t.side === 'buy' ? 'ซื้อ' : 'ขาย'} {t.asset} · {t.date}</p><p className="mt-1 break-all text-slate-500">{money(t.quantity)} @ {money(displayDecimal(t.price))} USDT · fee {money(t.fee)}</p>{t.voidedAt && <p className="mt-1 break-all text-xs text-rose-700">ยกเลิกแล้ว · ไม่รวมยอด · {t.voidReason}</p>}</div>{!t.voidedAt && <><div className="flex gap-3"><button type="button" className="text-teal-700" disabled={disabled} onClick={() => editTrade(t)}>แก้ไขประวัติ</button><button type="button" className="text-rose-700" disabled={disabled} onClick={() => { cancelCorrection(); setVoiding({ kind: 'crypto', id: t.id, label: `${t.side === 'buy' ? 'ซื้อ' : 'ขาย'} ${t.asset} ${money(t.quantity)}` }) }}>ยกเลิกประวัติ</button></div>{t.side === 'sell' && <p className="break-all">P&amp;L {money(t.realizedPnl ?? 'N/A')} USDT</p>}</>}</div>)}</div></section>
+     </div>}
+-    {section === 'stocks' && <StockPrices expired={expired} />}
++    {section === 'stocks' && <StockPrices expired={expired} lock={setBackupLocked} blocked={authBusy}/>}
+     {section === 'backup' && <Backup lock={setBackupLocked} expired={expired} restored={async () => { await load() }} />}
+     <p className="text-xs leading-6 text-slate-500">ข้อมูล DEMO เดิมยังอยู่ที่ต้นทาง ไม่มีการย้ายหรือรวมยอดอัตโนมัติ เวอร์ชันนี้ยังไม่เปิดการนำเข้า legacy</p>
+   </main></div>
+diff --git a/apps/web/src/tracker/ManualAssets.tsx b/apps/web/src/tracker/ManualAssets.tsx
+new file mode 100644
+index 0000000..9cf7bb8
+--- /dev/null
++++ b/apps/web/src/tracker/ManualAssets.tsx
+@@ -0,0 +1,29 @@
++import { useEffect,useState } from 'react'
++import { manualAssetInputSchema,manualAssetUpdateSchema,manualAssetOverviewSchema,type ManualAssetOverview } from '@finntech/contracts'
++import { usePresentation } from '../presentation'
++import { trackerRequest,TrackerRequestError,displayDecimal } from './client'
++import { useOwnedWrite } from './useOwnedWrite'
++import {parseCryptoDecimal,serializeCrypto} from '@finntech/finance'
++const today=()=>new Date(Date.now()+7*3600000).toISOString().slice(0,10)
++export default function ManualAssets({lock,expired,changed,blocked=false}:{lock:(v:boolean)=>void;expired:()=>void;changed:()=>void;blocked?:boolean}){
++ const {money}=usePresentation(),[data,setData]=useState<ManualAssetOverview|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('')
++ const [editing,setEditing]=useState<ManualAssetOverview['assets'][number]|null>(null),[name,setName]=useState(''),[type,setType]=useState<'GOLD'|'PROPERTY'|'OTHER'>('OTHER'),[currency,setCurrency]=useState<'THB'|'USD'|'USDT'>('THB')
++ const [quantity,setQuantity]=useState(''),[unit,setUnit]=useState(''),[cost,setCost]=useState(''),[value,setValue]=useState(''),[date,setDate]=useState(today()),[note,setNote]=useState('')
++ async function load(){setLoading(true);try{setData(manualAssetOverviewSchema.parse(await trackerRequest('assets/manual')));setError('')}catch(e){setData(null);setError('โหลดสินทรัพย์ประเมินเองไม่สำเร็จ');if(e instanceof TrackerRequestError&&e.expired)expired()}finally{setLoading(false)}}
++ function clear(){setEditing(null);setName('');setQuantity('');setUnit('');setCost('');setValue('');setNote('');setDate(today())}
++ const write=useOwnedWrite(lock,expired,async()=>{await load();changed()},clear);useEffect(()=>{void load()},[])
++ const disabled=loading||!data||blocked||write.busy||!!write.pending,display=(v:string|null)=>v===null?'ไม่ทราบ':money(displayDecimal(v))
++ const datedDifference=(value:string,cost:string|null)=>{try{return cost===null?'ไม่ทราบ':display(serializeCrypto(parseCryptoDecimal(value).minus(cost)))}catch{return 'N/A'}}
++ return <section className="tracker-card rounded-2xl p-5 space-y-4" aria-label="สินทรัพย์ประเมินด้วยตนเอง"><h2 className="text-xl font-semibold">สินทรัพย์อื่น · ประเมินด้วยตนเอง</h2><p className="text-sm">มูลค่าที่กรอกเป็นยอดรวม ณ วันที่ประเมิน ไม่ใช่ราคาตลาดสด ไม่คูณจำนวนซ้ำ ไม่หักเงินสด และไม่มี feed ทอง/อสังหาริมทรัพย์</p>
++  {!loading&&data?.assets.length===0&&<p>ยังไม่มีสินทรัพย์ประเมินเอง</p>}{data?.assets.map(row=><article key={row.id} className="border-t pt-4 break-all"><h3 className="font-semibold">{row.name}</h3><p>ประเมินด้วยตนเอง ณ {row.date} · {display(row.value)} {row.currency}</p><p>ต้นทุน {display(row.cost)} {row.currency} · จำนวน {display(row.quantity)} {row.unit}</p><p>ส่วนต่างมูลค่าประเมินกับต้นทุน {datedDifference(row.value,row.cost)} {row.currency} · ณ วันที่ประเมิน ไม่ใช่กำไรรับรู้</p><p>{row.note}</p><button className="auth-secondary mt-3" disabled={disabled} onClick={()=>{setEditing(row);setName(row.name);setType(row.type);setCurrency(row.currency);setQuantity(row.quantity??'');setUnit(row.unit);setCost(row.cost??'');setValue(row.value);setDate(row.date);setNote(row.note)}}>แก้ไขมูลค่าประเมิน</button></article>)}
++  <form aria-label="บันทึกสินทรัพย์ประเมินเอง" className="grid gap-4 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();if(disabled)return;const asset={name,type,currency,quantity:quantity||null,unit,cost:cost||null,value,date,note};if(editing)write.submit(`assets/manual/${editing.id}`,manualAssetUpdateSchema,{asset,expectedVersion:editing.version},'PATCH');else write.submit('assets/manual',manualAssetInputSchema,asset)}}>
++   <label className="auth-label">ชื่อสินทรัพย์อื่น<input className="auth-input" required maxLength={100} disabled={disabled} value={name} onChange={e=>setName(e.target.value)}/></label>
++   <label className="auth-label">ประเภทสินทรัพย์<select className="auth-input" disabled={disabled} value={type} onChange={e=>setType(e.target.value as typeof type)}><option value="OTHER">อื่น ๆ</option><option value="GOLD">ทองคำ</option><option value="PROPERTY">อสังหาริมทรัพย์</option></select></label>
++   <label className="auth-label">สกุลมูลค่าประเมิน<select className="auth-input" disabled={disabled} value={currency} onChange={e=>setCurrency(e.target.value as typeof currency)}>{['THB','USD','USDT'].map(v=><option key={v}>{v}</option>)}</select></label>
++   {([['จำนวน (ถ้าทราบ)',quantity,setQuantity],['ต้นทุนรวม (ถ้าทราบ)',cost,setCost],['มูลค่าประเมินรวม',value,setValue]] as const).map(([label,v,set])=><label key={label} className="auth-label">{label}<input className="auth-input" inputMode="decimal" required={label==='มูลค่าประเมินรวม'} disabled={disabled} value={v} onChange={e=>set(e.target.value)}/></label>)}
++   <label className="auth-label">หน่วยจำนวน<input className="auth-input" maxLength={32} disabled={disabled} value={unit} onChange={e=>setUnit(e.target.value)} placeholder="เช่น กรัม หรือ แปลง"/></label>
++   <label className="auth-label">วันที่ประเมิน<input className="auth-input" type="date" required disabled={disabled} value={date} onChange={e=>setDate(e.target.value)}/></label><label className="auth-label">บันทึกสินทรัพย์<input className="auth-input" maxLength={500} disabled={disabled} value={note} onChange={e=>setNote(e.target.value)}/></label>
++   <button className="auth-primary" disabled={disabled}>{editing?'บันทึกมูลค่าใหม่':'เพิ่มสินทรัพย์ประเมินเอง'}</button>{editing&&<button type="button" className="auth-secondary" disabled={disabled} onClick={clear}>เลิกแก้ไขสินทรัพย์</button>}
++  </form>{loading&&<p role="status">กำลังโหลดสินทรัพย์ประเมินเอง…</p>}{error&&<><p role="alert">{error}</p><button className="auth-secondary" disabled={write.busy||!!write.pending||blocked} onClick={()=>{void load()}}>โหลดสินทรัพย์ประเมินเองอีกครั้ง</button></>}{write.message&&<p role="alert">{write.message}</p>}{write.pending&&<><p role="status">ยังไม่ทราบผล ห้ามสร้างคำขอใหม่ ตรวจ payload และ key เดิม</p><button className="auth-primary" disabled={write.busy} onClick={write.retry}>ตรวจผลสินทรัพย์ด้วยคำขอเดิม</button></>}
++ </section>
++}
+diff --git a/apps/web/src/tracker/PageIntro.tsx b/apps/web/src/tracker/PageIntro.tsx
+index 7c4551c..efc457a 100644
+--- a/apps/web/src/tracker/PageIntro.tsx
++++ b/apps/web/src/tracker/PageIntro.tsx
+@@ -2,11 +2,11 @@ import type { ReactNode } from 'react'
+ import { sectionTitle, type Section } from './TrackerNavigation'
+ 
+ const copy: Record<Section, [string, string]> = {
+-  assets: ['YOUR PERSONAL MONEY JOURNAL', 'มองเห็นสิ่งที่มี · เงินสดและคริปโตที่บันทึกด้วยตัวเอง'],
++  assets: ['YOUR PERSONAL MONEY JOURNAL', 'เงินสด คริปโต หุ้น และสินทรัพย์ประเมินเอง · แยกสกุลและวันที่'],
+   finance: ['EVERYDAY RECORDS', 'ค่อย ๆ บันทึก แล้วภาพรวมจะชัดขึ้น · รายรับรายจ่ายใช้ THB'],
+   budget: ['A PLAN FOR THIS MONTH', 'วางแผนสิ่งที่ใช้ · งบประมาณไม่สร้างรายการรายจ่าย'],
+   crypto: ['YOUR INVESTMENT RECORDS', 'ติดตามต้นทุนและประวัติ · USDT แยกต่อพอร์ต ไม่มีการส่งคำสั่งซื้อขาย'],
+-  stocks: ['MARKET WATCHLIST', 'ติดตามราคาหุ้นใน USD · ไม่ใช่รายการสินทรัพย์ที่ถือจริง'],
++  stocks: ['YOUR STOCK RECORDS', 'บันทึกหุ้นและ ETF · ต้นทุน/ประวัติ USD แยกจาก watchlist'],
+   backup: ['TAKE CARE OF YOUR RECORDS', 'เก็บสำเนาข้อมูลของคุณ · ตรวจไฟล์ก่อนกู้คืนเสมอ'],
+   account: ['YOUR PERSONAL SPACE', 'บัญชีและการดูแลข้อมูล · เก็บสำเนาไว้ในที่ส่วนตัว'],
+ }
+diff --git a/apps/web/src/tracker/StockHoldings.tsx b/apps/web/src/tracker/StockHoldings.tsx
+new file mode 100644
+index 0000000..2b8b672
+--- /dev/null
++++ b/apps/web/src/tracker/StockHoldings.tsx
+@@ -0,0 +1,47 @@
++import { useEffect,useState,type FormEvent } from 'react'
++import { STOCK_INSTRUMENTS,stockOverviewSchema,stockPortfolioInputSchema,stockTradeEntrySchema,stockCorrectionSchema,type StockOverview,type StockMarketSnapshot } from '@finntech/contracts'
++import { parseCryptoDecimal,serializeCrypto,serializeThb,valuePosition } from '@finntech/finance'
++import { trackerRequest,TrackerRequestError,displayDecimal } from './client'
++import { usePresentation } from '../presentation'
++import { useOwnedWrite } from './useOwnedWrite'
++import ModalDialog from './ModalDialog'
++const today=()=>new Date(Date.now()+7*3600000).toISOString().slice(0,10)
++export default function StockHoldings({snapshot,now,lock,expired,blocked=false}:{snapshot:StockMarketSnapshot|null;now:number;lock:(v:boolean)=>void;expired:()=>void;blocked?:boolean}){
++ const {money}=usePresentation(),[data,setData]=useState<StockOverview|null>(null),[loading,setLoading]=useState(true),[loadError,setLoadError]=useState('')
++ const [portfolio,setPortfolio]=useState(''),[name,setName]=useState(''),[symbol,setSymbol]=useState('AAPL'),[side,setSide]=useState<'buy'|'sell'>('buy')
++ const [quantity,setQuantity]=useState(''),[price,setPrice]=useState(''),[fee,setFee]=useState('0'),[date,setDate]=useState(today()),[note,setNote]=useState('')
++ const [editing,setEditing]=useState<string|null>(null),[voiding,setVoiding]=useState<string|null>(null),[reason,setReason]=useState('')
++ async function load(){setLoading(true);try{setData(stockOverviewSchema.parse(await trackerRequest('stocks')));setLoadError('')}catch(e){setData(null);setLoadError('โหลดประวัติหุ้นไม่สำเร็จ');if(e instanceof TrackerRequestError&&e.expired)expired()}finally{setLoading(false)}}
++ const write=useOwnedWrite(lock,expired,load,()=>{cancel();setQuantity('');setPrice('');setNote('');setName('')});useEffect(()=>{void load()},[])
++ const disabled=blocked||loading||!data||write.busy||!!write.pending
++ const display=(v:string|null)=>v===null?'N/A':money(displayDecimal(v))
++ const rows=(data?.holdings??[]).filter(row=>row.portfolioId===portfolio).map(row=>{
++  const q=snapshot?.quotes.find(q=>q.symbol===row.symbol),fresh=q?.status==='LIVE'&&q.observedAt&&q.receivedAt&&now-Date.parse(q.observedAt)>=0&&now-Date.parse(q.observedAt)<=30000&&now-Date.parse(q.receivedAt)>=0&&now-Date.parse(q.receivedAt)<=30000
++  try{return {...row,...valuePosition(row.quantity,row.totalCost,fresh?q!.price:null),reference:q??null,fresh:!!fresh}}catch{return {...row,averageCost:null,value:null,unrealized:null,returnPercent:null,reference:q??null,fresh:false}}
++ })
++ let total:string|null=null;try{if(portfolio&&rows.every(row=>row.value!==null))total=serializeCrypto(rows.reduce((sum,row)=>sum.plus(row.value!),parseCryptoDecimal('0')))}catch{/* Overflow stays unavailable. */}
++ function cancel(){setEditing(null);setVoiding(null);setReason('')}
++ function submit(e:FormEvent){e.preventDefault();if(disabled||!portfolio)return;const entry={side,quantity,price,fee,date,note,quoteCurrency:'USD'};if(editing)write.submit(`stocks/trades/${editing}/corrections`,stockCorrectionSchema,{action:'replace',reason,entry});else write.submit('stocks/trades',stockTradeEntrySchema,{...entry,portfolioId:portfolio,symbol})}
++ const feedback=<>{write.message&&<p role="alert">{write.message}</p>}{write.pending&&<div className="tracker-card p-4"><p role="status">ยังไม่ทราบผลหุ้น ตรวจคำขอและ key เดิมก่อนเปลี่ยนหน้า</p><button className="auth-primary mt-3" disabled={write.busy} onClick={write.retry}>ตรวจผลหุ้นด้วยคำขอเดิม</button></div>}</>
++ return <section className="space-y-5" aria-label="พอร์ตหุ้นและ ETF">
++  <section className="tracker-card rounded-2xl p-5"><h2 className="text-xl font-semibold">หุ้นและ ETF ที่คุณบันทึก · USD</h2><p className="mt-2 text-sm">ติดตามสิ่งที่ถืออยู่ภายนอก ไม่มีการส่งคำสั่งหรือหักเงินสด ไม่รองรับ split/dividend หรือ corporate actions อัตโนมัติ</p>
++   <label className="auth-label mt-4">พอร์ตหุ้น<select className="auth-input" value={portfolio} disabled={disabled||!!editing} onChange={e=>setPortfolio(e.target.value)}><option value="">เลือกพอร์ต</option>{data?.portfolios.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
++   <p className="mt-4 break-all">มูลค่าประเมินของพอร์ต: {display(total)} USD · {total===null?'ข้อมูลราคายังไม่ครบ':'ครบตามรายการที่บันทึก'}</p>
++   {!rows.length&&<p className="mt-4">ยังไม่มีการถือครองในพอร์ตที่เลือก</p>}
++   <div className="mt-4 grid gap-4 sm:grid-cols-2">{rows.map(row=>{let allocation:string|null=null;try{if(total&&row.value&&parseCryptoDecimal(total).gt('0'))allocation=serializeThb(parseCryptoDecimal(row.value).div(total).times('100'))}catch{};return <article key={row.symbol} className="tracker-card rounded-xl p-4 break-all"><h3 className="font-semibold">{row.symbol}</h3><p>จำนวน {display(row.quantity)} หุ้น</p><p>ต้นทุน {display(row.totalCost)} USD · เฉลี่ย {display(row.averageCost)} USD</p><p>มูลค่าประเมิน {display(row.value)} USD</p><p>ราคาอ้างอิง {row.fresh?display(row.reference!.price):'N/A'} USD/หุ้น</p><p className='text-xs'>Alpaca IEX · เวลาต้นทาง {row.reference?.observedAt??'N/A'}<br/>เวลารับ {row.reference?.receivedAt??'N/A'}</p><p>กำไร/ขาดทุนรับรู้ {display(row.realizedPnl)} USD</p><p>ยังไม่รับรู้ {display(row.unrealized)} USD · ผลตอบแทน {display(row.returnPercent)}%</p><p>สัดส่วน {display(allocation)}%</p><p className="mt-2 text-sm">{row.value===null?'ไม่มีราคาสดที่บัญชีนี้มีสิทธิ์ใช้ ต้นทุนและประวัติยังครบ':'ราคาอ้างอิง Alpaca IEX · USD'}</p></article>})}</div>
++  </section>
++  <section className="tracker-card rounded-2xl p-5"><h3 className="font-semibold">สร้างพอร์ตหุ้น</h3><form className="mt-4 flex flex-wrap gap-3" aria-label="สร้างพอร์ตหุ้น" onSubmit={e=>{e.preventDefault();if(!disabled)write.submit('stocks/portfolios',stockPortfolioInputSchema,{name,quoteCurrency:'USD'})}}><label className="auth-label flex-1">ชื่อพอร์ตหุ้น<input required maxLength={100} className="auth-input" value={name} disabled={disabled} onChange={e=>setName(e.target.value)}/></label><button className="auth-secondary" disabled={disabled}>สร้างพอร์ตหุ้น</button></form></section>
++  <section className="tracker-card rounded-2xl p-5"><h3 className="font-semibold">{editing?'แก้ไขประวัติหุ้น':'บันทึกประวัติซื้อ/ขายหุ้น'}</h3><p className="mt-2 text-sm">เริ่มตำแหน่งที่ถืออยู่ด้วยประวัติซื้อ ระบุวันที่ จำนวน และต้นทุนจริงที่ทราบ ค่าธรรมเนียมเป็น USD · วันเดียวกันเรียงตามลำดับบันทึก การแก้ไขคงลำดับเดิมและย้อนคำนวณทั้งประวัติ</p>
++   <form aria-label="บันทึกประวัติหุ้น" className="mt-4 grid gap-4 sm:grid-cols-2" onSubmit={submit}>
++    <label className="auth-label">หลักทรัพย์ US / USD<input className="auth-input" list="stock-instruments" required value={symbol} disabled={disabled||!!editing} onChange={e=>setSymbol(e.target.value.toUpperCase())}/><datalist id="stock-instruments">{STOCK_INSTRUMENTS.map(row=><option key={row.symbol} value={row.symbol}>{row.name} · {row.kind}</option>)}</datalist></label>
++    <label className="auth-label">ชนิดประวัติหุ้น<select className="auth-input" value={side} disabled={disabled} onChange={e=>setSide(e.target.value as typeof side)}><option value="buy">ซื้อ</option><option value="sell">ขาย</option></select></label>
++    {([['จำนวนหุ้น (รวมเศษหุ้น)',quantity,setQuantity],['ราคาประวัติต่อหุ้น USD',price,setPrice],['ค่าธรรมเนียม USD',fee,setFee]] as const).map(([label,value,set])=><label key={label} className="auth-label">{label}<input className="auth-input" inputMode="decimal" required disabled={disabled} value={value} onChange={e=>set(e.target.value)}/></label>)}
++    <label className="auth-label">วันที่ประวัติหุ้น<input className="auth-input" type="date" required disabled={disabled} value={date} onChange={e=>setDate(e.target.value)}/></label><label className="auth-label">บันทึกหุ้น<input className="auth-input" maxLength={500} value={note} disabled={disabled} onChange={e=>setNote(e.target.value)}/></label>
++    {editing&&<label className="auth-label">เหตุผลแก้ไขหุ้น<input className="auth-input" required maxLength={500} value={reason} disabled={disabled} onChange={e=>setReason(e.target.value)}/></label>}
++    <button className="auth-primary" disabled={disabled||!portfolio}>บันทึกประวัติหุ้น</button>{editing&&<button type="button" className="auth-secondary" disabled={disabled} onClick={cancel}>เลิกแก้ไขหุ้น</button>}
++   </form></section>
++  <section className="tracker-card rounded-2xl p-5"><h3 className="font-semibold">ประวัติพอร์ตหุ้น</h3>{data?.trades.filter(t=>t.portfolioId===portfolio).map(row=><article key={row.id} className="mt-4 border-t pt-4 break-all"><p>{row.date} · {row.side==='buy'?'ซื้อ':'ขาย'} {row.symbol} · {display(row.quantity)} @ {display(row.price)} USD · fee {display(row.fee)} USD</p><p>{row.note}</p>{row.voidedAt?<p>ยกเลิกแล้ว · {row.voidReason}</p>:<div className="mt-2 flex flex-wrap gap-3"><button className="auth-secondary" disabled={disabled} onClick={()=>{setEditing(row.id);setSymbol(row.symbol);setSide(row.side);setQuantity(row.quantity);setPrice(row.price);setFee(row.fee);setDate(row.date);setNote(row.note);setReason('')}}>แก้ไขประวัติหุ้น</button><button className="auth-secondary" disabled={disabled} onClick={()=>{setVoiding(row.id);setReason('')}}>ยกเลิกประวัติหุ้น</button></div>}</article>)}</section>
++  {loading&&<p role="status">กำลังโหลดหุ้น…</p>}{loadError&&<><p role="alert">{loadError}</p><button className="auth-secondary" disabled={write.busy||!!write.pending||blocked} onClick={()=>{void load()}}>โหลดประวัติหุ้นอีกครั้ง</button></>}{!voiding&&feedback}
++  {voiding&&<ModalDialog title="ยกเลิกประวัติหุ้น" closeDisabled={write.busy||!!write.pending} onDismiss={cancel}><form onSubmit={e=>{e.preventDefault();if(!disabled)write.submit(`stocks/trades/${voiding}/corrections`,stockCorrectionSchema,{action:'void',reason})}}><label className="auth-label mt-3">เหตุผลยกเลิกหุ้น<input className="auth-input" required maxLength={500} disabled={disabled} value={reason} onChange={e=>setReason(e.target.value)}/></label><p className="mt-3">เก็บต้นฉบับ การขายเกินจำนวนหลังยกเลิกจะถูกปฏิเสธ</p><button className="auth-primary mt-4" disabled={disabled}>ยืนยันยกเลิกหุ้น</button></form><div className="mt-4 space-y-3">{feedback}</div></ModalDialog>}
++ </section>
++}
+diff --git a/apps/web/src/tracker/StockPrices.tsx b/apps/web/src/tracker/StockPrices.tsx
+index 3e36f1f..92ad3d8 100644
+--- a/apps/web/src/tracker/StockPrices.tsx
++++ b/apps/web/src/tracker/StockPrices.tsx
+@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
+ import { usePresentation } from '../presentation'
+ import { stockMarketSnapshotSchema, type StockMarketSnapshot } from '@finntech/contracts'
+ import { displayDecimal, trackerRequest, TrackerRequestError } from './client'
++import StockHoldings from './StockHoldings'
+ 
+ const connectionLabels: Record<StockMarketSnapshot['connection'], string> = {
+   NOT_CONFIGURED: 'ยังไม่ได้ตั้งค่า Alpaca key ฝั่ง server', CONNECTING: 'กำลังเชื่อมต่อข้อมูล IEX',
+@@ -9,7 +10,7 @@ const connectionLabels: Record<StockMarketSnapshot['connection'], string> = {
+ }
+ const clock = (value: string) => new Date(value).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+ 
+-export default function StockPrices({ expired }: { expired: () => void }): JSX.Element {
++export default function StockPrices({ expired,lock=()=>{},blocked=false }: { expired: () => void;lock?:(value:boolean)=>void;blocked?:boolean }): JSX.Element {
+   const { money } = usePresentation()
+   const [snapshot, setSnapshot] = useState<StockMarketSnapshot | null>(null)
+   const [message, setMessage] = useState('')
+@@ -55,17 +56,19 @@ export default function StockPrices({ expired }: { expired: () => void }): JSX.E
+   }, [])
+ 
+   return <section className="space-y-5" aria-label="ราคาหุ้นสหรัฐ">
++    <StockHoldings snapshot={snapshot} now={viewTime} expired={expired} lock={lock} blocked={blocked}/>
+     <div className="journal-stock-intro tracker-card rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+       <h2 className="text-xl font-semibold">ติดตามหุ้นและ ETF สหรัฐ · USD</h2>
+       <p className="mt-2 text-sm leading-7 text-slate-600">Alpaca Basic · ราคา last trade จาก IEX เท่านั้น ไม่ใช่ราคาครบทุกตลาดสหรัฐ · สูงสุด 30 หลักทรัพย์</p>
+-      <p className="mt-2 text-sm leading-7 text-slate-600">รายชื่อเริ่มต้นสำหรับติดตามราคา ไม่ใช่รายการที่คุณถือจริง ยังไม่มีการบันทึกต้นทุนหรือคำนวณ P&amp;L ของหุ้น และไม่รวมยอดกับ THB/USDT</p>
++      <p className="mt-2 text-sm leading-7 text-slate-600">Watchlist ไม่ใช่รายการที่คุณถือจริง แยกจากการถือครอง ไม่รวมยอดตามรายชื่อที่ติดตาม ราคา IEX ใช้ได้เฉพาะเจ้าของ key ตามสิทธิ์เดิม ผู้ใช้ทั่วไปบันทึกต้นทุนและประวัติได้แม้ราคา N/A</p>
+       <p role="status" className="mt-4 text-sm font-medium text-teal-800">{message || (snapshot ? connectionLabels[snapshot.connection] : 'กำลังตรวจการเชื่อมต่อ…')}</p>
+       {snapshot?.connection === 'NOT_CONFIGURED' && <p className="mt-2 text-sm leading-7 text-slate-600">เจ้าของต้องรับ key ฟรีจาก Alpaca และตั้งค่าเฉพาะฝั่ง server ก่อน ไม่ต้องส่ง key หรือ secret ในแชต ระบบไม่แสดงราคาจำลอง</p>}
+     </div>
+     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+       {snapshot?.quotes.map(quote => {
+-        const fresh = quote.status === 'LIVE' && quote.observedAt !== null
+-          && viewTime - Date.parse(quote.observedAt) <= 30_000
++        const fresh = quote.status === 'LIVE' && quote.observedAt !== null && quote.receivedAt!==null
++          && viewTime - Date.parse(quote.observedAt) >=0 && viewTime - Date.parse(quote.observedAt) <= 30_000
++          && viewTime - Date.parse(quote.receivedAt)>=0 && viewTime - Date.parse(quote.receivedAt)<=30_000
+         return <article key={quote.symbol} aria-label={`ราคา ${quote.symbol}`} className="tracker-card rounded-2xl border border-slate-200 bg-white p-5">
+           <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{quote.symbol}</h3><span className="text-xs text-slate-500">{fresh ? 'ราคาสด IEX' : quote.price ? 'ราคาเก่า / ตลาดอาจปิด' : 'ราคาไม่พร้อม'}</span></div>
+           <p className="mt-3 break-all text-xl font-semibold tabular-nums">{quote.price ? money(displayDecimal(quote.price)) : 'N/A'} <span className="text-xs text-slate-400">USD</span></p>
+diff --git a/apps/web/src/tracker/marketFreshness.ts b/apps/web/src/tracker/marketFreshness.ts
+index e13c634..aae9d0c 100644
+--- a/apps/web/src/tracker/marketFreshness.ts
++++ b/apps/web/src/tracker/marketFreshness.ts
+@@ -6,5 +6,6 @@ type CryptoQuote = MarketSnapshot['quotes'][number]
+ export function isFreshCryptoQuote(quote: CryptoQuote | undefined, now: number): boolean {
+   if (quote?.status !== 'LIVE' || quote.price === null || quote.receivedAt === null) return false
+   const age = now - Date.parse(quote.receivedAt)
+-  return Number.isFinite(age) && age >= 0 && age <= CRYPTO_PRICE_MAX_AGE_MS
++  const observedAge = quote.observedAt ? now - Date.parse(quote.observedAt) : age
++  return Number.isFinite(age) && age >= 0 && age <= CRYPTO_PRICE_MAX_AGE_MS && Number.isFinite(observedAge) && observedAge >= 0 && observedAge <= CRYPTO_PRICE_MAX_AGE_MS
+ }
+diff --git a/apps/web/src/tracker/useOwnedWrite.ts b/apps/web/src/tracker/useOwnedWrite.ts
+new file mode 100644
+index 0000000..06ebc99
+--- /dev/null
++++ b/apps/web/src/tracker/useOwnedWrite.ts
+@@ -0,0 +1,21 @@
++import { useEffect,useRef,useState } from 'react'
++import { trackerRequest,TrackerRequestError } from './client'
++type Pending={path:string;body:unknown;key:string;method:string}
++/** Unknown outcomes retain exactly the validated payload/key and keep parent navigation locked. */
++export function useOwnedWrite(lock:(value:boolean)=>void,expired:()=>void,refresh:()=>Promise<void>,completed?:()=>void){
++ const [busy,setBusy]=useState(false),[pending,setPending]=useState<Pending|null>(null),[message,setMessage]=useState(''),writing=useRef(false)
++ useEffect(()=>{lock(busy||!!pending);return()=>lock(false)},[busy,pending,lock])
++ async function send(request:Pending){
++  if(writing.current)return
++  writing.current=true;lock(true);setBusy(true);setMessage('')
++  try{await trackerRequest(request.path,request.method,request.body,request.key);setPending(null);completed?.();setMessage('บันทึกสำเร็จ');await refresh()}
++  catch(error){setMessage(error instanceof Error?error.message:'บันทึกไม่สำเร็จ');if(error instanceof TrackerRequestError&&error.unknownOutcome)setPending(request);else{setPending(null);if(error instanceof TrackerRequestError&&error.expired)expired();else await refresh()}}
++  finally{writing.current=false;setBusy(false)}
++ }
++ function submit(path:string,schema:{safeParse:(body:unknown)=>{success:boolean;data?:unknown}},body:unknown,method='POST'){
++  if(writing.current||busy||pending)return
++  const parsed=schema.safeParse(body);if(!parsed.success){setMessage('ตรวจข้อมูล จำนวนเงิน วันที่ และหน่วยอีกครั้ง');return}
++  void send({path,body:parsed.data,key:globalThis.crypto.randomUUID(),method})
++ }
++ return {busy,pending,message,setMessage,submit,retry:()=>{if(pending)void send(pending)}}
++}
+diff --git a/packages/contracts/src/index.ts b/packages/contracts/src/index.ts
+index 7a53bd6..ba5fa4e 100644
+--- a/packages/contracts/src/index.ts
++++ b/packages/contracts/src/index.ts
+@@ -137,12 +137,13 @@ export const cryptoOverviewSchema = z.object({
+   trades: z.array(z.object({ id: resourceIdSchema, portfolioId: resourceIdSchema, asset: z.string(), side: z.enum(['buy', 'sell']), quantity: z.string(), price: z.string(), fee: z.string(), realizedPnl: z.string().nullable(), date: calendarDateSchema, ...correctionViewFields })),
+ })
+ export type CryptoOverview = z.infer<typeof cryptoOverviewSchema>
+-export const providerMetadataSchema = z.object({ symbols: z.array(z.object({ symbol: z.string(), baseAsset: z.string(), quoteAsset: z.string(), status: z.string() })) })
++export const providerMetadataSchema = z.object({ symbols: z.array(z.object({ symbol: z.string(), baseAsset: z.string(), quoteAsset: z.string(), status: z.string(),isSpotTradingAllowed:z.boolean().optional() })) })
+ export const providerPriceSchema = z.object({ symbol: z.string(), price: positiveCryptoAmount })
+ export const marketSnapshotSchema = z.object({ quotes: z.array(z.object({
+-  asset: z.enum(['BTC', 'ETH']), price: positiveCryptoAmount.nullable(),
++  asset: z.string().regex(/^[A-Z0-9]{1,20}$/), price: positiveCryptoAmount.nullable(),
+   status: z.enum(['LIVE', 'STALE', 'UNAVAILABLE']), receivedAt: z.string().datetime().nullable(), source: z.literal('Binance public'),
+-})) })
++  observedAt: z.string().datetime().nullable().optional(), kind: z.enum(['TRADE', 'REST_SNAPSHOT']).optional(), quoteCurrency: z.literal('USDT').optional(),
++})).max(7), catalog: z.array(z.object({asset:z.string(),symbol:z.string(),quoteCurrency:z.literal('USDT'),available:z.boolean()})).max(7).optional() })
+ export type MarketSnapshot = z.infer<typeof marketSnapshotSchema>
+ 
+ // USD price observations are separate from the USDT ledger; this is a watchlist, not ownership.
+@@ -170,6 +171,35 @@ export const referenceRateSchema = z.object({ base: z.literal('USDT'), quote: z.
+ })
+ export type ReferenceRate = z.infer<typeof referenceRateSchema>
+ 
++// Bounded US instrument identity catalog, separate from following a market price.
++export const STOCK_INSTRUMENTS = [
++  { symbol:'AAPL', name:'Apple Inc.', kind:'STOCK' }, { symbol:'MSFT', name:'Microsoft Corporation', kind:'STOCK' },
++  { symbol:'NVDA', name:'NVIDIA Corporation', kind:'STOCK' }, { symbol:'AMZN', name:'Amazon.com Inc.', kind:'STOCK' },
++  { symbol:'GOOGL', name:'Alphabet Class A', kind:'STOCK' }, { symbol:'TSLA', name:'Tesla Inc.', kind:'STOCK' },
++  { symbol:'SPY', name:'SPDR S&P 500 ETF Trust', kind:'ETF' }, { symbol:'QQQ', name:'Invesco QQQ Trust', kind:'ETF' },
++] as const
++export const stockPortfolioInputSchema = portfolioInputSchema.omit({quoteCurrency:true}).extend({quoteCurrency:z.literal('USD')}).strict()
++export const stockTradeEntrySchema = tradeEntrySchema.omit({quoteCurrency:true,asset:true}).extend({
++  quoteCurrency:z.literal('USD'), symbol:stockSymbolSchema.refine(symbol=>STOCK_INSTRUMENTS.some(row=>row.symbol===symbol),'Unsupported instrument identity'), note:z.string().trim().max(500).default(''),
++}).strict()
++export const stockCorrectionSchema = z.discriminatedUnion('action',[
++ z.object({action:z.literal('replace'),reason:correctionReasonSchema,entry:stockTradeEntrySchema.omit({portfolioId:true,symbol:true}).strict()}).strict(),
++ z.object({action:z.literal('void'),reason:correctionReasonSchema}).strict(),
++])
++export const stockOverviewSchema = z.object({quoteCurrency:z.literal('USD'),portfolios:z.array(z.object({id:resourceIdSchema,name:z.string()})),
++ holdings:z.array(z.object({portfolioId:resourceIdSchema,symbol:stockSymbolSchema,quantity:z.string(),totalCost:z.string(),realizedPnl:z.string()})),
++ trades:z.array(stockTradeEntrySchema.extend({id:resourceIdSchema,realizedPnl:z.string(),...correctionViewFields})),
++})
++export type StockOverview = z.infer<typeof stockOverviewSchema>
++const manualAssetFields = z.object({name:z.string().trim().min(1).max(100),type:z.enum(['GOLD','PROPERTY','OTHER']),currency:z.enum(['THB','USD','USDT']),
++ quantity:nonNegativeCryptoAmount.nullable(),unit:z.string().trim().max(32),cost:nonNegativeCryptoAmount.nullable(),value:nonNegativeCryptoAmount,date:calendarDateSchema,note:z.string().trim().max(500).default(''),
++}).strict()
++const refineManualAsset=(v:z.infer<typeof manualAssetFields>,c:z.RefinementCtx)=>{if(v.quantity!==null&&!v.unit)c.addIssue({code:'custom',message:'Quantity needs a unit'});if(v.currency==='THB'){for(const value of [v.value,v.cost])if(value!==null&&!decimalStringField(parseThbDecimal,'non_negative','THB').safeParse(value).success)c.addIssue({code:'custom',message:'THB scale exceeded'})}}
++export const manualAssetInputSchema=manualAssetFields.superRefine(refineManualAsset)
++export const manualAssetUpdateSchema = z.object({asset:manualAssetInputSchema,expectedVersion:z.number().int().positive().max(2147483646)}).strict()
++export const manualAssetOverviewSchema = z.object({assets:z.array(manualAssetFields.extend({id:resourceIdSchema,version:z.number().int().positive()}).superRefine(refineManualAsset))})
++export type ManualAssetOverview = z.infer<typeof manualAssetOverviewSchema>
++
+ export const BACKUP_MAX_BYTES = 2 * 1024 * 1024
+ export const BACKUP_MAX_ROWS = 2000
+ const backupTimestamp = z.string().datetime().refine(value => {
+@@ -207,13 +237,31 @@ const backupV2Schema = backupFields.omit({ version: true }).extend({ version: z.
+   if (value.cashAccounts.length + value.categories.length + value.transactions.length + value.budgets.length + value.portfolios.length + value.trades.length > BACKUP_MAX_ROWS) context.addIssue({ code: 'custom', message: 'Backup row limit exceeded' })
+   if (new Set(value.cashAccounts.map(row => row.id)).size !== value.cashAccounts.length || new Set(value.cashAccounts.map(row => row.name)).size !== value.cashAccounts.length) context.addIssue({ code: 'custom', message: 'Duplicate cash accounts' })
+ })
+-export const backupDocumentSchema = z.union([backupV1Schema, backupV2Schema])
++const stockBackupTradeSchema = stockTradeEntrySchema.extend({id:backupId,createdAt:backupTimestamp,...backupCancellation,
++ accounting:z.object({gross:nonNegativeCryptoAmount,costRemoved:nonNegativeCryptoAmount,realizedPnl:decimalStringField(parseCryptoDecimal,'signed','USD P&L')}).strict(),
++}).strict().refine(pairedCancellation)
++const backupV3Schema = backupFields.omit({version:true}).extend({version:z.literal(3),
++ cashAccounts:z.array(cashInputSchema.extend({id:backupId}).strict()).max(BACKUP_MAX_ROWS),
++ stockPortfolios:z.array(stockPortfolioInputSchema.extend({id:backupId}).strict()).max(BACKUP_MAX_ROWS),
++ stockTrades:z.array(stockBackupTradeSchema).max(BACKUP_MAX_ROWS),
++ manualAssets:z.array(z.object({id:backupId,asset:manualAssetInputSchema}).strict()).max(BACKUP_MAX_ROWS),
++}).superRefine(refineBackup).superRefine((v,c)=>{
++ const groups=[v.categories,v.transactions,v.budgets,v.portfolios,v.trades,v.cashAccounts,v.stockPortfolios,v.stockTrades,v.manualAssets]
++ if(groups.reduce((n,rows)=>n+rows.length,0)>BACKUP_MAX_ROWS)c.addIssue({code:'custom',message:'Backup row limit exceeded'})
++ for(const rows of groups)if(new Set(rows.map(row=>row.id)).size!==rows.length)c.addIssue({code:'custom',message:'Duplicate ID'})
++ for(const names of [v.cashAccounts.map(row=>row.name),v.stockPortfolios.map(row=>row.name),v.manualAssets.map(row=>row.asset.name)])if(new Set(names).size!==names.length)c.addIssue({code:'custom',message:'Duplicate name'})
++ const portfolios=new Set(v.stockPortfolios.map(row=>row.id));for(const row of v.stockTrades)if(!portfolios.has(row.portfolioId))c.addIssue({code:'custom',message:'Invalid USD portfolio reference'})
++})
++export const backupDocumentSchema = z.union([backupV1Schema, backupV2Schema,backupV3Schema])
+ export type BackupDocument = z.infer<typeof backupDocumentSchema>
+ export const backupSummarySchema = z.object({
+   counts: z.object({ categories: z.number().int(), transactions: z.number().int(), cancelledTransactions: z.number().int(), budgets: z.number().int(), portfolios: z.number().int(), trades: z.number().int(), cancelledTrades: z.number().int() }),
+   months: z.array(z.object({ month: calendarMonthSchema, income: z.string(), expense: z.string(), balance: z.string() })),
+   holdings: z.array(z.object({ portfolioId: resourceIdSchema, asset: z.string(), quantity: z.string(), totalCost: z.string(), realizedPnl: z.string() })),
+   cash: z.array(cashInputSchema).default([]),
++  stockCounts:z.object({portfolios:z.number().int(),trades:z.number().int(),cancelledTrades:z.number().int(),manualAssets:z.number().int()}).default({portfolios:0,trades:0,cancelledTrades:0,manualAssets:0}),
++  stockHoldings:z.array(z.object({portfolioId:resourceIdSchema,symbol:stockSymbolSchema,quantity:z.string(),totalCost:z.string(),realizedPnl:z.string()})).default([]),
++  manual:z.array(manualAssetInputSchema).default([]),
+ })
+ export const backupPreviewSchema = z.object({ digest: z.string().regex(/^[0-9a-f]{64}$/), canRestore: z.boolean(), summary: backupSummarySchema })
+ export const backupRestoreSchema = z.object({ backup: backupDocumentSchema, previewDigest: z.string().regex(/^[0-9a-f]{64}$/), consent: z.literal(true) }).strict()
+diff --git a/packages/finance/src/analytics.ts b/packages/finance/src/analytics.ts
+index 87f25cf..afb18b2 100644
+--- a/packages/finance/src/analytics.ts
++++ b/packages/finance/src/analytics.ts
+@@ -18,6 +18,32 @@ export function expenseBreakdown(rows: readonly ExpenseRow[]) {
+ }
+ 
+ export interface ValuedHolding { portfolioId: string; asset: string; quantity: string }
++/** Currency-neutral Decimal calculation, used only inside one native-currency scope. */
++export function valuePosition(quantity:string,cost:string,price:string|null){
++ const q=parseCryptoDecimal(quantity),c=parseCryptoDecimal(cost)
++ if(q.lt('0')||c.lt('0'))throw new RangeError('Negative holding/cost')
++ const averageCost=q.isZero()?null:serializeCrypto(c.div(q))
++ if(q.isZero())return {averageCost,value:'0',unrealized:'0',returnPercent:null}
++ if(price===null)return {averageCost,value:null,unrealized:null,returnPercent:null}
++ const p=parseCryptoDecimal(price);if(!p.gt('0'))throw new RangeError('Invalid reference price')
++ const value=q.times(p),pnl=value.minus(c)
++ return {averageCost,value:serializeCrypto(value),unrealized:serializeCrypto(pnl),returnPercent:c.isZero()?null:serializeThb(pnl.div(c).times('100'))}
++}
++
++/** Manual amounts are dated total valuations, not a second market-priced quantity or cash debit. */
++export function valueMixedAssets(base:ReturnType<typeof valueAssets>,stocks:readonly {quantity:string;symbol:string}[],stockPrices:ReadonlyMap<string,string>,
++ manual:readonly {currency:'THB'|'USD'|'USDT';value:string}[],usdtThb:string|null,usdThb:string|null){
++ if(base.knownThb===null)throw new RangeError('Unrepresentable base valuation')
++ let known=parseCryptoDecimal(base.knownThb??'0'),complete=base.complete
++ const totals={THB:parseCryptoDecimal(base.cashThb),USD:parseCryptoDecimal('0'),USDT:parseCryptoDecimal('0')}
++ let usdComplete=true,usdtComplete=base.holdings.every(row=>row.usdt!==null)
++ for(const row of base.holdings)if(row.usdt!==null)totals.USDT=totals.USDT.plus(row.usdt)
++ const stockRows=stocks.map(row=>{const q=parseCryptoDecimal(row.quantity);if(q.lt('0'))throw new RangeError('Negative quantity');const p=stockPrices.get(row.symbol);if(q.isZero())return {...row,value:'0'};if(p===undefined){usdComplete=false;complete=false;return {...row,value:null}};const price=parseCryptoDecimal(p);if(!price.gt('0'))throw new RangeError('Invalid stock price');const value=serializeCrypto(q.times(price));totals.USD=totals.USD.plus(value);return {...row,value}})
++ let extraUsdt=parseCryptoDecimal('0')
++ for(const row of manual){const amount=parseCryptoDecimal(row.value);if(amount.lt('0'))throw new RangeError('Negative valuation');totals[row.currency]=totals[row.currency].plus(amount);if(row.currency==='THB')known=known.plus(amount);if(row.currency==='USDT')extraUsdt=extraUsdt.plus(amount)}
++ for(const [amount,rate] of [[extraUsdt,usdtThb],[totals.USD,usdThb]] as const){if(amount.isZero())continue;if(rate===null){complete=false;continue};const r=parseCryptoDecimal(rate);if(!r.gt('0'))throw new RangeError('Invalid FX rate');known=known.plus(amount.times(r))}
++ return {knownThb:serializeThb(known),totalThb:complete?serializeThb(known):null,complete,stockRows,native:{THB:serializeThb(totals.THB),USD:usdComplete?serializeCrypto(totals.USD):null,USDT:usdtComplete?serializeCrypto(totals.USDT):null},knownNative:{USD:serializeCrypto(totals.USD),USDT:serializeCrypto(totals.USDT)}}
++}
+ /** Caller supplies only fresh validated quotes/rates. Missing data never becomes a zero valuation. */
+ export function valueAssets(cash: readonly string[], holdings: readonly ValuedHolding[], prices: ReadonlyMap<string, string>, usdtThb: string | null) {
+   let cashTotal = parseThbDecimal('0'), known = parseThbDecimal('0')
+diff --git a/packages/finance/src/index.ts b/packages/finance/src/index.ts
+index 8350dfb..738d700 100644
+--- a/packages/finance/src/index.ts
++++ b/packages/finance/src/index.ts
+@@ -1,6 +1,6 @@
+ import { Decimal } from 'decimal.js'
+ export { replayCryptoTrades, LedgerError, type LedgerTrade, type LedgerResult } from './ledger.js'
+-export { expenseBreakdown, valueAssets } from './analytics.js'
++export { expenseBreakdown, valueAssets, valuePosition,valueMixedAssets } from './analytics.js'
+ 
+ export const FINANCE_DECIMAL_PRECISION = 80 as const
+ export const FINANCE_DECIMAL_ROUNDING = Decimal.ROUND_HALF_EVEN

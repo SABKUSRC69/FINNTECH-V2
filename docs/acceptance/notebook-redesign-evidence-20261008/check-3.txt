@@ -1,0 +1,15 @@
+
+> finntech@1.0.0 build
+> vite build --configLoader runner
+
+vite v6.4.3 building for production...
+transforming...
+✓ 2554 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   2.13 kB │ gzip:   1.01 kB
+dist/assets/index-CF8mSbb5.css   59.62 kB │ gzip:   9.87 kB
+dist/assets/icons-CaRGZ1FB.js    40.15 kB │ gzip:   9.97 kB
+dist/assets/index-DrPN8WP8.js   514.72 kB │ gzip: 134.19 kB
+dist/assets/charts-D65x48GL.js  557.84 kB │ gzip: 157.98 kB
+✓ built in 5.05s

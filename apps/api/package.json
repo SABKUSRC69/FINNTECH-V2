@@ -1,0 +1,47 @@
+{
+  "name": "@finntech/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env ../../node_modules/tsx/dist/cli.mjs watch src/server.ts",
+    "start": "node --env-file-if-exists=.env dist/server.js",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "prisma:validate": "prisma validate",
+    "prisma:generate": "prisma generate",
+    "prebuild": "npm run prisma:generate",
+    "pretypecheck": "npm run prisma:generate",
+    "pretest": "npm run prisma:generate",
+    "predb:test": "npm run build",
+    "db:test": "node --env-file-if-exists=../../.env.test ../../scripts/tracker-db-test.mjs",
+    "preauth:test": "npm run build",
+    "auth:test": "node --env-file-if-exists=../../.env.auth.test ../../scripts/tracker-auth-test.mjs"
+  },
+  "dependencies": {
+    "@better-auth/core": "1.7.7",
+    "@finntech/contracts": "0.1.0",
+    "@finntech/finance": "0.1.0",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "better-auth": "1.7.7",
+    "express": "^5.1.0",
+    "sharp": "0.35.5",
+    "ws": "8.21.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.5",
+    "@types/node": "^22.10.2",
+    "@types/supertest": "^6.0.2",
+    "@types/ws": "8.18.1",
+    "prisma": "7.10.0",
+    "supertest": "^7.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^5.0.1"
+  }
+}

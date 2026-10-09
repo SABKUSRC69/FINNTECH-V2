@@ -1,0 +1,41 @@
+{
+  "origin": "https://finntech-personal.onrender.com",
+  "independentCookieJars": 2,
+  "physicalBrowsers": "NOT TESTED",
+  "cases": [
+    {
+      "case": "HTTPS readiness, anonymous rejection, staging gate and recovery disabled",
+      "status": "PASS"
+    },
+    {
+      "case": "Two genuine Better Auth accounts/sessions, secure cookies, false email verification and distinct owners",
+      "status": "PASS"
+    },
+    {
+      "case": "Owner-isolated finance, concurrent idempotent Decimal expense, hostile write/correction and key mismatch rejected",
+      "status": "PASS"
+    },
+    {
+      "case": "THB budget and cash account persist exact decimals and remain owner-isolated",
+      "status": "PASS"
+    },
+    {
+      "case": "THB/USDT separation and exact crypto Decimals; attachment saved, parsed and credential-free",
+      "status": "PASS"
+    },
+    {
+      "case": "Consent-bound backup restore remaps owner IDs and preserves original owner with concurrent same-key retry",
+      "status": "PASS"
+    },
+    {
+      "case": "Separate real database boundary, all 10 forward migrations, no DEMO rows and no falsely verified emails",
+      "status": "PASS"
+    }
+  ],
+  "database": {
+    "name": "finntech_personal",
+    "role": "personal_app",
+    "migrations": 10
+  },
+  "status": "PASS"
+}

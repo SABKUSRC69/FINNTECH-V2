@@ -1,0 +1,80 @@
+- link "ข้ามไปยังเนื้อหา":
+  - /url: "#tracker-content"
+- banner:
+  - generic: F
+  - generic: FINNTECH
+  - button "ซ่อนยอดเงิน":
+  - button "เปิดโหมดมืด":
+- navigation "เมนูมือถือ":
+  - button "ภาพรวม":
+    - generic: ภาพรวม
+  - button "รายการ":
+    - generic: รายการ
+  - button "พอร์ต" [active]:
+    - generic: พอร์ต
+  - button "เพิ่มเติม":
+    - generic: เพิ่มเติม
+- main:
+  - paragraph: YOUR INVESTMENT RECORDS
+  - heading "พอร์ตคริปโต" [level=1]
+  - paragraph: ติดตามต้นทุนและประวัติ · USDT แยกต่อพอร์ต ไม่มีการส่งคำสั่งซื้อขาย
+  - paragraph: สวัสดี บัญชีสังเคราะห์ — ทดสอบพอร์ต
+  - button "โหลดข้อมูลล่าสุด"
+  - button "ออกจากระบบ"
+  - heading "พอร์ตคริปโต · USDT" [level=2]
+  - paragraph: บันทึกประวัติด้วยมือ · ไม่มีการส่งคำสั่งตลาด · ค่าธรรมเนียมคิดเป็น USDT
+  - text: พอร์ตที่ดู
+  - combobox "พอร์ตที่ดู":
+    - option "เลือกพอร์ต"
+    - option "พอร์ตสังเคราะห์ SOL" [selected]
+  - heading "สินทรัพย์ที่ถืออยู่" [level=3]
+  - paragraph: "มูลค่ารวม: 217.12 USDT"
+  - article:
+    - heading "SOL" [level=4]
+    - generic: ราคาอ้างอิงพร้อม
+    - generic: ปริมาณ 2
+    - generic: ต้นทุน 201.00 USDT
+    - generic: ต้นทุนเฉลี่ย 100.50 USDT
+    - generic: ราคาอ้างอิง 108.56 USDT
+    - generic: มูลค่าประเมิน 217.12 USDT
+    - generic: กำไร/ขาดทุนรับรู้ 0.00 USDT
+    - generic: กำไร/ขาดทุนยังไม่รับรู้ 16.12 USDT
+    - generic: ผลตอบแทนต้นทุน 8.019900497512437811% · ไม่ใช่การเปลี่ยนแปลงราคาตลาด
+    - generic: สัดส่วนพอร์ต 100.00%
+    - text: Binance public · USDT · รายการซื้อขายต้นทาง
+    - text: "เวลาต้นทาง: 2026-10-08T19:06:20.361Z"
+    - text: "เวลารับ: 2026-10-08T19:06:20.407Z · ไม่มี feed/ไม่รองรับแสดง N/A"
+  - paragraph: ราคาผ่าน backend · เกิน 30 วินาทีถือว่าล้าสมัย · ไม่รวมยอดกับ THB
+  - heading "บันทึกซื้อ/ขายในประวัติ" [level=3]
+  - form "บันทึกคริปโต":
+    - text: สินทรัพย์
+    - combobox "สินทรัพย์": BTC
+    - text: ชนิดประวัติ
+    - combobox "ชนิดประวัติ":
+      - option "ซื้อ" [selected]
+      - option "ขาย"
+    - text: ปริมาณ
+    - textbox "ปริมาณ"
+    - text: ราคาต่อหน่วย USDT
+    - textbox "ราคาต่อหน่วย USDT"
+    - text: ค่าธรรมเนียม USDT
+    - textbox "ค่าธรรมเนียม USDT": "0"
+    - text: วันที่ในประวัติ
+    - textbox "วันที่ในประวัติ": 2026-10-09
+    - button "บันทึกประวัติ"
+  - heading "สร้างพอร์ตแยก" [level=3]
+  - form "สร้างพอร์ต":
+    - text: ชื่อพอร์ต
+    - textbox "ชื่อพอร์ต"
+    - button "สร้างพอร์ต"
+  - paragraph: ต้นทุนแยกต่อพอร์ตและสินทรัพย์ ค้นหา BTC, ETH, SOL, XRP, BNB, DOGE และ ADA จากรายชื่อที่ backend ยืนยันคู่ spot USDT แล้ว สินทรัพย์ไม่รองรับ/ถูกถอดยังเก็บประวัติไว้ แต่การประเมินเป็น N/A เริ่มถือครองเดิมด้วยประวัติซื้อและต้นทุนที่ทราบ ไม่หักเงินสดอัตโนมัติ
+  - heading "ประวัติของพอร์ต" [level=3]
+  - paragraph: การแก้ไขรักษาพอร์ตและสินทรัพย์เดิม เก็บต้นฉบับและคำนวณต้นทุนใหม่ทั้งประวัติ
+  - paragraph: ซื้อ SOL · 2026-10-08
+  - paragraph: 2 @ 100.00 USDT · fee 1
+  - button "แก้ไขประวัติ"
+  - button "ยกเลิกประวัติ"
+  - paragraph: ข้อมูล DEMO เดิมยังอยู่ที่ต้นทาง ไม่มีการย้ายหรือรวมยอดอัตโนมัติ เวอร์ชันนี้ยังไม่เปิดการนำเข้า legacy
+- contentinfo:
+  - paragraph:
+    - text: ข้อมูลเพื่อการติดตาม ไม่ใช่คำแนะนำการลงทุน

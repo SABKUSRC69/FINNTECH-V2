@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "origin": "https://finntech-personal.onrender.com",
+  "cases": [
+    {
+      "case": "Both owner mappings, finance, crypto and export arrays persisted after Render redeployment",
+      "status": "PASS"
+    },
+    {
+      "case": "Logout revokes session; new genuine login resumes unchanged personal data",
+      "status": "PASS"
+    }
+  ]
+}

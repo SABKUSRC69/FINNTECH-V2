@@ -32,18 +32,36 @@ export default function DashboardView({
   portfolio,
   spotBalances,
   openOrders = [],
+  marketSnapshot,
   onNavigateToTransactions,
   onOpenQuickAdd
 }) {
-  const safeTransactions = Array.isArray(transactions) ? transactions : []
-  const metrics = calculateDashboardMetrics({ transactions: safeTransactions, portfolio, spotBalances, openOrders })
-  const { totalIncome, totalExpense, netSavings } = metrics
+  const hasInvalidTransactions = transactions !== undefined && (
+    !Array.isArray(transactions) || transactions.some((tx) => (
+      !tx || typeof tx !== 'object' || Array.isArray(tx) ||
+      (typeof tx.id !== 'string' && typeof tx.id !== 'number') ||
+      typeof tx.date !== 'string' || (tx.type !== 'income' && tx.type !== 'expense') ||
+      typeof tx.amount !== 'number' || !Number.isFinite(tx.amount)
+    ))
+  )
+  const safeTransactions = Array.isArray(transactions) && !hasInvalidTransactions ? transactions : []
+  const metrics = calculateDashboardMetrics({ transactions: safeTransactions, portfolio, spotBalances, openOrders, marketSnapshot })
+  const totalIncome = hasInvalidTransactions ? null : metrics.totalIncome
+  const totalExpense = hasInvalidTransactions ? null : metrics.totalExpense
+  const netSavings = hasInvalidTransactions ? null : metrics.netSavings
   const totalNetWorth = metrics.netWorth
   const netWorthDisplay = totalNetWorth === null ? 'N/A' : formatCurrency(totalNetWorth, false)
-  const previousNetSavings = metrics.previousMonthIncome - metrics.previousMonthExpense
+  const marketStatus = marketSnapshot?.symbolStatuses?.['BTC/THB']
+  const marketTime = marketStatus?.lastUpdated
+    ? `${marketStatus.timestampType === 'provider' ? 'provider time' : 'รับข้อมูล'} ${new Date(marketStatus.lastUpdated).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })} ICT`
+    : 'ไม่มีเวลาอัปเดต'
+  const previousNetSavings = metrics.previousMonthHasTransactions
+    ? metrics.previousMonthIncome - metrics.previousMonthExpense
+    : null
   const incomeChange = formatMonthlyChange(totalIncome, metrics.previousMonthIncome)
   const expenseChange = formatMonthlyChange(totalExpense, metrics.previousMonthExpense)
   const savingsChange = formatMonthlyChange(netSavings, previousNetSavings)
+  const displayAmount = (value) => value === null || !Number.isFinite(value) ? 'N/A' : formatCurrency(value, false)
 
   // Compute Expense by Category for Pie Chart
   const expenseByCategoryMap = {}
@@ -67,6 +85,11 @@ export default function DashboardView({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
+      {hasInvalidTransactions && (
+        <div role="alert" className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs">
+          รายการรายรับ-รายจ่ายบางรายการไม่ถูกต้อง จึงงดคำนวณกระแสเงินสดจากชุดข้อมูลนี้ ต้นฉบับไม่ได้ถูกแก้ไข
+        </div>
+      )}
       
       {/* Top Header Card */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#0c1017] border border-slate-200 dark:border-slate-800/80 shadow-sm transition-colors">
@@ -99,7 +122,7 @@ export default function DashboardView({
         <StatCard
           title="ความมั่งคั่งสุทธิ (Net Worth)"
           amount={netWorthDisplay}
-          subtitle="จากยอดบัญชีและสินทรัพย์ที่บันทึกไว้ (ราคา Spot อ้างอิง DEMO)"
+          subtitle={`จากบัญชีและสินทรัพย์ที่บันทึก • Bitkub ${marketStatus?.status || 'UNAVAILABLE'} • ${marketStatus?.source || 'ยังไม่มี feed'} • ${marketTime}`}
           change="N/A"
           changeType="neutral"
           icon={Wallet}
@@ -109,7 +132,7 @@ export default function DashboardView({
 
         <StatCard
           title="รายรับประจำเดือนนี้"
-          amount={formatCurrency(totalIncome, false)}
+          amount={displayAmount(totalIncome)}
           subtitle={metrics.currentMonthLabel}
           change={incomeChange}
           changeType={incomeChange === 'N/A' ? 'neutral' : totalIncome >= metrics.previousMonthIncome ? 'increase' : 'decrease'}
@@ -119,7 +142,7 @@ export default function DashboardView({
 
         <StatCard
           title="รายจ่ายประจำเดือนนี้"
-          amount={formatCurrency(totalExpense, false)}
+          amount={displayAmount(totalExpense)}
           subtitle={metrics.currentMonthLabel}
           change={expenseChange}
           changeType={expenseChange === 'N/A' ? 'neutral' : totalExpense <= metrics.previousMonthExpense ? 'increase' : 'decrease'}
@@ -129,7 +152,7 @@ export default function DashboardView({
 
         <StatCard
           title="เงินออมสุทธิ (Cash Flow)"
-          amount={formatCurrency(netSavings, false)}
+          amount={displayAmount(netSavings)}
           subtitle={metrics.currentMonthLabel}
           change={savingsChange}
           changeType={savingsChange === 'N/A' ? 'neutral' : netSavings >= previousNetSavings ? 'increase' : 'decrease'}
@@ -171,7 +194,7 @@ export default function DashboardView({
 
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={metrics.cashflow} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={hasInvalidTransactions ? [] : metrics.cashflow} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
@@ -252,7 +275,7 @@ export default function DashboardView({
                 <div className="absolute text-center pointer-events-none">
                   <div className="text-[11px] text-slate-400 font-medium">รวมรายจ่าย</div>
                   <div className="text-base font-extrabold text-slate-900 dark:text-white">
-                    {formatCurrency(totalExpense, false)}
+                    {displayAmount(totalExpense)}
                   </div>
                 </div>
               </div>

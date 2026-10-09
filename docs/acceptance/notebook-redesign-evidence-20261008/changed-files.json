@@ -1,0 +1,570 @@
+{
+  "baselineFiles": 518,
+  "changedFiles": 94,
+  "files": [
+    {
+      "path": "apps/web/THIRD_PARTY_NOTICES.md",
+      "status": "modified",
+      "before": "2ee8f896851277517a2bc6b4c5d46a22c72c20cc80b1aa6acd55a69a9bb279cb",
+      "after": "eed98fdfc5a43528cf252b1578fe2c7d97efe46514ca8d8ed08736b41c5c97cc"
+    },
+    {
+      "path": "apps/web/public/art/notebook-cat.svg",
+      "status": "added",
+      "before": null,
+      "after": "5a8896b94b7119da5b8741812cf61a64d340c465763a2c44092e2fa0ccd4df0b"
+    },
+    {
+      "path": "apps/web/public/art/notebook-stickers.svg",
+      "status": "added",
+      "before": null,
+      "after": "36d7e6b6340271a31206d5cac19270a257328d506f20512194c1bc83d1969aba"
+    },
+    {
+      "path": "apps/web/src/App.tsx",
+      "status": "modified",
+      "before": "a1e20beb4cc26842f1aa67212eae3388df695b291c62d12ab4f6a55e15a8d39d",
+      "after": "6f97a4e4f44465f9b9e4ad1f9835a74930a41072943d1cdd2c17ca1baad900db"
+    },
+    {
+      "path": "apps/web/src/auth/AccountDeletion.tsx",
+      "status": "modified",
+      "before": "d3a78887aebac5209e028ffd3958a09b6bc7ed851b61081f301b3fad3bb09ded",
+      "after": "6c619705b6789882148b61ec0dd2e07c5be1e36725287def3dc8f47ebc43adfa"
+    },
+    {
+      "path": "apps/web/src/journal.css",
+      "status": "modified",
+      "before": "07ac67c69808eb334190e1a2e3204728df9c4bd9849cd01d10e681b8b43c9c5b",
+      "after": "8c7fb7371d7a4586a3a4989c08bc0cc141d55ed074be3d273cd2f48a8a30982f"
+    },
+    {
+      "path": "apps/web/src/presentation.tsx",
+      "status": "modified",
+      "before": "c91d0ab46d88befcfc03cb4a6c5d1fc474183f6cfcfcea2e4520e21f64c6c904",
+      "after": "851b69d61de61afd1ca2a078b7dab2176f991736dedccde782333b002e27d5d9"
+    },
+    {
+      "path": "apps/web/src/tracker/Account.tsx",
+      "status": "modified",
+      "before": "b120fa17c8ec0dcef440cb56f5ee402b520281fb58396629c3591eafe6ae2d6e",
+      "after": "c5900df7ce7075695a9fd8bd0a54daa12a9b99c8a23e5093124a3e17841da203"
+    },
+    {
+      "path": "apps/web/src/tracker/Backup.tsx",
+      "status": "modified",
+      "before": "fac37c19689f3710dad620b50bc32ece46c272b2b33f338deae9f49f93523fcd",
+      "after": "3a6a128c484d707afff1c7f3439d886fa20a578a24cc9bd69203c1a7ffc00204"
+    },
+    {
+      "path": "apps/web/src/tracker/FinanceHistory.tsx",
+      "status": "modified",
+      "before": "e04c45655caf0a09794dd1310ba7f21330f89f73003dd6af8f17b1293b960e73",
+      "after": "37f943c773436606cd4c668e754e90f12fa87b898646fd46e5d056b453f829f5"
+    },
+    {
+      "path": "apps/web/src/tracker/ModalDialog.tsx",
+      "status": "modified",
+      "before": "04a88c30348743b5052f6ac85e9af08fbc805d1d70bbca44d741dfda12a48b00",
+      "after": "fbb204377cd4642ac5cfa76773d23d2263f80bf2b28a7c454aff5433ca6c0bd3"
+    },
+    {
+      "path": "apps/web/src/tracker/PageIntro.tsx",
+      "status": "modified",
+      "before": "c208938532262912b12892ddde87a64ce46af952001c5b028f7870f5a5194de9",
+      "after": "e58f2ad140d867f1b3b1bc886fbe6686ddee1cb6e0da2f628c6ac9f50276816f"
+    },
+    {
+      "path": "apps/web/src/tracker/TrackerNavigation.tsx",
+      "status": "modified",
+      "before": "c75612d18c648ef693aa910733097181e166da9c17d858ac9429eee4fab3d0b0",
+      "after": "fc9f2e2d280a0861ea8095b1d30ffb3c020c8fffb6cb8d88b3e95914b1398efe"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/account-1440-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "aeef9aa399bdd03e0c12ef6c9c9e7f38f7fd9bc9169878f3b308ba2b7930cbf9"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/account-1440-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "33163c9e0a0242451172b8fbe64a3d9087e28b12a2e1c2f20ab98c961925886a"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/account-375-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "26e4360edf26382d4cc3851ed0ee97894d5df19a368052b4147988610b8fb194"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/account-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "5d18962c40e73711e4118fa704f2b4b123c3124ae3710c22224c742805734f83"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/account-keyboard-bottom-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "4590498f236f7bd136c5dc7cfa38e6a1fee8b2e5f1ee74833561d5ecc3fb2dea"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/assets-1440-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "13af274f3382c2c4ca79b0335b9ea876f4a64bccb1028bc89561e1a4d9632d49"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/assets-1440-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "9565fc0b414874848267307154658fd03dcb7b930672e5c60ef0ac0b95baca27"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/assets-375-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "2a6233f4600dd1a3622488ffd8200cb684e33191a8eefdb3329735fee51ed179"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/assets-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "841f05c0d06351abf474436b40a697191d64bcbe8eb31ce0617c2ee5d7b7fdce"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/auth-1440-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "321e77b125033320bc126d6e8f894d322dd21fe422d409fd129b836d38bd7daa"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/auth-1440-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "cba69921d85213c2f12d72c63e1abafa5d96fcb707f390e630954b798c6d0738"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/auth-375-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "16201b33fc689cae341c2ec94c30b73652d2a595aa1449cf3b4605064748cf94"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/auth-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "20a61d32cea20c41c4faec5af10bd4c1eca19e60d549afd8b7c650d981d5cc2f"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/backup-1440-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "da5d5981688c653b57fe6ad3aaf3801e83479e55e78c36eb7dee457ca310b8d0"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/backup-1440-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "99429b7799e124e56fd8b089b86c73aec43023f449d8ac138c902a144fe1315a"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/backup-375-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "43c4effa354c8bcf11451e9fd3f2c4ddd8fd65d92cdb0f673a5f14dd44c710b3"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/backup-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "efc67feb20b7da98ec72fe9968fd75f14e2802ace2065a66d4f9439637108375"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/backup-preview-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "c2fa615fc2640f12ae38bbe195ed1a9ad8351ccb4cbf5d4defa99e55b9943bb8"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/backup-receipt-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "94664c17144aef92175278249923027c53418468006c876662d7af42e5815399"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/before-auth-desktop.jpg",
+      "status": "added",
+      "before": null,
+      "after": "37edf7cd6e36be8e9ba2497df7e29ee0e16ab74b8b96fc6d0f17c6a8566e125d"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/before-finance-desktop.jpg",
+      "status": "added",
+      "before": null,
+      "after": "a2e3a3c680652fbe8e666952aa0749eb5bf6a319f2ae9a3b76b97bd15931dfbe"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/before-finance-mobile.jpg",
+      "status": "added",
+      "before": null,
+      "after": "a62c0823f945ff21ed7426664afaa9fdd2adb5c30ec8ac88b3ada36b835b921b"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/boundaries.json",
+      "status": "added",
+      "before": null,
+      "after": "37c9df8da3c0834e1fd08f4ecf792bfd79b8081d74877edbc61bcb864b301169"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/budget-1440-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "9f6ad28f90824b7260a774a18839a0afd697d133abac239d02cf2743eb4f8542"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/budget-1440-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "ae0c05025df5a954442ab570d2c023a87641d9ca89f925a6d90e285fcfaa99ff"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/budget-375-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "8ecd88cb5b4527f04405a341dcaea8b363445de242b87f434fbc64d695998964"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/budget-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "791b8e01fd2ad4ed5191dcba52ba7e161e53dcb097e7dda3b8e8be8415468915"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/check-0.txt",
+      "status": "added",
+      "before": null,
+      "after": "58c03a83ec69175ace873187d1bc47d1700f9be8f3a705b40af55823e4f9f227"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/check-1.txt",
+      "status": "added",
+      "before": null,
+      "after": "7ca96f5ce1ab95f13e09449c1c978c4f23b7f8f236df78522bc2f678a03c61ff"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/check-2.txt",
+      "status": "added",
+      "before": null,
+      "after": "702c273249ba684109e264c800b0b2e9e18c3b7d01f78249072634ee78bfa555"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/check-3.txt",
+      "status": "added",
+      "before": null,
+      "after": "2519439a7cef4e096cc0bf5f4f0a0ffc9a3ad9973616c609999d129d70cffbdb"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/check-4.txt",
+      "status": "added",
+      "before": null,
+      "after": "92834f545f6ad784d76c75af85520f9e79fd5d68d0e0b896ab49824c1d10f88f"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/check-5.txt",
+      "status": "added",
+      "before": null,
+      "after": "a2aa78902af442873d9e2931cf548b0f15103eaf387ad5afccfffdcdf6251a04"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/check-6.txt",
+      "status": "added",
+      "before": null,
+      "after": "68392b2429ea2deee2d3b2bc0a662ed7c2cf61f7e6343715c55fc4e171e8f3a9"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/checks.json",
+      "status": "added",
+      "before": null,
+      "after": "2570fdbe9a5e9e9ac8b8f2ee1c185568d9be5a7bd670a893a8b7c50fed3218e6"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/contrast.json",
+      "status": "added",
+      "before": null,
+      "after": "a10e30bd44616f62f431d3d2e38f246decc3ea0c6573ac8c2d5eb33c6ae4c104"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/crypto-1440-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "26ac8bb676899c062d7c4ff3f343b04e8a994d0298a2f4c6dd676e12ba443738"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/crypto-1440-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "5f4ce11a820bb89a7a9125fefd2635f68589891d6fb0e6a580ec249505b8301d"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/crypto-375-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "5d66f4052d0ea96799d49856b6091dff91c8e0aa32209f1abf597b86d9c8c09f"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/crypto-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "f388b81d0560875984341c7243b8e86e621cc987e9244575e864c2534f1114b6"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/crypto-selected-1440-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "778d411aa4e216225683d6b04a7ed2556e0cd69339959acdac4ad15ceeadd4b6"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/crypto-selected-1440-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "ce31d1d5883507bc99d6aa24c6f0c2d492eaf393f2df3066c4ec83710254526e"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/crypto-selected-375-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "6f2f00f132a798dadef07470f71d4e1d13c54650c84f1bc07d84569803a8bfaa"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/crypto-selected-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "8db09ce6ab590643a757f0bd4002f5bdac10cab26ef1c891226dd6f509b8d35f"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/empty-finance-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "442674e3860c5ad7edc0f60971ed267e16f8094c8224061996120769eb2d6d1f"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/error-finance-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "208fdad98a427b9518255d93349a3bcf36f7b5df0b70957c93bda61d21709139"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/final-finance-desktop-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "d7d2a4b2d055bc2e67eb9c48c6c913b2903fe10fb44c0a2b757f7a5bfa05b5bb"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/final-finance-desktop-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "45f5ce3046caab85f5c2a94c317bd3583fbcd757a468984d03dda153d5a75b3f"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/final-finance-mobile-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "29340308f5de01a0356bb77358d0a990ecb94a8b3c8a757c82a0fe5e3c7b98a3"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/final-finance-mobile-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "2b4a471cce20496045963fc9abf3273016028a71f39c254a2596cb8e615a8d02"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/finance-1440-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "ee77db3b5e1a0caa8523983c8a9982045ee1afbedeaa0c20d4b84aca5c03574b"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/finance-1440-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "554385ee92e1e183626c226ab8b7e623ff17e42d5b45c7c256a14b024a0d8e70"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/finance-375-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "5c6650c1ca8a419cd5ef4cfeb56c32e3e0cf7e5131ad91c42431a5e670bf2939"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/finance-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "938adb0e5bb5547b147dfe735352e5d5997d360e843c8e90d69b2b5e5b76dd82"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/keyboard.json",
+      "status": "added",
+      "before": null,
+      "after": "f67ee9991b553e159ec00109851f1dca8484c9c2819ae32d70cd80abd2c2572a"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/loading-finance-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "05717157f91af556d23a1c549540c654687c68118a2915db3c2c1acddb212816"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/long-crypto-320-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "e9c141c29a4420b5773db59a929ddf8ecdb05d51d424be7d315e6000c5183b40"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/long-values.json",
+      "status": "added",
+      "before": null,
+      "after": "94349e8a9c5aa424804228abd17519c61aa00835050e1fbadfbc63a548fc0e63"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/mobile-bottom.json",
+      "status": "added",
+      "before": null,
+      "after": "ac5fe22fc56acccba37108f615e6dc7b95c85fdf746545e900cadf22e3f952ee"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/more-375-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "03b3db65f77f456a57af3c3cc57ed2ddc1bf6dad3c4f0f306664c3544015c697"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/more-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "c1d862fbd38e9145c89277653bd0b19da4b768ced5969cd1c1ab0559799d840d"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/pending-finance-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "801e06973dfd08e8b51ef565ed1762bf8fb365e2c07f87962f4712fafe52b26e"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/pending-more-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "d10ea3d3af96233eeea6ec705f818b40be071e425f1c992b3d460d463076697a"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/privacy-crypto-320-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "10f2c2277a250e65693dc26aeefc7e4ba8f55ee31dcdb481c5f2d0277e271221"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/privacy.json",
+      "status": "added",
+      "before": null,
+      "after": "33092d0656560fed237057be6c2526534b81d860a7658a9735135252e1caf834"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/responsive.json",
+      "status": "added",
+      "before": null,
+      "after": "2e6cddf7dc1fd1842a8bd07b331a873f6052c3add3fbe6759003d7c0528ed5db"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/retry.json",
+      "status": "added",
+      "before": null,
+      "after": "99c20c8b24452f8f50a0879caafb183333e72777c0593341e320e869fd787c47"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/review-desktop-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "7a75b46fe34b09e55aaf8a32dea39bd3047914bfd553f4d44c5f95b0bdcb1971"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/signup-1440-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "6a51a6ad1ce62ea7dd07a185e1b145b4c28c5be70485566eebdad1d2205c214c"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/signup-1440-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "232eb6f0704dca6acd3490c29ac0ce826509c8390f419126549d38d521feba0c"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/signup-375-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "3b5900ae8e2337845e5babfd19616bf2a09974442509c285dad355ec5ffe54e2"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/signup-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "4ea09a69d97eace794913beb92af8bec09b0ae6960557e280f4ccbb52077c394"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/signup-validation-375-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "1b68453b9261d09ae3d443e0576bcf24ceae15ba5317d1facbecca53ba605fa1"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/stocks-1440-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "25f3096dd4f4c0dd19998cb81fcd2f6f082dfbee668ace62d0b750b03042622e"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/stocks-1440-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "3891a383f11a412d06c8327a0dcee5afb8fa359f74ae23496e41e204bd1c6a4b"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/stocks-375-dark.jpg",
+      "status": "added",
+      "before": null,
+      "after": "0947b443661a4c16226b9f30c55fe614a320da5581ea0d9934962a50a861209d"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/stocks-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "bc8ab810528b9b69fe18638fc5fb05cb0510f82578f62dfc6d57c4d61f32d561"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/void-dialog-375-light.jpg",
+      "status": "added",
+      "before": null,
+      "after": "e579ba8902a3b0d56b6ab3628236a2a2e9fc13a5ece8080acdb4da1d9c237e57"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-evidence-20261008/void-keyboard.json",
+      "status": "added",
+      "before": null,
+      "after": "35e381d5ff94c9ecea3e9bf1ca712144afecbef5a46f01faa9a6e3d492a29dc1"
+    },
+    {
+      "path": "docs/acceptance/notebook-redesign-review-20261008.md",
+      "status": "added",
+      "before": null,
+      "after": "b827d2d85497acf2bf2130dcfa417b726773bb4e9a20bed21f24099be1177efe"
+    },
+    {
+      "path": "scripts/notebook-preview.mjs",
+      "status": "added",
+      "before": null,
+      "after": "d216f15bb4959fe8b6caa6c6e227fef33f24a9dd96dc96fd740efbe718f1d239"
+    }
+  ]
+}

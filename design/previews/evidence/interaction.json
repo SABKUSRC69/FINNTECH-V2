@@ -1,0 +1,38 @@
+[
+  {
+    "concept": "a",
+    "initialFocus": "ปิดแบบฟอร์ม",
+    "reverseFocus": "ทดลองตรวจแบบฟอร์ม ",
+    "forwardFocus": "ปิดแบบฟอร์ม",
+    "validation": "กรุณากรอกจำนวนเงินมากกว่า 0",
+    "result": "ข้อมูลตัวอย่างผ่านการตรวจรูปแบบ · ยังไม่ได้บันทึกลงระบบ",
+    "restored": "primary add-entry",
+    "moreLinks": 4,
+    "hidden": "••••",
+    "unhidden": "128,450.00"
+  },
+  {
+    "concept": "b",
+    "initialFocus": "ปิดแบบฟอร์ม",
+    "reverseFocus": "ทดลองตรวจแบบฟอร์ม ",
+    "forwardFocus": "ปิดแบบฟอร์ม",
+    "validation": "กรุณากรอกจำนวนเงินมากกว่า 0",
+    "result": "ข้อมูลตัวอย่างผ่านการตรวจรูปแบบ · ยังไม่ได้บันทึกลงระบบ",
+    "restored": "primary add-entry",
+    "moreLinks": 4,
+    "hidden": "••••",
+    "unhidden": "128,450.00"
+  },
+  {
+    "concept": "c",
+    "initialFocus": "ปิดแบบฟอร์ม",
+    "reverseFocus": "ทดลองตรวจแบบฟอร์ม ",
+    "forwardFocus": "ปิดแบบฟอร์ม",
+    "validation": "กรุณากรอกจำนวนเงินมากกว่า 0",
+    "result": "ข้อมูลตัวอย่างผ่านการตรวจรูปแบบ · ยังไม่ได้บันทึกลงระบบ",
+    "restored": "primary add-entry",
+    "moreLinks": 4,
+    "hidden": "••••",
+    "unhidden": "128,450.00"
+  }
+]

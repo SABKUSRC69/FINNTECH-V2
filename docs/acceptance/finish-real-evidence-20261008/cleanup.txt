@@ -1,0 +1,4 @@
+ Container finntech-finish-real-20261008-postgres-finish-1 Stopping
+ Container finntech-finish-real-20261008-postgres-restore-1 Stopping
+ Container finntech-finish-real-20261008-postgres-finish-1 Stopped
+ Container finntech-finish-real-20261008-postgres-restore-1 Stopped

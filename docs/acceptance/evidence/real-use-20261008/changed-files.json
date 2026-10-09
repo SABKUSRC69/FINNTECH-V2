@@ -1,0 +1,371 @@
+{
+  "baselineFiles": 333,
+  "preservedUnchangedBaselineFiles": 317,
+  "existingChanged": [
+    "README.md",
+    "apps/api/prisma/schema.prisma",
+    "apps/web/src/App.tsx",
+    "apps/web/src/tracker/Dashboard.tsx",
+    "apps/web/src/tracker/Account.tsx",
+    "apps/api/db-test/recovery.integration.ts",
+    "apps/web/src/auth/RecoveryPanel.tsx",
+    "apps/web/src/auth/client.ts",
+    "apps/api/src/runtime-config.ts",
+    "apps/api/src/server.ts",
+    "apps/api/src/app.ts",
+    "apps/api/src/tracker/service.ts",
+    "apps/api/src/auth/runtime.ts",
+    "apps/api/src/auth/recovery.ts",
+    "apps/api/src/auth/delivery.ts",
+    "apps/api/src/auth/config.ts"
+  ],
+  "newFiles": [
+    "Dockerfile.real",
+    "Dockerfile.real.dockerignore",
+    "compose.real-rehearsal.yaml",
+    "scripts/sql/real-restore-evidence.sql",
+    "scripts/real-backup-core.mjs",
+    "scripts/real-backup-core.test.mjs",
+    "scripts/real-backup-rehearsal.mjs",
+    "scripts/real-backup-scheduled.ps1",
+    "scripts/real-backup-target.mjs",
+    "scripts/real-backup-target.test.mjs",
+    "scripts/real-backup-watchdog.mjs",
+    "scripts/real-db-backup.mjs",
+    "scripts/real-drive-backup-core.mjs",
+    "scripts/real-drive-backup-core.test.mjs",
+    "scripts/real-drive-backup.mjs",
+    "scripts/real-migration-rehearsal.mjs",
+    "scripts/real-use-prepare.mjs",
+    "apps/api/src/auth/mail.ts",
+    "apps/api/src/auth/real.ts",
+    "apps/api/test/real-config-mail.test.ts",
+    "apps/api/db-test/real-use.integration.ts",
+    "apps/web/src/real-use.test.tsx",
+    "apps/web/src/auth/RealUseNotice.tsx",
+    "apps/api/prisma/migrations/20261008090000_real_runtime_boundary/migration.sql",
+    "docs/operations/real-use-setup.md",
+    "docs/operations/real-use-backup.md",
+    "docs/operations/real-use-data-lifecycle.md",
+    "docs/operations/templates/real-backup-monitor.yml",
+    "docs/acceptance/real-use-readiness-20261008.md",
+    "docs/acceptance/evidence/real-use-20261008/audit-production.json",
+    "docs/acceptance/evidence/real-use-20261008/diff-check.log",
+    "docs/acceptance/evidence/real-use-20261008/fresh-migration.log",
+    "docs/acceptance/evidence/real-use-20261008/full-restore-first.log",
+    "docs/acceptance/evidence/real-use-20261008/full-restore-result.json",
+    "docs/acceptance/evidence/real-use-20261008/full-restore-second.log",
+    "docs/acceptance/evidence/real-use-20261008/image-build-final.log",
+    "docs/acceptance/evidence/real-use-20261008/integration-fifth.log",
+    "docs/acceptance/evidence/real-use-20261008/integration-final.log",
+    "docs/acceptance/evidence/real-use-20261008/integration-summary.json",
+    "docs/acceptance/evidence/real-use-20261008/local-browser.json",
+    "docs/acceptance/evidence/real-use-20261008/local-login.jpg",
+    "docs/acceptance/evidence/real-use-20261008/local-recovery-390-dark.jpg",
+    "docs/acceptance/evidence/real-use-20261008/local-recovery-390-light.jpg",
+    "docs/acceptance/evidence/real-use-20261008/own-containers-stop.log",
+    "docs/acceptance/evidence/real-use-20261008/package-smoke.log",
+    "docs/acceptance/evidence/real-use-20261008/release-scan.json",
+    "docs/acceptance/evidence/real-use-20261008/root-build.log",
+    "docs/acceptance/evidence/real-use-20261008/root-test-accepted.log",
+    "docs/acceptance/evidence/real-use-20261008/root-test-release.log",
+    "docs/acceptance/evidence/real-use-20261008/runtime-inventory.json",
+    "docs/acceptance/evidence/real-use-20261008/source-snapshot.json",
+    "docs/acceptance/evidence/real-use-20261008/tracker-build-final-permitted.log",
+    "docs/acceptance/evidence/real-use-20261008/tracker-build-final.log",
+    "docs/acceptance/evidence/real-use-20261008/tracker-test-final.log",
+    "docs/acceptance/evidence/real-use-20261008/typecheck-final.log",
+    "docs/acceptance/evidence/real-use-20261008/typecheck-release.log"
+  ],
+  "dependencyFilesUnchanged": true,
+  "files": [
+    {
+      "path": "Dockerfile.real",
+      "sha256": "1afa9c23baac189a3163794890c360b9f258f7d555d58346f7a4fd3b41ccd86f"
+    },
+    {
+      "path": "Dockerfile.real.dockerignore",
+      "sha256": "09812bfb64feb7383099b9eceecd69da8f69217cfaa027d07e8fa46a7b27d995"
+    },
+    {
+      "path": "README.md",
+      "sha256": "c677065cac9d1912d54942e41999807e2c6419d5a2d5fbd9d3deb2186e1f83ee"
+    },
+    {
+      "path": "apps/api/db-test/real-use.integration.ts",
+      "sha256": "b87d9e0cb2e2584020f73271f1e1fda94991148e461a7da971d1ff254f745d85"
+    },
+    {
+      "path": "apps/api/db-test/recovery.integration.ts",
+      "sha256": "f065352be3560d431d03ed0f75d372c2c8415da7a4332afd5d0ab83363bc4bb8"
+    },
+    {
+      "path": "apps/api/prisma/migrations/20261008090000_real_runtime_boundary/migration.sql",
+      "sha256": "04be4a694024d7063c7c0f380520a1ec515389a0e8f947565d1d91d1b8924905"
+    },
+    {
+      "path": "apps/api/prisma/schema.prisma",
+      "sha256": "647ac4b7cb168339ed1246af924d7d574c8788aca55029197685603544c9307f"
+    },
+    {
+      "path": "apps/api/src/app.ts",
+      "sha256": "c764ab45cd1f08b4b76e9e594de7d85a2df12ec20f6eaa1050e60d9936d2adf1"
+    },
+    {
+      "path": "apps/api/src/auth/config.ts",
+      "sha256": "bf02989d65e9bebe2de3dd12efd76ead34fe4ee9c37e80a57ee04e4bb6fdbb2b"
+    },
+    {
+      "path": "apps/api/src/auth/delivery.ts",
+      "sha256": "8154d5863758dd1a9b9d0035e69145040386844f3d52cc59cc923e430467c9bf"
+    },
+    {
+      "path": "apps/api/src/auth/mail.ts",
+      "sha256": "dad0bbebf5fc3c3f82421b334b0e215e0fcd8d8711ed2756b2a7992e46b7d1e5"
+    },
+    {
+      "path": "apps/api/src/auth/real.ts",
+      "sha256": "2589776287e561790834e63995ee568ff471d26bbdec79af6350586b256c13e5"
+    },
+    {
+      "path": "apps/api/src/auth/recovery.ts",
+      "sha256": "32f62daa56622d0054bcabaa0157793ccbcf2d5b8cdc0bb09e6b7834a4f0ea97"
+    },
+    {
+      "path": "apps/api/src/auth/runtime.ts",
+      "sha256": "0a6d5d7c4d42ef2431e13fc45564ceaee929219ec42338e07943ea48b233d31d"
+    },
+    {
+      "path": "apps/api/src/runtime-config.ts",
+      "sha256": "7c84c4c3dd337d32762819be2177fcc76e4296d5de062a5338a6ea10a6c4bd2a"
+    },
+    {
+      "path": "apps/api/src/server.ts",
+      "sha256": "d18ef6c3f4eafde43edb358a76677cc15f1736587081e3eea26fce9190d82e2d"
+    },
+    {
+      "path": "apps/api/src/tracker/service.ts",
+      "sha256": "ef7f64bf61148179296463f08bf6c9a61af89b033f8f07ad82328d66899a2cd7"
+    },
+    {
+      "path": "apps/api/test/real-config-mail.test.ts",
+      "sha256": "5d58c097664dc9e725575dc2e136b02fbceb093eaef34ebd58f58146a0731c08"
+    },
+    {
+      "path": "apps/web/src/App.tsx",
+      "sha256": "0f7fd44e7daf632ad0bc80e8645910bd077f5cb2febd0039b4d86e32a145f51e"
+    },
+    {
+      "path": "apps/web/src/auth/RealUseNotice.tsx",
+      "sha256": "6d72d08f9fa10bc9b80b8b1c47441e909191bc98a8fda6758e6a15f5a188900e"
+    },
+    {
+      "path": "apps/web/src/auth/RecoveryPanel.tsx",
+      "sha256": "c9f3ae3a7964d653f5f229d3c46604ba7e003966e224901313129e984357c9b6"
+    },
+    {
+      "path": "apps/web/src/auth/client.ts",
+      "sha256": "ee1f3bb497f0b4c6664c4a56d1bb591084917f5e74ba9ccb5de9c68922ded07b"
+    },
+    {
+      "path": "apps/web/src/real-use.test.tsx",
+      "sha256": "0779f9a3b303021b98fc436e07b2488f44c76e776b1e1cef8dec7153ad67107c"
+    },
+    {
+      "path": "apps/web/src/tracker/Account.tsx",
+      "sha256": "1962c41e47b2ec9f57df078081172ed66e793bfc72455bfb50eaca4ac6b50087"
+    },
+    {
+      "path": "apps/web/src/tracker/Dashboard.tsx",
+      "sha256": "4b07546c558584bcd9a56bd98b53ebcad6f679f46415d664f76a68763e3d5cf4"
+    },
+    {
+      "path": "compose.real-rehearsal.yaml",
+      "sha256": "2f7a456d26b0e99d1ac386ab9d5482fb598cd304a89d8272e63de34e38c88dce"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/audit-production.json",
+      "sha256": "1c11f50e17d249b2d9a9a167a7422c40fb747f3c944cea25886c298714a9c445"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/diff-check.log",
+      "sha256": "68392b2429ea2deee2d3b2bc0a662ed7c2cf61f7e6343715c55fc4e171e8f3a9"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/fresh-migration.log",
+      "sha256": "be4b7e8eea808c926c738a88dd48478cf66a0fef6797b87436795f8709aa6e2c"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/full-restore-first.log",
+      "sha256": "01ac6293e0e13a802dc251eff47a564d14bee915330dab57d24823d5ef099466"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/full-restore-result.json",
+      "sha256": "66f94e1560d8fc4bf434b8dc7adc84d182913138ffa35902f4dbe764188a87be"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/full-restore-second.log",
+      "sha256": "ba767682dd04fb8c0af3f5a393f4cce04e6386ca0ad67ee935fb4cb76336d724"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/image-build-final.log",
+      "sha256": "7838c27daf8b9c8512c91ebb2d324092a3e15197e57381881e7049e0a4216660"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/integration-fifth.log",
+      "sha256": "29b55c9e53f4d462bab9d0bfa3382a4249723081e9307ce3f0f158432d2730c1"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/integration-final.log",
+      "sha256": "e2bf87b2105bbeaa2795fae8e6efd2cc25183d22d498c5a3262ade8d6a81db47"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/integration-summary.json",
+      "sha256": "2feb5462137d4feb54419284c46ca168f77ecc09a646c66f4afe353e0fde435c"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/local-browser.json",
+      "sha256": "3c73ff4405e5a5871d5a56066d43519386e1147a884e355459a484461859d008"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/local-login.jpg",
+      "sha256": "0bf5e5adf9dab17662341a45f18440e5b9837b14a096a15742268b7c99db42a8"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/local-recovery-390-dark.jpg",
+      "sha256": "b4eef7c1cceb6d3d052f63dfe15965d40200f0a9c4b86694314e3eec578daae5"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/local-recovery-390-light.jpg",
+      "sha256": "fb34a8aa1a14faff5c7786679e7d5a521b520c0754295e1a56b027ffdf72f5cd"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/own-containers-stop.log",
+      "sha256": "e7e718644c44a069c745e7f79b2d34a06f9938eb9062ab893a77289441a5e827"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/package-smoke.log",
+      "sha256": "a2aa78902af442873d9e2931cf548b0f15103eaf387ad5afccfffdcdf6251a04"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/release-scan.json",
+      "sha256": "1cc3cf32685230cee54ab7365d05dbef77f06afd6fc53841bc372f957160301e"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/root-build.log",
+      "sha256": "6b133a2764b9c65251152e9c8bf2ad9212ae6b52d6df76e7decf299526fa8edc"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/root-test-accepted.log",
+      "sha256": "7fa15f66b9c53a572b9af01ceb75b1cd3dc4e69dd522b12852a0ff8067b1be06"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/root-test-release.log",
+      "sha256": "260fe54dcb2f85a7fb6a65c608f791dffbc6e1676ab05df64c2c8cc9a1049bd3"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/runtime-inventory.json",
+      "sha256": "0456a3441a3873cf2e613072e77e91d9b3ea5df898d2e464580d3d4dec48ac7c"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/source-snapshot.json",
+      "sha256": "fe0aeff4f4dbc3f04b0048f6e4d3f61418e759d7855ef44e4131f2d21c6941b9"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/tracker-build-final-permitted.log",
+      "sha256": "7e9dd65d6fe7166ca3a40e695db714030ea4e7a18d4f66ce264468d5c5646241"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/tracker-build-final.log",
+      "sha256": "f63b1a7e95fe483108f54258424e8b8492a0edb3394b07929e5a87ece2611f35"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/tracker-test-final.log",
+      "sha256": "81e0396145047c8a9040b24d4cf86fdfbb70d2e6bc7f607dfcd86c1bad71ca5c"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/typecheck-final.log",
+      "sha256": "c3d8562fe02dca98c31cfe0c126b135fd3d8609db50c67767803242d10029517"
+    },
+    {
+      "path": "docs/acceptance/evidence/real-use-20261008/typecheck-release.log",
+      "sha256": "d068ff8ccf4823174ce01df631776b0a010faaab1c2c98e33f76b8e7dce25250"
+    },
+    {
+      "path": "docs/acceptance/real-use-readiness-20261008.md",
+      "sha256": "87cbd9b3e72246fd1ac345e1668e61a241fd5ab89d388e4beac866d7a44d9a6f"
+    },
+    {
+      "path": "docs/operations/real-use-backup.md",
+      "sha256": "e537da3d8b3bb320dab09c53cf88b85c3bfe3cc20425004c0e456073770b7199"
+    },
+    {
+      "path": "docs/operations/real-use-data-lifecycle.md",
+      "sha256": "a1b1f8efe092a6acda61f005f5ef53a98ca80d633c83bc248644e17069603dc9"
+    },
+    {
+      "path": "docs/operations/real-use-setup.md",
+      "sha256": "a78fe1737df143015cfa8ae290cf4476fc36cf33da04f1daad404cae7fe74745"
+    },
+    {
+      "path": "docs/operations/templates/real-backup-monitor.yml",
+      "sha256": "2b3f7b487feebfd8ecbb42d5cb25f6539a9a3e320ef103afdd31c4f7123adadd"
+    },
+    {
+      "path": "scripts/real-backup-core.mjs",
+      "sha256": "d28ee6da86e447d785a27ad399b3e10df0de3da80bae0a1d606d8a6d82e1bea0"
+    },
+    {
+      "path": "scripts/real-backup-core.test.mjs",
+      "sha256": "92caa5047bcd4fa43d457cd0a3802cffd863e536dea84dcd506f8ad7d45a0c98"
+    },
+    {
+      "path": "scripts/real-backup-rehearsal.mjs",
+      "sha256": "35a14e3c07d302d0cae4ed2189e20555f6acffd9f8be1e95dd53f3995e0817ae"
+    },
+    {
+      "path": "scripts/real-backup-scheduled.ps1",
+      "sha256": "f4d94bab62e342e6abe13365b4ab06012ab5d01ae3834c1fc22cd5da6fab6fc5"
+    },
+    {
+      "path": "scripts/real-backup-target.mjs",
+      "sha256": "de4bac730bd940090668e25345de97a9252ad60ebdbcfb82b556333ebbd7eaeb"
+    },
+    {
+      "path": "scripts/real-backup-target.test.mjs",
+      "sha256": "cb90b17b80b64205b4e4c54cf226ec7d12180ccd5465b5998df9744220d4fbf4"
+    },
+    {
+      "path": "scripts/real-backup-watchdog.mjs",
+      "sha256": "8c1e73ca32473ff2fd56d84337a32889f9496aa098b608b1e3cd5179767841df"
+    },
+    {
+      "path": "scripts/real-db-backup.mjs",
+      "sha256": "13de9675758b79e2089e91720a03ebd176546a417a866f52741098909181c9e7"
+    },
+    {
+      "path": "scripts/real-drive-backup-core.mjs",
+      "sha256": "05ee105f915303eb8ddcb1ee562bdae6c7ae4215765d15f4ec26264d570afe3c"
+    },
+    {
+      "path": "scripts/real-drive-backup-core.test.mjs",
+      "sha256": "cee9e8d34dca3072749cf44e38d3828cdc6f6e5b2df7c247a9ba7792bbf3d65a"
+    },
+    {
+      "path": "scripts/real-drive-backup.mjs",
+      "sha256": "2269ac00b233ea0b90bd0939a4eaa45095563a2d98974e04eb9ee10de6bb9fd9"
+    },
+    {
+      "path": "scripts/real-migration-rehearsal.mjs",
+      "sha256": "87fda9ef1b6227417a44ead6c41716e0b3a1ebc2c2e971f2ce304b629997cdae"
+    },
+    {
+      "path": "scripts/real-use-prepare.mjs",
+      "sha256": "3b85f1dab7c14206b057522495b187691bc55178cc0a16817814e2bdfa93d97d"
+    },
+    {
+      "path": "scripts/sql/real-restore-evidence.sql",
+      "sha256": "5986332067eed51fe9605b2f24f329b63b8c580c812fa85e7723f1d8ecea333b"
+    }
+  ]
+}

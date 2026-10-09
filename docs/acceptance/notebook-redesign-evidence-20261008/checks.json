@@ -1,0 +1,37 @@
+[
+  {
+    "command": "npm run tracker:typecheck",
+    "exitCode": 0,
+    "seconds": 18
+  },
+  {
+    "command": "npm test",
+    "exitCode": 0,
+    "seconds": 17
+  },
+  {
+    "command": "npm run tracker:test",
+    "exitCode": 0,
+    "seconds": 25
+  },
+  {
+    "command": "npm run build",
+    "exitCode": 0,
+    "seconds": 6
+  },
+  {
+    "command": "npm run tracker:build",
+    "exitCode": 0,
+    "seconds": 15
+  },
+  {
+    "command": "node --no-strip-types scripts/tracker-package-smoke.mjs",
+    "exitCode": 0,
+    "seconds": 0
+  },
+  {
+    "command": "git diff --check",
+    "exitCode": 0,
+    "seconds": 0
+  }
+]

@@ -1,0 +1,124 @@
+{
+  "checkedAt": "2026-10-08T18:35:48.097Z",
+  "location": "local Windows network, NOT Render",
+  "crypto": [
+    {
+      "endpoint": "/api/v3/exchangeInfo",
+      "status": 200,
+      "pairs": [
+        {
+          "symbol": "BTCUSDT",
+          "base": "BTC",
+          "quote": "USDT",
+          "status": "TRADING",
+          "spot": true
+        },
+        {
+          "symbol": "ETHUSDT",
+          "base": "ETH",
+          "quote": "USDT",
+          "status": "TRADING",
+          "spot": true
+        },
+        {
+          "symbol": "BNBUSDT",
+          "base": "BNB",
+          "quote": "USDT",
+          "status": "TRADING",
+          "spot": true
+        },
+        {
+          "symbol": "ADAUSDT",
+          "base": "ADA",
+          "quote": "USDT",
+          "status": "TRADING",
+          "spot": true
+        },
+        {
+          "symbol": "XRPUSDT",
+          "base": "XRP",
+          "quote": "USDT",
+          "status": "TRADING",
+          "spot": true
+        },
+        {
+          "symbol": "DOGEUSDT",
+          "base": "DOGE",
+          "quote": "USDT",
+          "status": "TRADING",
+          "spot": true
+        },
+        {
+          "symbol": "SOLUSDT",
+          "base": "SOL",
+          "quote": "USDT",
+          "status": "TRADING",
+          "spot": true
+        }
+      ]
+    },
+    {
+      "endpoint": "/api/v3/ticker/price",
+      "status": 200,
+      "price": "107.57000000",
+      "symbol": "SOLUSDT"
+    }
+  ],
+  "instruments": [
+    {
+      "source": "nasdaqlisted",
+      "row": "AAPL|Apple Inc. - Common Stock|Q|N|N|40|N|N"
+    },
+    {
+      "source": "nasdaqlisted",
+      "row": "AMZN|Amazon.com, Inc. - Common Stock|Q|N|N|100|N|N"
+    },
+    {
+      "source": "nasdaqlisted",
+      "row": "GOOGL|Alphabet Inc. - Class A Common Stock|Q|N|N|40|N|N"
+    },
+    {
+      "source": "nasdaqlisted",
+      "row": "MSFT|Microsoft Corporation - Common Stock|Q|N|N|40|N|N"
+    },
+    {
+      "source": "nasdaqlisted",
+      "row": "NVDA|NVIDIA Corporation - Common Stock|Q|N|N|100|N|N"
+    },
+    {
+      "source": "nasdaqlisted",
+      "row": "QQQ|Invesco QQQ Trust, Series 1|G|N|N|40|Y|N"
+    },
+    {
+      "source": "nasdaqlisted",
+      "row": "TSLA|Tesla, Inc.  - Common Stock|Q|N|N|40|N|N"
+    },
+    {
+      "source": "otherlisted",
+      "row": "SPY|State Street SPDR S&P 500 ETF Trust|P|SPY|Y|40|N|SPY"
+    }
+  ],
+  "stream": {
+    "result": "received public observations",
+    "rows": [
+      {
+        "symbol": "SOLUSDT",
+        "price": "107.63000000",
+        "observedAt": "2026-10-08T18:36:04.330Z",
+        "receivedAt": "2026-10-08T18:36:04.385Z"
+      },
+      {
+        "symbol": "SOLUSDT",
+        "price": "107.63000000",
+        "observedAt": "2026-10-08T18:36:05.217Z",
+        "receivedAt": "2026-10-08T18:36:05.269Z"
+      },
+      {
+        "symbol": "SOLUSDT",
+        "price": "107.63000000",
+        "observedAt": "2026-10-08T18:36:05.259Z",
+        "receivedAt": "2026-10-08T18:36:05.312Z"
+      }
+    ]
+  }
+}

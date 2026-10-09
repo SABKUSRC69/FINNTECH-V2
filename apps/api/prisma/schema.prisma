@@ -1,0 +1,626 @@
+generator client {
+  provider = "prisma-client"
+  output = "../src/generated/prisma"
+  moduleFormat = "esm"
+  generatedFileExtension = "ts"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum IdentityState {
+  UNVERIFIED
+  FIXTURE
+  VERIFIED
+}
+
+enum FinanceType {
+  INCOME
+  EXPENSE
+}
+
+enum TradeSide {
+  BUY
+  SELL
+}
+
+enum Provenance {
+  USER_ENTERED
+  LEGACY_DEMO
+}
+
+enum ProjectionState {
+  NOT_BUILT
+  READY
+}
+
+enum ImportStatus {
+  COMMITTED
+  REVERSED
+}
+
+enum IdempotencyStatus {
+  COMPLETED
+  REVERSED
+}
+
+enum LegacySection {
+  TRANSACTIONS
+  PORTFOLIO
+  PAPER_WALLET
+  PAPER_OPEN_ORDERS
+  PAPER_TRADE_HISTORY
+  PAPER_CANCELLED_ORDER_IDS
+  PRICE_ALERTS
+}
+
+model TrackerUser {
+  id String @id @default(uuid()) @db.Uuid
+  identityState IdentityState @default(UNVERIFIED) @map("identity_state")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  authIdentities AuthIdentity[]
+  categories FinanceCategory[]
+  cashAccounts CashAccount[]
+  transactions FinanceTransaction[]
+  budgets Budget[]
+  portfolios CryptoPortfolio[]
+  trades CryptoTrade[]
+  holdings PortfolioHolding[]
+  namespaces SourceDatasetNamespace[]
+  imports LegacyImport[]
+  legacyRows LegacyImportRow[]
+  legacySummaries LegacyDemoSummary[]
+  auditEvents AuditEvent[]
+  idempotencyKeys IdempotencyKey[]
+  stockPortfolios StockPortfolio[]
+  stockTrades StockTrade[]
+  stockHoldings StockHolding[]
+  manualAssets ManualAsset[]
+  valuationReferences ValuationReference[]
+  mediaObjects MediaObject[]
+  mediaAttachments MediaAttachment[]
+  profile OwnerProfile?
+  @@map("tracker_users")
+}
+
+// One explicit owner override per instrument, shared across that owner's portfolios.
+model ValuationReference {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  symbol String @db.VarChar(16)
+  currency String @db.VarChar(3)
+  source String @default("MANUAL") @db.VarChar(16)
+  value Decimal @db.Decimal(38,18)
+  asOf DateTime @map("as_of") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(3)
+  enabled Boolean @default(true)
+  version Int @default(1)
+  @@unique([ownerId, symbol])
+  @@map("valuation_references")
+}
+
+// Private immutable normalized bytes. Only unlinked staging objects expire.
+model MediaObject {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  purpose String @db.VarChar(16)
+  bytes Bytes
+  byteSize Int @map("byte_size")
+  width Int
+  height Int
+  sha256 String @db.Char(64)
+  stagedExpiresAt DateTime? @map("staged_expires_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  attachments MediaAttachment[]
+  avatars OwnerProfile[]
+  @@unique([ownerId, id])
+  @@index([ownerId, stagedExpiresAt])
+  @@map("media_objects")
+}
+
+// SQL trigger validates the owner of the polymorphic financial record.
+model MediaAttachment {
+  ownerId String @map("owner_id") @db.Uuid
+  kind String @db.VarChar(16)
+  recordId String @map("record_id") @db.Uuid
+  mediaId String @map("media_id") @db.Uuid
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  media MediaObject @relation(fields: [ownerId, mediaId], references: [ownerId, id], onDelete: Restrict)
+  @@id([ownerId, kind, recordId])
+  @@map("media_attachments")
+}
+
+model OwnerProfile {
+  ownerId String @id @map("owner_id") @db.Uuid
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  mediaId String? @map("media_id") @db.Uuid
+  media MediaObject? @relation(fields: [ownerId, mediaId], references: [ownerId, id], onDelete: Restrict)
+  preset String? @db.VarChar(16)
+  version Int @default(1)
+  @@map("owner_profiles")
+}
+
+model CashAccount {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  name String @db.VarChar(100)
+  balance Decimal @db.Decimal(20, 2)
+  currency String @default("THB") @db.VarChar(3)
+  asOf String @map("as_of") @db.VarChar(10)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@unique([ownerId, name])
+  @@map("cash_accounts")
+}
+
+// Business ownership is separate from credentials and database sessions.
+model AuthIdentity {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  provider String @db.VarChar(64)
+  subject String @db.VarChar(191)
+  verifiedAt DateTime? @map("verified_at") @db.Timestamptz(3)
+  authUserId String? @unique @map("auth_user_id") @db.Uuid
+  authUser AuthUser? @relation(fields: [authUserId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  auditEvents AuditEvent[]
+  @@unique([provider, subject])
+  @@unique([ownerId, id])
+  @@map("auth_identities")
+}
+
+model AuthUser {
+  id String @id @default(uuid()) @db.Uuid
+  name String
+  email String @unique
+  emailVerified Boolean @default(false) @map("email_verified")
+  image String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  sessions AuthSession[]
+  accounts AuthAccount[]
+  identity AuthIdentity?
+  recovery AuthRecoveryEnrollment?
+  deliveryJobs AuthDeliveryJob[]
+  demoWorkspace DemoWorkspace?
+  @@map("auth_users")
+}
+
+// Durable browser request receipt. No demo password store and no automatic retention deletion.
+model DemoWorkspace {
+  requestHash String @id @map("request_hash") @db.Char(64)
+  userId String @unique @map("user_id") @db.Uuid
+  user AuthUser @relation(fields: [userId], references: [id], onDelete: Restrict)
+  sessionId String @unique @map("session_id") @db.Uuid
+  epoch String @db.VarChar(64)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@map("demo_workspaces")
+}
+
+model AuthSession {
+  id String @id @default(uuid()) @db.Uuid
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  token String @unique
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
+  userId String @map("user_id") @db.Uuid
+  user AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  @@index([userId])
+  @@map("auth_sessions")
+}
+
+model AuthAccount {
+  id String @id @default(uuid()) @db.Uuid
+  accountId String @map("account_id")
+  providerId String @map("provider_id")
+  userId String @map("user_id") @db.Uuid
+  user AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  accessToken String? @map("access_token")
+  refreshToken String? @map("refresh_token")
+  idToken String? @map("id_token")
+  accessTokenExpiresAt DateTime? @map("access_token_expires_at") @db.Timestamptz(3)
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at") @db.Timestamptz(3)
+  scope String?
+  password String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("auth_accounts")
+}
+
+model AuthVerification {
+  id String @id @default(uuid()) @db.Uuid
+  identifier String
+  value String
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@index([identifier])
+  @@map("auth_verifications")
+}
+
+// Explicit enrollment on creation in the isolated recovery runtime. Never enroll old accounts automatically.
+model AuthRecoveryEnrollment {
+  userId String @id @map("user_id") @db.Uuid
+  user AuthUser @relation(fields: [userId], references: [id], onDelete: Restrict)
+  blocked Boolean @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@map("auth_recovery_enrollments")
+}
+
+// Minimal AES-GCM encrypted delivery envelope; never a plaintext token/link.
+model AuthDeliveryJob {
+  id String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  user AuthUser @relation(fields: [userId], references: [id], onDelete: Restrict)
+  fingerprint String @unique
+  kind String @db.VarChar(16)
+  envelope String
+  status String @default("PENDING") @db.VarChar(16)
+  attempts Int @default(0)
+  firstAttemptAt DateTime? @map("first_attempt_at") @db.Timestamptz(3)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  nextAt DateTime @default(now()) @map("next_at") @db.Timestamptz(3)
+  reason String? @db.VarChar(32)
+  @@index([status, nextAt])
+  @@map("auth_delivery_jobs")
+}
+
+model AuthRecoveryRate {
+  key String
+  window DateTime @db.Timestamptz(3)
+  hits Int
+  @@id([key, window])
+  @@map("auth_recovery_rates")
+}
+
+model RuntimeBoundary {
+  id String @id
+  datasetId String @default(uuid()) @map("dataset_id") @db.Uuid
+  mode String
+  databaseName String @map("database_name")
+  databaseRole String @map("database_role")
+  origin String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@map("runtime_boundaries")
+}
+
+model RealRuntimeCounter {
+  key String @id
+  window DateTime @db.Timestamptz(3)
+  hits Int
+  @@map("real_runtime_counters")
+}
+
+// Minimal tombstones have no FK: they must survive an authorized owner purge.
+model AccountDeletionCase {
+  id String @id @default(uuid()) @db.Uuid
+  sequence BigInt @unique @default(autoincrement())
+  userId String @unique @map("user_id") @db.Uuid
+  ownerId String @unique @map("owner_id") @db.Uuid
+  requestHash String @unique @map("request_hash") @db.Char(64)
+  status String @default("REQUESTED")
+  requestedAt DateTime @default(now()) @map("requested_at") @db.Timestamptz(3)
+  purgedAt DateTime? @map("purged_at") @db.Timestamptz(3)
+  purgeTransaction BigInt? @map("purge_transaction")
+  archiveId String? @map("archive_id")
+  archiveSha256 String? @map("archive_sha256") @db.Char(64)
+  archiveEnvelope String? @map("archive_envelope")
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(3)
+  @@map("account_deletion_cases")
+}
+
+model PrivacyOperator {
+  roleName String @id @map("role_name")
+  @@map("privacy_operators")
+}
+
+model FinanceCategory {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  type FinanceType
+  name String @db.VarChar(100)
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  transactions FinanceTransaction[]
+  budgets Budget[]
+  @@unique([ownerId, id, type])
+  @@unique([ownerId, type, name])
+  @@map("finance_categories")
+}
+
+model FinanceTransaction {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  categoryId String? @map("category_id") @db.Uuid
+  type FinanceType
+  amount Decimal @db.Decimal(20, 2)
+  currency String @default("THB") @db.VarChar(4)
+  provenance Provenance @default(USER_ENTERED)
+  occurredAt DateTime @map("occurred_at") @db.Timestamptz(3)
+  note String? @db.VarChar(500)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  voidedAt DateTime? @map("voided_at") @db.Timestamptz(3)
+  voidReason String? @map("void_reason") @db.VarChar(500)
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  category FinanceCategory? @relation(fields: [ownerId, categoryId, type], references: [ownerId, id, type], onDelete: Restrict, onUpdate: Restrict)
+  @@index([ownerId, occurredAt])
+  @@map("finance_transactions")
+}
+
+model Budget {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  categoryId String @map("category_id") @db.Uuid
+  categoryType FinanceType @default(EXPENSE) @map("category_type")
+  month DateTime @db.Date
+  amount Decimal @db.Decimal(20, 2)
+  currency String @default("THB") @db.VarChar(4)
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  category FinanceCategory @relation(fields: [ownerId, categoryId, categoryType], references: [ownerId, id, type], onDelete: Restrict, onUpdate: Restrict)
+  @@unique([ownerId, categoryId, month])
+  @@map("budgets")
+}
+
+model CryptoPortfolio {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  name String @db.VarChar(100)
+  quoteCurrency String @default("USDT") @map("quote_currency") @db.VarChar(4)
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  trades CryptoTrade[]
+  holdings PortfolioHolding[]
+  @@unique([ownerId, name])
+  @@unique([ownerId, id, quoteCurrency])
+  @@map("crypto_portfolios")
+}
+
+model CryptoAsset {
+  id String @id @default(uuid()) @db.Uuid
+  symbol String @unique @db.VarChar(32)
+  name String? @db.VarChar(100)
+  trades CryptoTrade[]
+  holdings PortfolioHolding[]
+  @@map("crypto_assets")
+}
+
+model CryptoTrade {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  portfolioId String @map("portfolio_id") @db.Uuid
+  assetId String @map("asset_id") @db.Uuid
+  quoteCurrency String @default("USDT") @map("quote_currency") @db.VarChar(4)
+  side TradeSide
+  quantity Decimal @db.Decimal(38, 18)
+  price Decimal @db.Decimal(38, 18)
+  fee Decimal @db.Decimal(38, 18)
+  gross Decimal? @db.Decimal(38, 18)
+  costRemoved Decimal? @map("cost_removed") @db.Decimal(38, 18)
+  realizedPnl Decimal? @map("realized_pnl") @db.Decimal(38, 18)
+  provenance Provenance @default(USER_ENTERED)
+  occurredAt DateTime @map("occurred_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  voidedAt DateTime? @map("voided_at") @db.Timestamptz(3)
+  voidReason String? @map("void_reason") @db.VarChar(500)
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  portfolio CryptoPortfolio @relation(fields: [ownerId, portfolioId, quoteCurrency], references: [ownerId, id, quoteCurrency], onDelete: Restrict)
+  asset CryptoAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  lastForHoldings PortfolioHolding[]
+  @@unique([ownerId, portfolioId, assetId, quoteCurrency, id])
+  @@index([ownerId, portfolioId, assetId, quoteCurrency, occurredAt, id])
+  @@map("crypto_trades")
+}
+
+model PortfolioHolding {
+  ownerId String @map("owner_id") @db.Uuid
+  portfolioId String @map("portfolio_id") @db.Uuid
+  assetId String @map("asset_id") @db.Uuid
+  quoteCurrency String @default("USDT") @map("quote_currency") @db.VarChar(4)
+  quantity Decimal @db.Decimal(38, 18)
+  totalCost Decimal? @map("total_cost") @db.Decimal(38, 18)
+  realizedPnl Decimal? @map("realized_pnl") @db.Decimal(38, 18)
+  state ProjectionState @default(NOT_BUILT)
+  version Int @default(0)
+  lastTradeId String? @map("last_trade_id") @db.Uuid
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  portfolio CryptoPortfolio @relation(fields: [ownerId, portfolioId, quoteCurrency], references: [ownerId, id, quoteCurrency], onDelete: Restrict)
+  asset CryptoAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  lastTrade CryptoTrade? @relation(fields: [ownerId, portfolioId, assetId, quoteCurrency, lastTradeId], references: [ownerId, portfolioId, assetId, quoteCurrency, id], onDelete: Restrict)
+  @@id([ownerId, portfolioId, assetId, quoteCurrency])
+  @@map("portfolio_holdings")
+}
+
+model SourceDatasetNamespace {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  displayName String @map("display_name") @db.VarChar(100)
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  imports LegacyImport[]
+  rows LegacyImportRow[]
+  @@unique([ownerId, id])
+  @@map("source_dataset_namespaces")
+}
+
+model LegacyImport {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  namespaceId String @map("namespace_id") @db.Uuid
+  fileSha256 String @map("file_sha256") @db.Char(64)
+  sourceOrigin String? @map("source_origin") @db.VarChar(255)
+  exportedAt DateTime? @map("exported_at") @db.Timestamptz(3)
+  importedAt DateTime @default(now()) @map("imported_at") @db.Timestamptz(3)
+  consentedAt DateTime @map("consented_at") @db.Timestamptz(3)
+  selectedSections LegacySection[] @map("selected_sections")
+  currencyOverride String? @map("currency_override") @db.VarChar(4)
+  provenance Provenance @default(LEGACY_DEMO)
+  status ImportStatus @default(COMMITTED)
+  receipt Json
+  reversedAt DateTime? @map("reversed_at") @db.Timestamptz(3)
+  reversalReason String? @map("reversal_reason") @db.VarChar(500)
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  namespace SourceDatasetNamespace @relation(fields: [ownerId, namespaceId], references: [ownerId, id], onDelete: Restrict)
+  rows LegacyImportRow[]
+  summaries LegacyDemoSummary[]
+  idempotencyKeys IdempotencyKey[]
+  @@unique([ownerId, id])
+  @@unique([ownerId, namespaceId, fileSha256, id])
+  @@map("legacy_imports")
+}
+
+// SQL migration adds separate partial unique indexes for known-ID and no-ID rows.
+model LegacyImportRow {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  namespaceId String @map("namespace_id") @db.Uuid
+  importId String @map("import_id") @db.Uuid
+  fileSha256 String @map("file_sha256") @db.Char(64)
+  section LegacySection
+  sourceRowId String? @map("source_row_id") @db.VarChar(191)
+  ordinal Int
+  payloadSha256 String @map("payload_sha256") @db.Char(64)
+  sourcePayload Json @map("source_payload")
+  currencyOverride String? @map("currency_override") @db.VarChar(4)
+  costBasis Decimal? @map("cost_basis") @db.Decimal(38, 18)
+  unknownReason String? @map("unknown_reason") @db.VarChar(500)
+  provenance Provenance @default(LEGACY_DEMO)
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  namespace SourceDatasetNamespace @relation(fields: [ownerId, namespaceId], references: [ownerId, id], onDelete: Restrict)
+  import LegacyImport @relation(fields: [ownerId, namespaceId, fileSha256, importId], references: [ownerId, namespaceId, fileSha256, id], onDelete: Restrict)
+  @@index([ownerId, importId])
+  @@map("legacy_import_rows")
+}
+
+model LegacyDemoSummary {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  importId String @map("import_id") @db.Uuid
+  summaryKey String @map("summary_key") @db.VarChar(100)
+  rowCount Int @map("row_count")
+  thbTotal Decimal? @map("thb_total") @db.Decimal(20, 2)
+  usdtTotal Decimal? @map("usdt_total") @db.Decimal(38, 18)
+  provenance Provenance @default(LEGACY_DEMO)
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  import LegacyImport @relation(fields: [ownerId, importId], references: [ownerId, id], onDelete: Restrict)
+  @@unique([ownerId, importId, summaryKey])
+  @@map("legacy_demo_summaries")
+}
+
+model IdempotencyKey {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  endpoint String @db.VarChar(128)
+  key String @db.VarChar(191)
+  requestSha256 String @map("request_sha256") @db.Char(64)
+  status IdempotencyStatus @default(COMPLETED)
+  receipt Json
+  legacyImportId String? @map("legacy_import_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  legacyImport LegacyImport? @relation(fields: [ownerId, legacyImportId], references: [ownerId, id], onDelete: Restrict)
+  auditEvents AuditEvent[]
+  @@unique([ownerId, endpoint, key])
+  @@unique([ownerId, id])
+  @@map("idempotency_keys")
+}
+
+model AuditEvent {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  actorIdentityId String? @map("actor_identity_id") @db.Uuid
+  idempotencyId String? @map("idempotency_id") @db.Uuid
+  requestId String @map("request_id") @db.VarChar(191)
+  eventType String @map("event_type") @db.VarChar(64)
+  entityType String @map("entity_type") @db.VarChar(64)
+  entityId String? @map("entity_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  actorIdentity AuthIdentity? @relation(fields: [ownerId, actorIdentityId], references: [ownerId, id], onDelete: Restrict)
+  idempotency IdempotencyKey? @relation(fields: [ownerId, idempotencyId], references: [ownerId, id], onDelete: Restrict)
+  @@index([ownerId, createdAt])
+  @@map("audit_events")
+}
+model StockInstrument {
+  symbol String @id @db.VarChar(15)
+  name String @db.VarChar(100)
+  kind String @db.VarChar(8)
+  currency String @default("USD") @db.VarChar(3)
+  trades StockTrade[]
+  holdings StockHolding[]
+  @@map("stock_instruments")
+}
+model StockPortfolio {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  owner TrackerUser @relation(fields:[ownerId], references:[id], onDelete:Restrict)
+  name String @db.VarChar(100)
+  quoteCurrency String @default("USD") @map("quote_currency") @db.VarChar(3)
+  trades StockTrade[]
+  holdings StockHolding[]
+  @@unique([ownerId,name])
+  @@unique([ownerId,id,quoteCurrency])
+  @@map("stock_portfolios")
+}
+model StockTrade {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  owner TrackerUser @relation(fields:[ownerId], references:[id], onDelete:Restrict)
+  portfolioId String @map("portfolio_id") @db.Uuid
+  quoteCurrency String @default("USD") @map("quote_currency") @db.VarChar(3)
+  portfolio StockPortfolio @relation(fields:[ownerId,portfolioId,quoteCurrency], references:[ownerId,id,quoteCurrency], onDelete:Restrict)
+  symbol String @db.VarChar(15)
+  instrument StockInstrument @relation(fields:[symbol], references:[symbol], onDelete:Restrict)
+  side TradeSide
+  quantity Decimal @db.Decimal(38,18)
+  price Decimal @db.Decimal(38,18)
+  fee Decimal @db.Decimal(38,18)
+  gross Decimal @db.Decimal(38,18)
+  costRemoved Decimal @map("cost_removed") @db.Decimal(38,18)
+  realizedPnl Decimal @map("realized_pnl") @db.Decimal(38,18)
+  occurredAt DateTime @map("occurred_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  voidedAt DateTime? @map("voided_at") @db.Timestamptz(3)
+  voidReason String? @map("void_reason") @db.VarChar(500)
+  note String @default("") @db.VarChar(500)
+  @@index([ownerId,portfolioId,symbol,occurredAt,createdAt,id])
+  @@map("stock_trades")
+}
+model StockHolding {
+  ownerId String @map("owner_id") @db.Uuid
+  owner TrackerUser @relation(fields:[ownerId], references:[id], onDelete:Restrict)
+  portfolioId String @map("portfolio_id") @db.Uuid
+  quoteCurrency String @default("USD") @map("quote_currency") @db.VarChar(3)
+  portfolio StockPortfolio @relation(fields:[ownerId,portfolioId,quoteCurrency], references:[ownerId,id,quoteCurrency], onDelete:Restrict)
+  symbol String @db.VarChar(15)
+  instrument StockInstrument @relation(fields:[symbol], references:[symbol], onDelete:Restrict)
+  quantity Decimal @db.Decimal(38,18)
+  totalCost Decimal @map("total_cost") @db.Decimal(38,18)
+  realizedPnl Decimal @map("realized_pnl") @db.Decimal(38,18)
+  @@id([ownerId,portfolioId,symbol])
+  @@map("stock_holdings")
+}
+model ManualAsset {
+  id String @id @default(uuid()) @db.Uuid
+  ownerId String @map("owner_id") @db.Uuid
+  owner TrackerUser @relation(fields:[ownerId], references:[id], onDelete:Restrict)
+  name String @db.VarChar(100)
+  type String @db.VarChar(8)
+  currency String @db.VarChar(4)
+  quantity Decimal? @db.Decimal(38,18)
+  unit String @db.VarChar(32)
+  cost Decimal? @db.Decimal(38,18)
+  value Decimal @db.Decimal(38,18)
+  date String @db.VarChar(10)
+  note String @db.VarChar(500)
+  version Int @default(1)
+  @@unique([ownerId,name])
+  @@map("manual_assets")
+}

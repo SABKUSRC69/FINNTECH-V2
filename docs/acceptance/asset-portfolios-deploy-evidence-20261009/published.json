@@ -1,0 +1,32 @@
+{
+  "commit": "8cbb11af2ce3579338fc3976088b9dd3ab1888e6",
+  "branch": "codex/student-real-use",
+  "pushExit": 0,
+  "files": [
+    "apps/api/prisma/migrations/20261009000000_owned_asset_ledgers/migration.sql",
+    "apps/api/prisma/migrations/20261009000001_asset_history_guards/migration.sql",
+    "apps/api/prisma/migrations/20261009000002_asset_numeric_invariants/migration.sql",
+    "apps/api/prisma/schema.prisma",
+    "apps/api/src/server.ts",
+    "apps/api/src/tracker/backup.ts",
+    "apps/api/src/tracker/crypto-stream.ts",
+    "apps/api/src/tracker/manual-assets.ts",
+    "apps/api/src/tracker/market.ts",
+    "apps/api/src/tracker/routes.ts",
+    "apps/api/src/tracker/stock-ledger.ts",
+    "apps/api/src/tracker/stocks.ts",
+    "apps/web/src/tracker/Assets.tsx",
+    "apps/web/src/tracker/Backup.tsx",
+    "apps/web/src/tracker/Dashboard.tsx",
+    "apps/web/src/tracker/ManualAssets.tsx",
+    "apps/web/src/tracker/PageIntro.tsx",
+    "apps/web/src/tracker/StockHoldings.tsx",
+    "apps/web/src/tracker/StockPrices.tsx",
+    "apps/web/src/tracker/marketFreshness.ts",
+    "apps/web/src/tracker/useOwnedWrite.ts",
+    "packages/contracts/src/index.ts",
+    "packages/finance/src/analytics.ts",
+    "packages/finance/src/index.ts"
+  ],
+  "ownerWorkingRepositoryCommitted": false
+}

@@ -1,0 +1,876 @@
+{
+  "baselineFiles": 634,
+  "unchangedBaselineFiles": 614,
+  "missingBaselineFiles": [],
+  "changedFiles": [
+    {
+      "path": "apps/api/db-test/assets.integration.ts",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "e2126c6dd35befcc6d05cef469594951f38bd4073a667b79bf4cda5f6f564b0f",
+      "bytes": 13809
+    },
+    {
+      "path": "apps/api/prisma/migrations/20261009000000_owned_asset_ledgers/migration.sql",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "b7f34707ed8859949fa4fd0f6d0eda2a307d3e851215b16c973e5f8d75cb24ac",
+      "bytes": 9538
+    },
+    {
+      "path": "apps/api/prisma/migrations/20261009000001_asset_history_guards/migration.sql",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "ab140584d6da7247f33a26b2d6eb8cd213367a93d0bb7e1a052b7eb15afac6ac",
+      "bytes": 1254
+    },
+    {
+      "path": "apps/api/prisma/migrations/20261009000002_asset_numeric_invariants/migration.sql",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "1e2a5fbd6bf781eadffe81a9f1e568dc2b5ca46e9c6b6120de1fb78702b23475",
+      "bytes": 740
+    },
+    {
+      "path": "apps/api/prisma/schema.prisma",
+      "status": "modified",
+      "beforeSha256": "2de1497ac9f3df744defcaa6d19750bcd6dab9556957d771be2b01d6e4870818",
+      "afterSha256": "3057040621f00925559c0c88d32cf3ed6e0d4173e868526c888f5cf8fb85eba5",
+      "bytes": 21830
+    },
+    {
+      "path": "apps/api/src/server.ts",
+      "status": "modified",
+      "beforeSha256": "d18ef6c3f4eafde43edb358a76677cc15f1736587081e3eea26fce9190d82e2d",
+      "afterSha256": "15180eebac759d4b510adfcbe5ff3f1105950685e9bf23558f424d2d63172bf1",
+      "bytes": 4810
+    },
+    {
+      "path": "apps/api/src/tracker/backup.ts",
+      "status": "modified",
+      "beforeSha256": "e68a90458ba96cbc9c55c5598c2a9942b420add982b8aad08e914daf8f8e76e8",
+      "afterSha256": "e24d49fffdeab1c70825f95982a2e8c629894deffd551f152c318631552d050e",
+      "bytes": 17439
+    },
+    {
+      "path": "apps/api/src/tracker/crypto-stream.ts",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "b3dce0637c391b4f12f05db232cbbcbc903d9acc76e2e233ad6d155854daec80",
+      "bytes": 6502
+    },
+    {
+      "path": "apps/api/src/tracker/manual-assets.ts",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "43fb2ec0e70bfbe8a011c47f4621fdce12b73999bdc4ff08fe374007789a7d2b",
+      "bytes": 1478
+    },
+    {
+      "path": "apps/api/src/tracker/market.ts",
+      "status": "modified",
+      "beforeSha256": "513436e297dc45db0d08f59eb6e35707d6af5ae9b218ebfef5bd1f85033a1ecd",
+      "afterSha256": "d8cb2143a83d969efef26b893e06478a51a2b5a02c85f8a7c95a503e645a323b",
+      "bytes": 66
+    },
+    {
+      "path": "apps/api/src/tracker/routes.ts",
+      "status": "modified",
+      "beforeSha256": "ad0f1ae1468a001a82c02c13b5ca0651d7211da627970abf43e29a3487596470",
+      "afterSha256": "8a25789b61bc117abad0649acfd6e266a1decc20a1833fd1acf62960b31d1766",
+      "bytes": 8153
+    },
+    {
+      "path": "apps/api/src/tracker/stock-ledger.ts",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "b1f9d1d7885c7132a67f464ef732bc6b1e31f4bfb2934540be7391dba2ec5cc1",
+      "bytes": 5363
+    },
+    {
+      "path": "apps/api/src/tracker/stocks.ts",
+      "status": "modified",
+      "beforeSha256": "c1abe266a022081b589dbeb303833f04c157b95d41884624a60b4e32e9f83815",
+      "afterSha256": "ade608d3e8a8be306bdfe5dba1bda972fb20d7d03bf3bf7cd760ed8f2468730f",
+      "bytes": 8486
+    },
+    {
+      "path": "apps/api/test/crypto-stream.test.ts",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "63b7ad3e4bace3058c2f52e8dc539edbdbe3f3e2f2329adf0c1023b3c36a19ac",
+      "bytes": 5735
+    },
+    {
+      "path": "apps/web/src/tracker/Assets.test.tsx",
+      "status": "modified",
+      "beforeSha256": "0e6c0d26a08bcd6bc76db29ced33477fa82a3292cbb30554f42dfdcb43b4a242",
+      "afterSha256": "7ed37891cdfefbdf8b9b2c1d4315443a2934c125b9699e93777418e5f043da7e",
+      "bytes": 4355
+    },
+    {
+      "path": "apps/web/src/tracker/Assets.tsx",
+      "status": "modified",
+      "beforeSha256": "31be03df6241374e41104044df6bbae32368220e2d4c0675aa484abcfbd2ec92",
+      "afterSha256": "7bf95b47bf0f18d215939289187b7645f5666d6ccbe54738d53a8b7f40f73199",
+      "bytes": 15965
+    },
+    {
+      "path": "apps/web/src/tracker/Backup.tsx",
+      "status": "modified",
+      "beforeSha256": "3a6a128c484d707afff1c7f3439d886fa20a578a24cc9bd69203c1a7ffc00204",
+      "afterSha256": "df0fb25e669be47b3e692b8fb7cacdc9950d76cd8068d20aa595139d0345590d",
+      "bytes": 12402
+    },
+    {
+      "path": "apps/web/src/tracker/Dashboard.navigation.test.tsx",
+      "status": "modified",
+      "beforeSha256": "cc3813aa162bdcacfcbe34ca1027aea6bdf912e39574901f53a67a24495f33e3",
+      "afterSha256": "d2d8ce95fb40ebe9901b66987918c48956cb29b583544fee193bf61c26a7b394",
+      "bytes": 15338
+    },
+    {
+      "path": "apps/web/src/tracker/Dashboard.tsx",
+      "status": "modified",
+      "beforeSha256": "a2ff253e2a11d4d28fe16ca74f7c73cfbc4efb25ca68c4daaf52536100ef7493",
+      "afterSha256": "5553f0f6f64c70735cc8c02a4a8f5c28b79ac8a22ad101d0a40555dbd2e7495d",
+      "bytes": 34960
+    },
+    {
+      "path": "apps/web/src/tracker/ManualAssets.tsx",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "0f2a12f3560cd501034216848c26598fa9c8f8b4bff13f7d1d58b811e0f6c166",
+      "bytes": 7576
+    },
+    {
+      "path": "apps/web/src/tracker/OwnedAssets.test.tsx",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "63291d39beba91ceac5fd7cd860bf614149b11badb15250a2e63bf0708eb8a05",
+      "bytes": 8442
+    },
+    {
+      "path": "apps/web/src/tracker/PageIntro.tsx",
+      "status": "modified",
+      "beforeSha256": "e58f2ad140d867f1b3b1bc886fbe6686ddee1cb6e0da2f628c6ac9f50276816f",
+      "afterSha256": "3586cdcac3f891591b2eb608b999771aaddd92b7c3328f4ff2991e10f32efbeb",
+      "bytes": 1982
+    },
+    {
+      "path": "apps/web/src/tracker/StockHoldings.tsx",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "f7e1e6e51d8440a4ce9f8040992c28684788cbbe6e0581e47851cef7aa4e2d1e",
+      "bytes": 12416
+    },
+    {
+      "path": "apps/web/src/tracker/StockPrices.test.tsx",
+      "status": "modified",
+      "beforeSha256": "b5741c2a362013e064c73317ac009875f5a7adf8b27e8f5096d38c3e91b44307",
+      "afterSha256": "ec0b0eb41d6307a2b931024aeebf17506faa4dc314772296db31a8f470e9aef3",
+      "bytes": 2845
+    },
+    {
+      "path": "apps/web/src/tracker/StockPrices.tsx",
+      "status": "modified",
+      "beforeSha256": "dc1f577ec935d3341254a702b0828c122d5e0ef6af0aed5dfcd5cd841eee3ea7",
+      "afterSha256": "dcf4a13a3bf2e840a947290f8087b4dc830c355d7f2cb4125ed35283e0c3794a",
+      "bytes": 6907
+    },
+    {
+      "path": "apps/web/src/tracker/marketFreshness.test.ts",
+      "status": "modified",
+      "beforeSha256": "dda64a8d7942a034ffac9465cb7ec96e41da1dd35f16e51156265be07ee60278",
+      "afterSha256": "bcb085b48ce0ce880623434cda792b1ba6f4a8ffc14d959412c3d8588cc41d71",
+      "bytes": 1715
+    },
+    {
+      "path": "apps/web/src/tracker/marketFreshness.ts",
+      "status": "modified",
+      "beforeSha256": "37e9882c9c33ad74af2d16bfede5bc4f58f0976abc3f2288790ce9273ae04f24",
+      "afterSha256": "5eec19e25286e3bcb7f6cfa006d783861181e5efd92bcebce6a1516908459442",
+      "bytes": 650
+    },
+    {
+      "path": "apps/web/src/tracker/useOwnedWrite.ts",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "40a728b949e3677a60e3d9161e265af3d556c8e3442547d4abc2b2be870af566",
+      "bytes": 1840
+    },
+    {
+      "path": "docs/acceptance/asset-portfolios-review-20261009.md",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "b16fe1a075ab11e972693d44fc0296077f8c077ce66d8f475f47bb38332c7375",
+      "bytes": 16479
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/assets-1024-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "36fa702ad21594f631234f5d45150ba68c5f30529b61124e15662e70b8018050",
+      "bytes": 10260
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/assets-1024-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "a0c71a745fc612debfac179e232faa6a34810587cf2e239d9a455be6aef113dd",
+      "bytes": 10244
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/assets-1440-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "36fa702ad21594f631234f5d45150ba68c5f30529b61124e15662e70b8018050",
+      "bytes": 10260
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/assets-1440-dark.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "c1a1eedb6cd4a2f7dc3c0bc880f1e5cab0d6b2a4dc023ce33dea89af89c6f24f",
+      "bytes": 122176
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/assets-1440-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "a0c71a745fc612debfac179e232faa6a34810587cf2e239d9a455be6aef113dd",
+      "bytes": 10244
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/assets-1440-light.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "1ef3964ad3d7e486db3097566b9ca3e154ab963d48fa0a0dea22b50ad96950d1",
+      "bytes": 118431
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/assets-320-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "80dec4d9909ab504e2f86df557b659f23d455b3b4480e4f2050b250532add8ed",
+      "bytes": 9416
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/assets-320-dark.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "78b0fa94634cb925f8c27b3e0d51a870c1062289f2478bad2e410d7a58c3fd6f",
+      "bytes": 38468
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/assets-320-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "eed4a96ac0e5d2d5836f6947def51adfc73951c913f1a3b4dd8bdf917225a855",
+      "bytes": 9400
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/assets-320-light.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "416da8ac2da37a0cb4dff7130397dbea9c1b6df9a46cf1c10831b5f1b5256d00",
+      "bytes": 37516
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/assets-375-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "0b54be51feafdb0fdc85687ddc0c3ed5c2e09d10d169b83879bc94b0322b1da6",
+      "bytes": 9416
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/assets-375-dark.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "8bbc1d1e993f365924b4599bc88f0df65d4d8be78212a929f8766a97e7b54267",
+      "bytes": 40886
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/assets-375-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "6db2a70ccb29a11fc235eb36192bf87358be5dd90da799c3d1bcb3d8c0fa2787",
+      "bytes": 9400
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/assets-375-light.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "4a53d740ba88307d9aca27fcdb0faa54f645a682710bc04989af89d7fdce8398",
+      "bytes": 43604
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/assets-768-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "36fa702ad21594f631234f5d45150ba68c5f30529b61124e15662e70b8018050",
+      "bytes": 10260
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/assets-768-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "547d0ba95d4a59e108fecac9078f29562f2ddd7dd156eff56468200c61ed8c83",
+      "bytes": 10244
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/backup-1024-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "e4d6986f5cf2599287f4c73c5ef6abd0dbfc7e0171168087efc9a5539c0c06f5",
+      "bytes": 4765
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/backup-1024-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "f4c80ecca9c0a46b092c188a446441845e1c894f43f8b09b3750e991f25a8279",
+      "bytes": 4749
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/backup-1440-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "e4d6986f5cf2599287f4c73c5ef6abd0dbfc7e0171168087efc9a5539c0c06f5",
+      "bytes": 4765
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/backup-1440-dark.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "5c04cbf6008532fa34a9bede5580e913d2bbe3d676842fb09c970c9b3df53ce7",
+      "bytes": 111465
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/backup-1440-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "f4c80ecca9c0a46b092c188a446441845e1c894f43f8b09b3750e991f25a8279",
+      "bytes": 4749
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/backup-1440-light.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "13ebaf4e16de6ccb82c253fe61e91c43593b02a51aa602f20e85748715783631",
+      "bytes": 109257
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/backup-320-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "d30102d0a3eab2c8fa75f5cdfd6985a0f147489aad91f4ba16f86bf780142449",
+      "bytes": 3921
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/backup-320-dark.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "80a69db90164f42295a64cea1998834b0185f4efa705a2f10f88a69e5d9c9c10",
+      "bytes": 44077
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/backup-320-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "5527ebb30009cd73426d3ab603bc16afae86646e78970ca679e7150612f443cc",
+      "bytes": 3905
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/backup-320-light.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "9c8d0f45e3a94f869608bdc8b19448bcb6eaec5f36ec15f22ede85872d5b20a3",
+      "bytes": 42587
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/backup-375-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "d30102d0a3eab2c8fa75f5cdfd6985a0f147489aad91f4ba16f86bf780142449",
+      "bytes": 3921
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/backup-375-dark.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "f713e57bdbffa7eebadaf73b76ed906463be7071da80abeb4b443691314b7bf8",
+      "bytes": 47455
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/backup-375-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "5527ebb30009cd73426d3ab603bc16afae86646e78970ca679e7150612f443cc",
+      "bytes": 3905
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/backup-375-light.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "507f33330437fd11300ca57b05087d963f594f0210545c441979e2e4abfd9937",
+      "bytes": 49491
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/backup-768-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "e4d6986f5cf2599287f4c73c5ef6abd0dbfc7e0171168087efc9a5539c0c06f5",
+      "bytes": 4765
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/backup-768-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "f4c80ecca9c0a46b092c188a446441845e1c894f43f8b09b3750e991f25a8279",
+      "bytes": 4749
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/browser-download.json",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "b2ab585370f495930eda5bfdc1083e03d44a068ea69ed0f5ba77eee4d89d2a35",
+      "bytes": 222
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/checks.json",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "5a23a8498db103944c64be6d929cd84529afb50fd551eb1ab95401a1ba796790",
+      "bytes": 1111
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-1024-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "6b7994bd086217352b9f7bed54634f05a6208aa6daacbca24c83e5dd2df178b7",
+      "bytes": 6540
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-1024-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "fde7e5912ba42ba9f871f3f92acf71a3a5dd1642eb4172003a3e006f626be01c",
+      "bytes": 6524
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-1440-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "b543d22fc85f86cf34d0cfe6b71ef2ec984598263c5fe2ddee204d84ff43c7fb",
+      "bytes": 6524
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-1440-dark.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "2d1c2c9efa69b3cdb3c97c66a632aeb13ef02650336489ac6f5816486f663b6f",
+      "bytes": 99108
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-1440-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "77c76b7a812b4416af4427d76299fe34b2ea66be11960da79101140a8bf02cde",
+      "bytes": 6508
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-1440-light.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "9fc0f04e8c3c24f903fc83e7db30533da0b3d76463c60920fd616daad4ad3e41",
+      "bytes": 97035
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-320-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "b6e0b8c71075f2dccd7272915382dd628ec19d7c8ef4ee905259f8215ff402d1",
+      "bytes": 5696
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-320-dark.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "c58a800f6ee3d46d466c4a03770d0665735f9617734b649cb3bcd7bac923bb81",
+      "bytes": 37620
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-320-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "6a9136bb9ca88475623fc082e2d6a5514d749b36af8789d52f1ecfcc4e508b0d",
+      "bytes": 5680
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-320-light.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "21f982242fa61b06edd7f190ba6a22d630b9037ff23c6af3b4939a5c6cc52b95",
+      "bytes": 39079
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-375-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "b6e0b8c71075f2dccd7272915382dd628ec19d7c8ef4ee905259f8215ff402d1",
+      "bytes": 5696
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-375-dark.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "517b8c86c7ddbe9473b0832787c8b6b6db47d9779febd49c3b9587b3cb2ae34c",
+      "bytes": 41977
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-375-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "998391858e8f490074d6612838d9fba295be639df485586459a268c126ae3ef4",
+      "bytes": 5680
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-375-light.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "7c2e89ace7a4d743db3b5739e0f62fb2a0f5ed315934fbb33709c17fd719f2cd",
+      "bytes": 45291
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-768-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "6b7994bd086217352b9f7bed54634f05a6208aa6daacbca24c83e5dd2df178b7",
+      "bytes": 6540
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-768-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "44f12bfa125885de493e34ac17e3e8b1abf593bcb9fad2e9f5d59f288c69e6d6",
+      "bytes": 6524
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-real-1.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "82960fe99287274de2a02416da60084da75dd297d69a661e3d8b0bd879446538",
+      "bytes": 6524
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-real-1.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "9cd1aa633a2024fafb5d43dea87b6eb52a59f48bd670d68fc1da122e6f332041",
+      "bytes": 74350
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-real-2.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "ebea1a848d8f9aec6b3aadd39128d921caf12760893188b3dd22a54ea575477c",
+      "bytes": 6524
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/crypto-real-2.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "99ab1087044f52e62c13b435c51dd932e063c415d80686b4459b952f8398fbed",
+      "bytes": 74320
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/first-checks.json",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "52dfc836689634cf5f7cf45c2fb6efac70505e3eced445ae5df7695c8c10e14c",
+      "bytes": 1111
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/interactive-targets.json",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "e9ef9f41f3e6e3a15f989efa8e6805ade6595bc842812b23f68ab40f88bde2b2",
+      "bytes": 3478
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/manual-form-375-dark.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "7b8b4a11fd8ffd6c742c195234b65452363babdde860aabe0ed6f4582b1dfb3d",
+      "bytes": 42671
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/manual-submit-375-dark.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "9d727fe71bb76ee74d4929106ea7e186238ef3da86be50151edd6c3932128e50",
+      "bytes": 34266
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/mobile-form-bottom.json",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "46b0414d79ad7599efc83d1922170007d94890d8e7981ad873bd54938e7bfdfb",
+      "bytes": 178
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/more-keyboard.json",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "914f54e49b0bc26e58dc9a6e6cb665299e7235129f39d98e5575e28a7e113422",
+      "bytes": 153
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/provider-probe.json",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "5a23ec877565941f56970228fb3eb8458b098ccea6fe05e181b8fa608c5167b0",
+      "bytes": 2982
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/real-public-observations.json",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "ba6a18c8a78de2e47ffe08d2eaca517855feb6da6c85be2a276096a252b72aa2",
+      "bytes": 10803
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/responsive-matrix.json",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "8695ef448025396d2fc6577f7b7050f409addd31c269c49b9de3cc79b48dbed9",
+      "bytes": 9912
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/second-checks.json",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "cffa24c2886eae8a6ff67371775c8ef2c68cf79b0b669f9bada372723e18f3bf",
+      "bytes": 1111
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stock-dialog-keyboard.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "ba6e5a8d2cb08234dd62cc5e8d019ba59a0d5f60d2f08ff19319a162d96aa76e",
+      "bytes": 69925
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stock-dialog-keyboard.json",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "67d110e051e0b9ea7970fb97a675ebf5de4678505d6f3630d1462cad50628717",
+      "bytes": 457
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stock-privacy.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "0d8958c5160a15629c04a66380a67e3a534492763839ef46d12a6b6e7866a763",
+      "bytes": 15366
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stocks-1024-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "2882e69704a1df50e31efb55fb8377ddd02ba5bcce6c48c47d1c2e0db1665058",
+      "bytes": 14989
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stocks-1024-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "5d8649ab9a74561376c6c3367e73b06208aadd8a67f42ae039114e1a55712d06",
+      "bytes": 14973
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stocks-1440-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "2882e69704a1df50e31efb55fb8377ddd02ba5bcce6c48c47d1c2e0db1665058",
+      "bytes": 14989
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stocks-1440-dark.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "b64e47cbd172b29f5f38bcfd84d24d897e721021a82a3a7da41e6fccdb10706d",
+      "bytes": 91542
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stocks-1440-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "5d8649ab9a74561376c6c3367e73b06208aadd8a67f42ae039114e1a55712d06",
+      "bytes": 14973
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stocks-1440-light.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "5352cb92500f4abe398c80e7e43fa9783edce5476b1d98e6aa35f0a208000de9",
+      "bytes": 89932
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stocks-320-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "9dc0d1b6f328d3073164f11f7b0c90c0b098e7c1a373e36a457eb47940724018",
+      "bytes": 14145
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stocks-320-dark.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "e5dcb6f33c3aac6bedec503030e8b2d52271ca8f5c5e2316321074f0eda66e98",
+      "bytes": 39453
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stocks-320-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "9b7fc5e0bda0c56136648eb956fe60b6edbfe8866334cb718654f2a085f655fa",
+      "bytes": 14129
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stocks-320-light.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "fbf20849df7370025feddebf6ef6640fe2b28e9cf7ffc0a99e0369be95dfff21",
+      "bytes": 39953
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stocks-375-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "9dc0d1b6f328d3073164f11f7b0c90c0b098e7c1a373e36a457eb47940724018",
+      "bytes": 14145
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stocks-375-dark.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "fe718fe9f012deb12fbb31ecaf49020074be8224a440814539be94b524e00721",
+      "bytes": 45040
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stocks-375-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "9b7fc5e0bda0c56136648eb956fe60b6edbfe8866334cb718654f2a085f655fa",
+      "bytes": 14129
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stocks-375-light.jpg",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "2eae43821da261f7601e704f3a2818d78090b506ee689babccdc5fd34d4c5722",
+      "bytes": 42574
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stocks-768-dark.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "2882e69704a1df50e31efb55fb8377ddd02ba5bcce6c48c47d1c2e0db1665058",
+      "bytes": 14989
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/stocks-768-light.dom.txt",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "5d8649ab9a74561376c6c3367e73b06208aadd8a67f42ae039114e1a55712d06",
+      "bytes": 14973
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/time-sync-result.json",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "91b32e49dc38840182d989fb1c4cfdf71195018f1c415c70ffa333aa026023b4",
+      "bytes": 757
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/upgrade-result.json",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "e841757eabc6912b75ee2ba84fcfbe5c1423f69f4e34d6c5b76df78c0065747c",
+      "bytes": 524
+    },
+    {
+      "path": "docs/acceptance/evidence/asset-portfolios-20261009/windows-time-followup.json",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "52c54f645706a3d5b70b4cf78ea492cdc33da6b1610b78e2571b93817a408377",
+      "bytes": 518
+    },
+    {
+      "path": "packages/contracts/src/index.ts",
+      "status": "modified",
+      "beforeSha256": "0d75996bf9b9e317ae820d71e50c0d47c6eac46af218992b06c52b94b8e260c6",
+      "afterSha256": "f5d12a91c56bc40065b3e19497475270c402019efc0e3c78d78bc6f8c6f5e416",
+      "bytes": 19665
+    },
+    {
+      "path": "packages/contracts/test/owned-assets.test.ts",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "95e2c7219869ece00134b6dd6c73789477f110697ff1593f2bef68669aa93c1e",
+      "bytes": 2211
+    },
+    {
+      "path": "packages/finance/src/analytics.ts",
+      "status": "modified",
+      "beforeSha256": "18f01c5930d73be09a46d6c675b3aa0f6900856941e64c2efe594ae7457e4e81",
+      "afterSha256": "da435a866859fa461166dd3d0214c8a4b030ddf3dcc0b2fdcc6274f9a2be22c5",
+      "bytes": 6323
+    },
+    {
+      "path": "packages/finance/src/index.ts",
+      "status": "modified",
+      "beforeSha256": "244afb2e66127ddca32c750adc79d94ca86c6995c1d9df3a411d0015beb028e4",
+      "afterSha256": "f427fa2ee8702e7ab7d806530bd14fa0e1113caf6c28a515803426bc10db575a",
+      "bytes": 8891
+    },
+    {
+      "path": "packages/finance/test/asset-portfolios.test.ts",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "31d1ee336bc1ef938c5ee4d5d7399a79c37d6d01fd1742bc2f92fc0c83eb4255",
+      "bytes": 2434
+    },
+    {
+      "path": "scripts/portfolio-db-target.d.mts",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "7640b0fd9fa44344f6476523fb11d092b82811e1ce6c43a88ba7322d76ce0626",
+      "bytes": 71
+    },
+    {
+      "path": "scripts/portfolio-db-target.mjs",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "a81c7c06c4a5e080edb69f85656bdc5f7d4577e692b9fe9d0a455fe3993ac498",
+      "bytes": 610
+    },
+    {
+      "path": "scripts/portfolio-local-preview.mjs",
+      "status": "new",
+      "beforeSha256": null,
+      "afterSha256": "b2578f835575a8ea62d7ce44eafc58243596ece602aec67c7ae48961a78ff063",
+      "bytes": 4826
+    },
+    {
+      "path": "README.md",
+      "status": "modified",
+      "beforeSha256": "c677065cac9d1912d54942e41999807e2c6419d5a2d5fbd9d3deb2186e1f83ee",
+      "afterSha256": "69a811afbb915b96b357ace71e76bef40c640ddb03f80d8652186a321d0ff0bf",
+      "bytes": 52361
+    }
+  ],
+  "meta": "Patch, this manifest and its verification record excluded from self-reference"
+}

@@ -1,0 +1,19 @@
+name: finntech-recovery-3a-20261007
+services:
+  postgres-recovery-3a:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: finntech_recovery_3a_20261007
+      POSTGRES_USER: recovery_fixture
+      POSTGRES_PASSWORD: ${TRACKER_RECOVERY_DB_PASSWORD:?Explicit synthetic password required}
+    ports:
+      - "127.0.0.1:5441:5432"
+    volumes:
+      - recovery_3a_20261007_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recovery_fixture -d finntech_recovery_3a_20261007"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+volumes:
+  recovery_3a_20261007_pgdata:

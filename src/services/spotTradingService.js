@@ -35,6 +35,20 @@ const hasPrecision = (value, precision) => {
   if (!Number.isInteger(precision) || precision < 0 || precision > 12) return false
   return Number.isFinite(value) && decimalPlaces(value) <= precision
 }
+const matchesStep = (value, step) => {
+  if (!isFinitePositive(step)) return true
+  const quotient = value / step
+  return Number.isFinite(quotient) && Math.abs(quotient - Math.round(quotient)) <= Math.max(1e-8, Math.abs(quotient) * 1e-10)
+}
+const hasCompleteProviderRules = (rules) => (
+  rules?.orderRulesVerified === true &&
+  Number.isInteger(rules?.baseAssetScale) && rules.baseAssetScale >= 0 && rules.baseAssetScale <= 12 &&
+  Number.isInteger(rules?.providerPriceScale) && rules.providerPriceScale >= 0 && rules.providerPriceScale <= 12 &&
+  Number.isFinite(Number(rules?.priceStep)) && Number(rules.priceStep) > 0 &&
+  Number.isInteger(rules?.providerQuantityScale) && rules.providerQuantityScale >= 0 && rules.providerQuantityScale <= 12 &&
+  Number.isFinite(Number(rules?.quantityStep)) && Number(rules.quantityStep) > 0 &&
+  Number.isFinite(Number(rules?.minQuoteSize)) && Number(rules.minQuoteSize) > 0
+)
 
 export function getSpotAmountPrecision(pair) {
   if (Number.isInteger(pair?.amountPrecision) && pair.amountPrecision >= 0) return pair.amountPrecision
@@ -43,6 +57,27 @@ export function getSpotAmountPrecision(pair) {
   const text = minimum.toString().toLowerCase()
   if (text.includes('e-')) return Number(text.split('e-')[1])
   return text.includes('.') ? text.split('.')[1].length : 0
+}
+
+export function withSpotProviderRules(pair, rules) {
+  if (!pair || !rules?.providerSymbol) return pair
+  const verified = hasCompleteProviderRules(rules)
+  const minQty = Number(rules.minQty)
+  const priceStep = Number(rules.priceStep)
+  const quantityStep = Number(rules.quantityStep)
+  const minQuoteSize = Number(rules.minQuoteSize)
+  return {
+    ...pair,
+    precision: verified ? rules.providerPriceScale : pair.precision,
+    // Never treat Bitkub quantity_scale as base amount precision unless its
+    // order semantics have been verified. This preserves fractional BTC for
+    // display/input while order validation remains fail-closed.
+    amountPrecision: verified ? rules.providerQuantityScale : pair.amountPrecision,
+    minQty: Number.isFinite(minQty) && minQty > 0 ? minQty : pair.minQty,
+    priceStep: Number.isFinite(priceStep) && priceStep > 0 ? priceStep : pair.priceStep ?? null,
+    quantityStep: verified && Number.isFinite(quantityStep) && quantityStep > 0 ? quantityStep : pair.quantityStep ?? null,
+    minQuoteSize: Number.isFinite(minQuoteSize) && minQuoteSize > 0 ? minQuoteSize : pair.minQuoteSize ?? null,
+  }
 }
 
 export function floorSpotAmount(pair, amountInput) {
@@ -55,7 +90,9 @@ export function floorSpotAmount(pair, amountInput) {
 
 export function isUsablePriceStatus(status) {
   const value = typeof status === 'string' ? status : status?.status
-  return value === 'DEMO'
+  // Paper orders may reference verified public market data. Unavailable, stale,
+  // and illustrative prices must never trigger execution or limit matching.
+  return value === 'LIVE'
 }
 
 export function createSpotAccount({
@@ -92,7 +129,7 @@ export function migrateLegacyOpenOrders(orders = []) {
   })
 }
 
-export function validateSpotOrder(order) {
+export function validateSpotOrder(order, pairRules = order?.pairRules) {
   if (!order || typeof order !== 'object') return { success: false, error: 'ไม่พบข้อมูลคำสั่งเทรด' }
 
   const price = Number(order.price)
@@ -120,10 +157,17 @@ export function validateSpotOrder(order) {
   }
 
   const [symbolBase, symbolQuote] = String(order.symbol || '').split('/')
-  const supportedPair = TRADING_PAIRS.find((pair) => pair.symbol === order.symbol)
-  if (!supportedPair) return { success: false, error: 'รองรับเฉพาะคู่ Spot DEMO ที่แสดงในระบบ' }
+  const basePair = TRADING_PAIRS.find((pair) => pair.symbol === order.symbol)
+  if (!basePair) return { success: false, error: 'รองรับเฉพาะคู่ Spot ที่แสดงในระบบ' }
+  if (!pairRules?.providerSymbol) {
+    return { success: false, error: 'ไม่มี metadata กฎคู่เทรดจาก Bitkub /symbols จึงปิดคำสั่ง Spot แบบจำลองไว้' }
+  }
+  if (!hasCompleteProviderRules(pairRules)) {
+    return { success: false, error: pairRules?.orderRulesReason || 'ยังยืนยันความหมาย precision/step/min_quote_size จาก Bitkub /symbols ไม่ได้ จึงปิดคำสั่ง Spot แบบจำลองไว้' }
+  }
+  const supportedPair = withSpotProviderRules(basePair, pairRules)
   const amountPrecision = getSpotAmountPrecision(supportedPair)
-  if (amount < Number(supportedPair.minQty)) {
+  if (Number.isFinite(Number(supportedPair.minQty)) && amount < Number(supportedPair.minQty)) {
     return { success: false, error: `จำนวนขั้นต่ำของ ${order.symbol} คือ ${supportedPair.minQty} ${supportedPair.baseAsset}` }
   }
   if (!hasPrecision(amount, amountPrecision)) {
@@ -131,6 +175,12 @@ export function validateSpotOrder(order) {
   }
   if (!hasPrecision(price, Number(supportedPair.precision))) {
     return { success: false, error: `ราคา ${order.symbol} รองรับทศนิยมไม่เกิน ${supportedPair.precision} ตำแหน่ง` }
+  }
+  if (!matchesStep(price, Number(supportedPair.priceStep)) || !matchesStep(amount, Number(supportedPair.quantityStep))) {
+    return { success: false, error: `ราคา/จำนวน ${order.symbol} ไม่ตรงกับ step ของ Bitkub /symbols` }
+  }
+  if (Number.isFinite(Number(supportedPair.minQuoteSize)) && calculatedTotal < Number(supportedPair.minQuoteSize)) {
+    return { success: false, error: `ยอดคำสั่ง ${order.symbol} ต่ำกว่า min_quote_size ${supportedPair.minQuoteSize} ${supportedPair.quoteAsset}` }
   }
   const baseAsset = order.baseAsset || symbolBase
   const quoteAsset = order.quoteAsset || symbolQuote
@@ -161,6 +211,7 @@ export function validateSpotOrder(order) {
       baseAsset,
       quoteAsset,
       targetPrice: order.orderType === 'LIMIT' ? Number(order.targetPrice ?? price) : undefined,
+      ...(pairRules?.providerSymbol ? { pairRules: { ...pairRules } } : {}),
     },
   }
 }
@@ -192,9 +243,9 @@ function appendTrade(account, order) {
   return { ...account, tradeHistory: [entry, ...account.tradeHistory] }
 }
 
-export function applySpotOrder(currentAccount, orderInput, { priceStatus } = {}) {
+export function applySpotOrder(currentAccount, orderInput, { priceStatus, pairRules = orderInput?.pairRules } = {}) {
   const account = createSpotAccount(currentAccount)
-  const validated = validateSpotOrder(orderInput)
+  const validated = validateSpotOrder(orderInput, pairRules)
   if (!validated.success) return fail(account, validated.error)
   const order = validated.order
   const isLimitPlacement = order.orderType === 'LIMIT' && !order.isLimitExecution
@@ -335,7 +386,7 @@ export function cancelSpotLimitOrder(currentAccount, orderId) {
   }
 }
 
-export function applyLimitPriceTick(currentAccount, symbol, priceInput, priceStatus) {
+export function applyLimitPriceTick(currentAccount, symbol, priceInput, priceStatus, { pairRules } = {}) {
   const account = createSpotAccount(currentAccount)
   const price = Number(priceInput)
   if (!isUsablePriceStatus(priceStatus) || !isFinitePositive(price)) {
@@ -362,7 +413,7 @@ export function applyLimitPriceTick(currentAccount, symbol, priceInput, priceSta
       total,
       fee: total * SPOT_FEE_RATE,
       isLimitExecution: true,
-    }, { priceStatus })
+    }, { priceStatus, pairRules: openOrder.pairRules || pairRules })
     if (fill.success) {
       nextAccount = fill.account
       filledOrders.push(fill.order)

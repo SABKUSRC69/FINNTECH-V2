@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
-import { X, ShieldCheck, User, Mail, Calendar, Award, LogOut, Edit3, Check, Copy, Wallet, Layers, Trash2, RefreshCw, Sparkles, Receipt, PieChart } from 'lucide-react'
+import { X, ShieldCheck, User, Mail, Calendar, Award, LogOut, Edit3, Check, Copy, Wallet, Layers, Trash2, RefreshCw, Sparkles, Receipt, PieChart, Download } from 'lucide-react'
 import { formatCurrency } from '../../utils/formatters'
+import { DEMO_EXPORT_SECTIONS } from '../../services/demoDataExport.js'
 
 export default function UserProfileModal(props) {
   if (!props.isOpen || !props.currentUser) return null
@@ -19,11 +20,34 @@ function UserProfileModalContent({
   onUpdateName,
   onClearAllData,
   onLoadSampleData,
+  onExportData,
   onLogout,
 }) {
   const [isEditing, setIsEditing] = useState(false)
   const [nameInput, setNameInput] = useState(currentUser.name || '')
   const [copiedUID, setCopiedUID] = useState(false)
+  const [selectedExportSections, setSelectedExportSections] = useState([])
+  const [exportMessage, setExportMessage] = useState('')
+
+  const toggleExportSection = (sectionId) => {
+    setSelectedExportSections((previous) => previous.includes(sectionId)
+      ? previous.filter((id) => id !== sectionId)
+      : [...previous, sectionId])
+    setExportMessage('')
+  }
+
+  const handleExportData = () => {
+    if (selectedExportSections.length === 0) {
+      setExportMessage('เลือกข้อมูลที่ต้องการส่งออกอย่างน้อย 1 หมวด')
+      return
+    }
+    const result = onExportData?.(selectedExportSections)
+    if (result?.ok) {
+      setExportMessage(`สร้างไฟล์ส่งออกแล้ว: ${result.filename}`)
+    } else {
+      setExportMessage(result?.message || 'ส่งออกไม่สำเร็จ ข้อมูลต้นฉบับยังไม่ได้ถูกแก้ไข')
+    }
+  }
 
   const handleSaveName = (e) => {
     e.preventDefault()
@@ -48,7 +72,7 @@ function UserProfileModalContent({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden relative text-slate-100">
+      <div className="w-full max-w-md max-h-[90vh] bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden relative text-slate-100 flex flex-col">
         
         {/* Header */}
         <div className="p-5 border-b border-slate-800 flex items-center justify-between">
@@ -68,7 +92,7 @@ function UserProfileModalContent({
         </div>
 
         {/* Profile Card */}
-        <div className="p-6 space-y-5">
+        <div className="p-6 space-y-5 overflow-y-auto">
           
           {/* Top Avatar & Name Info */}
           <div className="flex items-center space-x-4">
@@ -167,14 +191,54 @@ function UserProfileModalContent({
             </div>
           </div>
 
+          {/* Explicitly selected, credential-free demo export */}
+          <section className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3" aria-label="ส่งออกข้อมูล DEMO">
+            <div>
+              <h3 className="text-xs font-bold text-white flex items-center gap-2">
+                <Download className="w-4 h-4 text-cyan-400" /> ส่งออกข้อมูล DEMO ที่เลือก
+              </h3>
+              <p className="mt-1 text-[10px] leading-relaxed text-slate-400">
+                ไฟล์มีเฉพาะหมวดและฟิลด์ที่อนุญาต ไม่มีฟิลด์โปรไฟล์หรือ credential ข้อความ/ชื่อที่คุณกรอกอาจมีข้อมูลส่วนตัว โปรดตรวจไฟล์ก่อนส่ง การส่งออกไม่แก้ไขหรือลบต้นฉบับ
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {DEMO_EXPORT_SECTIONS.map((section) => (
+                <label key={section.id} className="flex items-start gap-2 text-[11px] text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedExportSections.includes(section.id)}
+                    onChange={() => toggleExportSection(section.id)}
+                    className="mt-0.5 accent-emerald-500"
+                  />
+                  <span>{section.label}</span>
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={handleExportData}
+              className="w-full py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 font-bold text-xs border border-cyan-500/30 flex items-center justify-center gap-2"
+            >
+              <Download className="w-3.5 h-3.5" /> ดาวน์โหลดไฟล์ JSON
+            </button>
+            <p className="text-[10px] leading-relaxed text-slate-500">
+              หากจะเปลี่ยน custom domain หรือ redirect ให้ส่งออกขณะเปิดจาก origin เดิมก่อน แล้วเก็บไฟล์ไว้เพื่อนำไปใช้กับ origin ใหม่เมื่อระบบนำเข้าพร้อมใช้งาน รอบนี้ยังไม่มีตัวนำเข้าอัตโนมัติ
+            </p>
+            {exportMessage && <p role="status" className="text-[10px] text-emerald-300 break-words">{exportMessage}</p>}
+          </section>
+
           {/* Account Data Management Actions */}
           <div className="space-y-2 pt-2 border-t border-slate-800">
             <button
               onClick={() => {
                 if (window.confirm('⚠️ คุณต้องการล้างข้อมูลทั้งหมดของบัญชีนี้ (รายรับ-รายจ่าย, สินทรัพย์พอร์ต, ประวัติการเทรด) ให้กลับเป็น 0 สะอาดหมดจดทันทีหรือไม่?')) {
-                  if (onClearAllData) onClearAllData()
-                  alert('✅ ล้างข้อมูลทั้งหมดของบัญชีเรียบร้อยแล้ว')
-                  onClose()
+                  const cleared = onClearAllData ? onClearAllData() : false
+                  if (cleared === false) {
+                    alert('ล้างข้อมูลไม่สำเร็จ ข้อมูลต้นฉบับยังไม่ได้ถูกเปลี่ยน')
+                  } else {
+                    alert('✅ ล้างข้อมูล DEMO ทั้งหมดของบัญชีเรียบร้อยแล้ว')
+                    onClose()
+                  }
                 }
               }}
               className="w-full py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-bold text-xs border border-rose-500/30 flex items-center justify-center space-x-2 transition-all cursor-pointer active:scale-95"
@@ -186,9 +250,13 @@ function UserProfileModalContent({
             <button
               onClick={() => {
                 if (window.confirm('คุณต้องการโหลดชุดข้อมูลตัวอย่าง (Sample Demo) เพื่อทดสอบระบบหรือไม่?')) {
-                  if (onLoadSampleData) onLoadSampleData()
-                  alert('✅ โหลดชุดข้อมูลตัวอย่างสำเร็จ')
-                  onClose()
+                  const loaded = onLoadSampleData ? onLoadSampleData() : false
+                  if (loaded === false) {
+                    alert('โหลดชุดข้อมูลไม่สำเร็จ กรุณาตรวจสอบสถานะการบันทึกข้อมูล')
+                  } else {
+                    alert('✅ โหลดชุดข้อมูลตัวอย่าง DEMO สำเร็จ')
+                    onClose()
+                  }
                 }
               }}
               className="w-full py-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-xs border border-slate-700/60 flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
@@ -203,8 +271,12 @@ function UserProfileModalContent({
             <button
               onClick={() => {
                 if (window.confirm('คุณต้องการออกจากระบบหรือไม่?')) {
-                  onLogout()
-                  onClose()
+                  const loggedOut = onLogout ? onLogout() : false
+                  if (loggedOut === false) {
+                    alert('ออกจากระบบไม่สำเร็จ บัญชียังเปิดอยู่ โปรดลองอีกครั้ง')
+                  } else {
+                    onClose()
+                  }
                 }
               }}
               className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs flex items-center justify-center space-x-2 transition-colors cursor-pointer"

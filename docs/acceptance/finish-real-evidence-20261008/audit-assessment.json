@@ -1,0 +1,147 @@
+{
+  "auditExitCode": 1,
+  "counts": {
+    "info": 0,
+    "low": 0,
+    "moderate": 2,
+    "high": 12,
+    "critical": 0,
+    "total": 14
+  },
+  "runtimePackageCount": 119,
+  "findings": [
+    {
+      "name": "@prisma/config",
+      "severity": "high",
+      "runtimePaths": [],
+      "fixAvailable": {
+        "name": "prisma",
+        "version": "6.19.3",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "name": "braces",
+      "severity": "high",
+      "runtimePaths": [],
+      "fixAvailable": {
+        "name": "tailwindcss",
+        "version": "4.3.3",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "name": "chokidar",
+      "severity": "high",
+      "runtimePaths": [],
+      "fixAvailable": {
+        "name": "tailwindcss",
+        "version": "4.3.3",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "name": "deepmerge-ts",
+      "severity": "high",
+      "runtimePaths": [],
+      "fixAvailable": {
+        "name": "prisma",
+        "version": "6.19.3",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "name": "fast-glob",
+      "severity": "high",
+      "runtimePaths": [],
+      "fixAvailable": {
+        "name": "gh-pages",
+        "version": "6.1.1",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "name": "gh-pages",
+      "severity": "high",
+      "runtimePaths": [],
+      "fixAvailable": {
+        "name": "gh-pages",
+        "version": "6.1.1",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "name": "globby",
+      "severity": "high",
+      "runtimePaths": [],
+      "fixAvailable": {
+        "name": "gh-pages",
+        "version": "6.1.1",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "name": "micromatch",
+      "severity": "high",
+      "runtimePaths": [],
+      "fixAvailable": {
+        "name": "tailwindcss",
+        "version": "4.3.3",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "name": "mysql2",
+      "severity": "high",
+      "runtimePaths": [],
+      "fixAvailable": {
+        "name": "prisma",
+        "version": "6.19.3",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "name": "postcss-nested",
+      "severity": "moderate",
+      "runtimePaths": [],
+      "fixAvailable": true
+    },
+    {
+      "name": "postcss-selector-parser",
+      "severity": "moderate",
+      "runtimePaths": [],
+      "fixAvailable": {
+        "name": "tailwindcss",
+        "version": "4.3.3",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "name": "prisma",
+      "severity": "high",
+      "runtimePaths": [],
+      "fixAvailable": {
+        "name": "prisma",
+        "version": "6.19.3",
+        "isSemVerMajor": true
+      }
+    },
+    {
+      "name": "source-map-js",
+      "severity": "high",
+      "runtimePaths": [],
+      "fixAvailable": true
+    },
+    {
+      "name": "tailwindcss",
+      "severity": "high",
+      "runtimePaths": [],
+      "fixAvailable": {
+        "name": "tailwindcss",
+        "version": "4.3.3",
+        "isSemVerMajor": true
+      }
+    }
+  ],
+  "baseImageCveScan": "NOT_TESTED: no local scanner installed"
+}

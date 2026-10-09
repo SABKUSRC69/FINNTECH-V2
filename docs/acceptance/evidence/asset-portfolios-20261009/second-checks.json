@@ -1,0 +1,56 @@
+[
+  {
+    "command": "npm run tracker:typecheck",
+    "exitCode": 0,
+    "seconds": 16,
+    "testCounts": []
+  },
+  {
+    "command": "npm test",
+    "exitCode": 0,
+    "seconds": 17,
+    "testCounts": [
+      "Test Files  53 passed (53)",
+      "Tests  425 passed (425)"
+    ]
+  },
+  {
+    "command": "npm run tracker:test",
+    "exitCode": 0,
+    "seconds": 24,
+    "testCounts": [
+      "Test Files  4 passed (4)",
+      "Tests  25 passed (25)",
+      "Test Files  5 passed (5)",
+      "Tests  16 passed (16)",
+      "Test Files  15 passed (15)",
+      "Tests  129 passed (129)",
+      "Test Files  17 passed (17)",
+      "Tests  110 passed (110)"
+    ]
+  },
+  {
+    "command": "npm run build",
+    "exitCode": 0,
+    "seconds": 6,
+    "testCounts": []
+  },
+  {
+    "command": "npm run tracker:build",
+    "exitCode": 0,
+    "seconds": 19,
+    "testCounts": []
+  },
+  {
+    "command": "node --no-strip-types scripts/tracker-package-smoke.mjs",
+    "exitCode": 0,
+    "seconds": 0,
+    "testCounts": []
+  },
+  {
+    "command": "git diff --check",
+    "exitCode": 0,
+    "seconds": 0,
+    "testCounts": []
+  }
+]
