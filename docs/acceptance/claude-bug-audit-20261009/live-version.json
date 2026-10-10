@@ -1,0 +1,32 @@
+﻿{
+    "fetchedAt":  "2026-10-09T20:52:52.8673604+07:00",
+    "health":  {
+                   "status":  "ok",
+                   "service":  "tracker-api",
+                   "checks":  {
+                                  "process":  "ok",
+                                  "database":  "ok",
+                                  "auth":  "not_checked"
+                              },
+                   "real":  {
+                                "registrationsOpen":  true,
+                                "authenticationMode":  "email-password",
+                                "stagingEnrollment":  false,
+                                "rehearsal":  false,
+                                "supportEmail":  ""
+                            }
+               },
+    "assets":  [
+                   {
+                       "asset":  "/assets/index-BS-Aa3p3.css",
+                       "sha256":  "e40ad9f5c09ce50ad1df4e23d757015a45544e0e9173554434d277a08f684b07"
+                   },
+                   {
+                       "asset":  "/assets/index-D3vtIgU1.js",
+                       "sha256":  "53c26490ce297dddd9c6291f25b03e4b59b167fc2c8f9bb3e8b8c46850f34db2"
+                   }
+               ],
+    "ready":  {
+                  "ready":  true
+              }
+}

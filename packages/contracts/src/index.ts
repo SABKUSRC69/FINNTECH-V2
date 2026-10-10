@@ -91,8 +91,20 @@ export const categoryInputSchema = z.object({
   name: z.string().trim().min(1).max(100), type: z.enum(['income', 'expense']),
 }).strict()
 export const categoryRenameSchema = z.object({ name: z.string().trim().min(1).max(100) }).strict()
+/** Category labels only: the starter action never creates amounts, transactions, budgets or trades. */
+export const STARTER_CATEGORIES = {
+  expense: ['อาหารและเครื่องดื่ม', 'เดินทาง', 'ที่พัก', 'ค่าน้ำไฟและอินเทอร์เน็ต', 'สุขภาพ', 'การศึกษา', 'ซื้อของ', 'อื่น ๆ'],
+  // No 'investment income' label: sale proceeds already reach cash through the trade itself.
+  income: ['เงินเดือน', 'งานเสริม', 'ปันผล / ดอกเบี้ย', 'ของขวัญ', 'อื่น ๆ'],
+} as const
+export const starterCategoriesInputSchema = z.object({}).strict()
+export const cashSettlementSchema = z.object({ accountId: z.string().uuid(), amountThb: positiveThbAmount }).strict()
+// Input form: the THB amount is omitted only for a record already included in the opening balance.
+export const cashSettlementInputSchema = z.object({ accountId: z.string().uuid(), amountThb: positiveThbAmount.optional() }).strict()
+/** true: dated before the account's opening date and already in that balance (no cash change). */
+const openingBalanceField = { inOpeningBalance: z.boolean().optional() }
 export const financeEntrySchema = financeTransactionInputSchema.extend({
-  attachmentId: z.string().uuid().optional(), categoryId: z.string().uuid(), date: calendarDateSchema, note: z.string().trim().max(500).default(''),
+  ...openingBalanceField, cashAccountId: z.string().uuid().nullable().optional(), attachmentId: z.string().uuid().optional(), categoryId: z.string().uuid(), date: calendarDateSchema, note: z.string().trim().max(500).default(''),
 }).strict()
 export const budgetInputSchema = z.object({
   categoryId: z.string().uuid(), month: calendarMonthSchema, amount: positiveThbAmount,
@@ -100,7 +112,7 @@ export const budgetInputSchema = z.object({
 }).strict()
 export const portfolioInputSchema = z.object({ name: z.string().trim().min(1).max(100), quoteCurrency: z.literal('USDT') }).strict()
 export const tradeEntrySchema = cryptoTradeInputSchema.extend({
-  attachmentId: z.string().uuid().optional(), portfolioId: z.string().uuid(), date: calendarDateSchema,
+  ...openingBalanceField, cashSettlement: cashSettlementInputSchema.nullable().optional(), attachmentId: z.string().uuid().optional(), portfolioId: z.string().uuid(), date: calendarDateSchema,
 }).strict()
 const correctionReasonSchema = z.string().trim().min(1).max(500)
 export const financeCorrectionSchema = z.discriminatedUnion('action', [
@@ -126,7 +138,7 @@ export const financeOverviewSchema = z.object({
   month: calendarMonthSchema, currency: z.literal('THB'),
   income: z.string(), expense: z.string(), balance: z.string(),
   categories: z.array(categoryViewSchema),
-  transactions: z.array(z.object({ id: resourceIdSchema, type: z.enum(['income', 'expense']), amount: z.string(), date: calendarDateSchema, note: z.string(), categoryId: resourceIdSchema, ...correctionViewFields })),
+  transactions: z.array(z.object({ id: resourceIdSchema, type: z.enum(['income', 'expense']), amount: z.string(), date: calendarDateSchema, note: z.string(), cashAccountId: resourceIdSchema.nullable().optional(), ...openingBalanceField, categoryId: resourceIdSchema, ...correctionViewFields })),
   budgets: z.array(z.object({ id: resourceIdSchema, categoryId: resourceIdSchema, amount: z.string(), spent: z.string(), remaining: z.string() })),
 })
 export type FinanceOverview = z.infer<typeof financeOverviewSchema>
@@ -134,7 +146,7 @@ export type FinanceEntry = z.infer<typeof financeEntrySchema>
 export const cryptoOverviewSchema = z.object({
   quoteCurrency: z.literal('USDT'), portfolios: z.array(z.object({ id: resourceIdSchema, name: z.string() })),
   holdings: z.array(z.object({ portfolioId: resourceIdSchema, asset: z.string(), quantity: z.string(), totalCost: z.string().nullable(), realizedPnl: z.string().nullable() })),
-  trades: z.array(z.object({ id: resourceIdSchema, portfolioId: resourceIdSchema, asset: z.string(), side: z.enum(['buy', 'sell']), quantity: z.string(), price: z.string(), fee: z.string(), realizedPnl: z.string().nullable(), date: calendarDateSchema, ...correctionViewFields })),
+  trades: z.array(z.object({ ...openingBalanceField, cashSettlement: cashSettlementSchema.nullable().optional(), id: resourceIdSchema, portfolioId: resourceIdSchema, asset: z.string(), side: z.enum(['buy', 'sell']), quantity: z.string(), price: z.string(), fee: z.string(), realizedPnl: z.string().nullable(), date: calendarDateSchema, ...correctionViewFields })),
 })
 export type CryptoOverview = z.infer<typeof cryptoOverviewSchema>
 export const providerMetadataSchema = z.object({ symbols: z.array(z.object({ symbol: z.string(), baseAsset: z.string(), quoteAsset: z.string(), status: z.string(),isSpotTradingAllowed:z.boolean().optional() })) })
@@ -149,12 +161,16 @@ export type MarketSnapshot = z.infer<typeof marketSnapshotSchema>
 // USD price observations are separate from the USDT ledger; this is a watchlist, not ownership.
 export const stockSymbolSchema = z.string().regex(/^[A-Za-z][A-Za-z0-9.-]{0,14}$/)
   .transform(symbol => symbol.toUpperCase())
+// Last-trade valuation only (never bid/ask/midpoint). AUTH_FAILED / NOT_ENTITLED / CONNECTION_LIMIT are
+// provider answers, distinct from NOT_CONFIGURED (no server keys) and from a closed market session.
 export const stockMarketSnapshotSchema = z.object({
   source: z.literal('Alpaca IEX'), currency: z.literal('USD'),
-  connection: z.enum(['NOT_CONFIGURED', 'CONNECTING', 'STREAMING', 'UNAVAILABLE']),
+  connection: z.enum(['NOT_CONFIGURED', 'CONNECTING', 'STREAMING', 'UNAVAILABLE', 'AUTH_FAILED', 'NOT_ENTITLED', 'CONNECTION_LIMIT']),
+  session: z.enum(['REGULAR', 'CLOSED']).optional(),
+  excluded: z.array(stockSymbolSchema).max(200).optional(),
   quotes: z.array(z.object({
     symbol: stockSymbolSchema, price: positiveCryptoAmount.nullable(),
-    status: z.enum(['LIVE', 'STALE', 'UNAVAILABLE']),
+    status: z.enum(['LIVE', 'STALE', 'CLOSED', 'UNAVAILABLE']),
     observedAt: z.string().nullable(), receivedAt: z.string().datetime().nullable(),
   })).max(30),
 })
@@ -188,7 +204,7 @@ export const stockCorrectionSchema = z.discriminatedUnion('action',[
 ])
 export const stockOverviewSchema = z.object({quoteCurrency:z.literal('USD'),portfolios:z.array(z.object({id:resourceIdSchema,name:z.string()})),
  holdings:z.array(z.object({portfolioId:resourceIdSchema,symbol:stockSymbolSchema,quantity:z.string(),totalCost:z.string(),realizedPnl:z.string()})),
- trades:z.array(stockTradeEntrySchema.extend({id:resourceIdSchema,realizedPnl:z.string(),...correctionViewFields})),
+ trades:z.array(stockTradeEntrySchema.extend({cashSettlement:cashSettlementSchema.nullable().optional(),id:resourceIdSchema,realizedPnl:z.string(),...correctionViewFields})),
 })
 export type StockOverview = z.infer<typeof stockOverviewSchema>
 const manualAssetFields = z.object({name:z.string().trim().min(1).max(100),type:z.enum(['GOLD','PROPERTY','OTHER']),currency:z.enum(['THB','USD','USDT']),
@@ -197,7 +213,8 @@ const manualAssetFields = z.object({name:z.string().trim().min(1).max(100),type:
 const refineManualAsset=(v:z.infer<typeof manualAssetFields>,c:z.RefinementCtx)=>{if(v.quantity!==null&&!v.unit)c.addIssue({code:'custom',message:'Quantity needs a unit'});if(v.currency==='THB'){for(const value of [v.value,v.cost])if(value!==null&&!decimalStringField(parseThbDecimal,'non_negative','THB').safeParse(value).success)c.addIssue({code:'custom',message:'THB scale exceeded'})}}
 export const manualAssetInputSchema=manualAssetFields.superRefine(refineManualAsset)
 export const manualAssetUpdateSchema = z.object({asset:manualAssetInputSchema,expectedVersion:z.number().int().positive().max(2147483646)}).strict()
-export const manualAssetOverviewSchema = z.object({assets:z.array(manualAssetFields.extend({id:resourceIdSchema,version:z.number().int().positive()}).superRefine(refineManualAsset))})
+export const manualAssetStatusSchema = z.object({archived:z.boolean(),expectedVersion:z.number().int().positive().max(2147483646)}).strict()
+export const manualAssetOverviewSchema = z.object({assets:z.array(manualAssetFields.extend({id:resourceIdSchema,version:z.number().int().positive(),archived:z.boolean().default(false)}).superRefine(refineManualAsset))})
 export type ManualAssetOverview = z.infer<typeof manualAssetOverviewSchema>
 
 // USDTHB is a rate (THB per USD); instrument prices are USD per share.
@@ -211,11 +228,39 @@ export const valuationReferenceSchema=referenceFields.extend({id:resourceIdSchem
 export type ValuationReference=z.infer<typeof valuationReferenceSchema>
 export const dailyUsdRateSchema=z.object({source:z.literal('ECB'),kind:z.literal('DAILY'),status:z.enum(['DAILY','STALE','MISSING','ERROR']),rate:positiveCryptoAmount.nullable(),asOf:z.string().datetime().nullable(),receivedAt:z.string().datetime().nullable()})
 export type DailyUsdRate=z.infer<typeof dailyUsdRateSchema>
-export const valuationOverviewSchema=z.object({references:z.array(valuationReferenceSchema).max(STOCK_INSTRUMENTS.length+1),usdThb:dailyUsdRateSchema})
+// Shared end-of-day closes fetched by the server (never by the browser, never with a browser key).
+// `close` is the unadjusted official close per share for `tradingDate` (New York). Freshness is
+// judged in trading sessions by @finntech/finance assessDailyClose, never by the 30 s live rule.
+// provider: NOT_CONFIGURED = no server key/licence; NOT_LICENSED = licence does not cover this account.
+export const dailyCloseQuoteSchema=z.object({symbol:stockSymbolSchema,currency:z.literal('USD'),priceType:z.literal('CLOSE'),
+ close:positiveCryptoAmount.nullable(),tradingDate:calendarDateSchema.nullable(),fetchedAt:z.string().datetime().nullable(),
+ status:z.enum(['CURRENT','DELAYED','STALE','MISSING','ERROR']),
+ problem:z.enum(['AUTH_FAILED','RATE_LIMITED','NOT_FOUND','UNAVAILABLE','INVALID_DATA','NOT_YET_PUBLISHED','BUDGET_EXHAUSTED']).nullable()}).strict()
+export const dailyCloseSnapshotSchema=z.object({provider:z.enum(['NOT_CONFIGURED','READY','NOT_LICENSED']),
+ source:z.string().max(64).nullable(),license:z.enum(['REDISTRIBUTION','PERSONAL']).nullable(),expectedSession:calendarDateSchema,
+ attribution:z.object({label:z.string().max(64),url:z.string().url().max(200)}).nullable(),
+ // SERVER: shared licensed key. ACCOUNT: this account's own personal key (data never shown to others).
+ keySource:z.enum(['SERVER','ACCOUNT']).optional(),
+ // Free personal data is request-scoped on the server and held only by the active browser view.
+ retention:z.enum(['TRANSIENT','PERSISTENT']).optional(),keyVersion:z.number().int().positive().nullable().optional(),
+ quotes:z.array(dailyCloseQuoteSchema).max(STOCK_INSTRUMENTS.length)}).strict()
+// A personal provider key: sent once over HTTPS to this server, stored encrypted, never returned.
+export const marketKeyInputSchema=z.object({provider:z.literal('TIINGO'),token:z.string().trim().regex(/^[A-Za-z0-9]{20,128}$/),
+ confirmPersonalUse:z.literal(true),expectedVersion:z.number().int().positive().max(2147483646).nullable()}).strict()
+export const marketKeyRemoveSchema=z.object({expectedVersion:z.number().int().positive().max(2147483646)}).strict()
+export const marketKeyStatusSchema=z.object({available:z.boolean(),provider:z.literal('TIINGO'),status:z.enum(['NONE','ACTIVE','REMOVED']),
+ hint:z.string().regex(/^[A-Za-z0-9]{4}$/).nullable(),updatedAt:z.string().datetime().nullable(),version:z.number().int().positive().nullable()}).strict()
+export type MarketKeyStatus=z.infer<typeof marketKeyStatusSchema>
+export type DailyCloseSnapshot=z.infer<typeof dailyCloseSnapshotSchema>
+export type DailyCloseQuote=z.infer<typeof dailyCloseQuoteSchema>
+export const valuationOverviewSchema=z.object({references:z.array(valuationReferenceSchema).max(STOCK_INSTRUMENTS.length+1),usdThb:dailyUsdRateSchema,dailyCloses:dailyCloseSnapshotSchema.optional()})
 export type ValuationOverview=z.infer<typeof valuationOverviewSchema>
 
-export const BACKUP_MAX_BYTES = 2 * 1024 * 1024
-export const BACKUP_MAX_ROWS = 2000
+// Chosen from measurements on a 0.1 CPU / 512 MB container (Render Free): at 5,000 mixed rows export
+// took ~19 s, restore ~47 s and peak memory ~285 MiB; 20,000 rows was not safe on that CPU budget.
+// See docs/acceptance/claude-fix-release-20261009.md before raising either value.
+export const BACKUP_MAX_BYTES = 5 * 1024 * 1024
+export const BACKUP_MAX_ROWS = 5000
 const backupTimestamp = z.string().datetime().refine(value => {
   try { return new Date(value).toISOString() === value } catch { return false }
 }, 'Timestamp must use canonical UTC milliseconds')
@@ -228,7 +273,7 @@ const backupFields = z.object({
   transactions: z.array(financeEntrySchema.omit({attachmentId:true}).extend({ id: backupId, createdAt: backupTimestamp, ...backupCancellation }).strict().refine(pairedCancellation)).max(BACKUP_MAX_ROWS),
   budgets: z.array(budgetInputSchema.extend({ id: backupId }).strict()).max(BACKUP_MAX_ROWS),
   portfolios: z.array(portfolioInputSchema.extend({ id: backupId }).strict()).max(BACKUP_MAX_ROWS),
-  trades: z.array(tradeEntrySchema.omit({attachmentId:true}).extend({ id: backupId, createdAt: backupTimestamp, ...backupCancellation,
+  trades: z.array(tradeEntrySchema.omit({attachmentId:true}).extend({ cashSettlement: cashSettlementSchema.nullable().optional(), id: backupId, createdAt: backupTimestamp, ...backupCancellation,
     accounting: z.object({ gross: nonNegativeCryptoAmount.nullable(), costRemoved: nonNegativeCryptoAmount.nullable(), realizedPnl: decimalStringField(parseCryptoDecimal, 'signed', 'crypto P&L').nullable() }).strict(),
   }).strict().refine(pairedCancellation)).max(BACKUP_MAX_ROWS),
 }).strict()
@@ -246,19 +291,27 @@ const refineBackup = (value: Omit<z.infer<typeof backupFields>, "version">, cont
   }
   if (new Set(value.trades.map(row => row.asset)).size > 128) context.addIssue({ code: 'custom', message: 'Asset limit exceeded' })
 }
-const backupV1Schema = backupFields.superRefine(refineBackup)
-const backupV2Schema = backupFields.omit({ version: true }).extend({ version: z.literal(2), cashAccounts: z.array(cashInputSchema.extend({ id: backupId }).strict()).max(BACKUP_MAX_ROWS) }).superRefine(refineBackup).superRefine((value, context) => {
+const refineCashLinks=(v:{transactions:{cashAccountId?:string|null|undefined;inOpeningBalance?:boolean|undefined}[];trades:{cashSettlement?:z.infer<typeof cashSettlementSchema>|null|undefined;inOpeningBalance?:boolean|undefined}[];cashAccounts?:{id:string}[];stockTrades?:{cashSettlement?:z.infer<typeof cashSettlementSchema>|null|undefined;inOpeningBalance?:boolean|undefined}[]},c:z.RefinementCtx)=>{
+ const ids=new Set((v.cashAccounts??[]).map(row=>row.id))
+ // A record already in an opening balance moved no money, so it never carries a cash link.
+ for(const row of v.transactions)if(row.inOpeningBalance&&row.cashAccountId)c.addIssue({code:'custom',message:'Opening-balance record cannot be linked'})
+ for(const row of [...v.trades,...(v.stockTrades??[])])if(row.inOpeningBalance&&row.cashSettlement)c.addIssue({code:'custom',message:'Opening-balance trade cannot be settled'})
+ for(const row of v.transactions)if(row.cashAccountId&&!ids.has(row.cashAccountId))c.addIssue({code:'custom',message:'Invalid cash account reference'})
+ for(const row of [...v.trades,...(v.stockTrades??[])])if(row.cashSettlement&&!ids.has(row.cashSettlement.accountId))c.addIssue({code:'custom',message:'Invalid settlement account reference'})
+}
+const backupV1Schema = backupFields.superRefine(refineBackup).superRefine(refineCashLinks)
+const backupV2Schema = backupFields.omit({ version: true }).extend({ version: z.literal(2), cashAccounts: z.array(cashInputSchema.extend({ id: backupId }).strict()).max(BACKUP_MAX_ROWS) }).superRefine(refineBackup).superRefine(refineCashLinks).superRefine((value, context) => {
   if (value.cashAccounts.length + value.categories.length + value.transactions.length + value.budgets.length + value.portfolios.length + value.trades.length > BACKUP_MAX_ROWS) context.addIssue({ code: 'custom', message: 'Backup row limit exceeded' })
   if (new Set(value.cashAccounts.map(row => row.id)).size !== value.cashAccounts.length || new Set(value.cashAccounts.map(row => row.name)).size !== value.cashAccounts.length) context.addIssue({ code: 'custom', message: 'Duplicate cash accounts' })
 })
-const stockBackupTradeSchema = stockTradeEntrySchema.omit({attachmentId:true}).extend({id:backupId,createdAt:backupTimestamp,...backupCancellation,
+const stockBackupTradeSchema = stockTradeEntrySchema.omit({attachmentId:true}).extend({cashSettlement:cashSettlementSchema.nullable().optional(),id:backupId,createdAt:backupTimestamp,...backupCancellation,
  accounting:z.object({gross:nonNegativeCryptoAmount,costRemoved:nonNegativeCryptoAmount,realizedPnl:decimalStringField(parseCryptoDecimal,'signed','USD P&L')}).strict(),
 }).strict().refine(pairedCancellation)
 const backupAssetFields = backupFields.omit({version:true}).extend({
  cashAccounts:z.array(cashInputSchema.extend({id:backupId}).strict()).max(BACKUP_MAX_ROWS),
  stockPortfolios:z.array(stockPortfolioInputSchema.extend({id:backupId}).strict()).max(BACKUP_MAX_ROWS),
  stockTrades:z.array(stockBackupTradeSchema).max(BACKUP_MAX_ROWS),
- manualAssets:z.array(z.object({id:backupId,asset:manualAssetInputSchema}).strict()).max(BACKUP_MAX_ROWS),
+ manualAssets:z.array(z.object({id:backupId,asset:manualAssetInputSchema,archived:z.boolean().default(false)}).strict()).max(BACKUP_MAX_ROWS),
 })
 const refineAssetBackup=(v:z.infer<typeof backupAssetFields>,c:z.RefinementCtx)=>{
  const groups=[v.categories,v.transactions,v.budgets,v.portfolios,v.trades,v.cashAccounts,v.stockPortfolios,v.stockTrades,v.manualAssets]
@@ -267,8 +320,8 @@ const refineAssetBackup=(v:z.infer<typeof backupAssetFields>,c:z.RefinementCtx)=
  for(const names of [v.cashAccounts.map(row=>row.name),v.stockPortfolios.map(row=>row.name),v.manualAssets.map(row=>row.asset.name)])if(new Set(names).size!==names.length)c.addIssue({code:'custom',message:'Duplicate name'})
  const portfolios=new Set(v.stockPortfolios.map(row=>row.id));for(const row of v.stockTrades)if(!portfolios.has(row.portfolioId))c.addIssue({code:'custom',message:'Invalid USD portfolio reference'})
 }
-const backupV3Schema=backupAssetFields.extend({version:z.literal(3)}).superRefine(refineBackup).superRefine(refineAssetBackup)
-const backupV4Schema=backupAssetFields.extend({version:z.literal(4),valuationReferences:z.array(referenceFields.extend({id:backupId}).refine(referenceCurrency)).max(STOCK_INSTRUMENTS.length+1)}).superRefine(refineBackup).superRefine(refineAssetBackup).superRefine((v,c)=>{
+const backupV3Schema=backupAssetFields.extend({version:z.literal(3)}).superRefine(refineBackup).superRefine(refineAssetBackup).superRefine(refineCashLinks)
+const backupV4Schema=backupAssetFields.extend({version:z.literal(4),valuationReferences:z.array(referenceFields.extend({id:backupId}).refine(referenceCurrency)).max(STOCK_INSTRUMENTS.length+1)}).superRefine(refineBackup).superRefine(refineAssetBackup).superRefine(refineCashLinks).superRefine((v,c)=>{
  const refs=v.valuationReferences
  if(new Set(refs.map(r=>r.id)).size!==refs.length||new Set(refs.map(r=>r.symbol)).size!==refs.length)c.addIssue({code:'custom',message:'Duplicate reference'})
  if([v.categories,v.transactions,v.budgets,v.portfolios,v.trades,v.cashAccounts,v.stockPortfolios,v.stockTrades,v.manualAssets,refs].reduce((n,r)=>n+r.length,0)>BACKUP_MAX_ROWS)c.addIssue({code:'custom',message:'Backup row limit exceeded'})

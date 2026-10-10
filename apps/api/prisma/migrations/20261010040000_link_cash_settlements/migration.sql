@@ -1,0 +1,11 @@
+CREATE UNIQUE INDEX cash_accounts_owner_id_id_key ON cash_accounts(owner_id, id);
+ALTER TABLE finance_transactions ADD COLUMN cash_account_id UUID;
+ALTER TABLE finance_transactions ADD CONSTRAINT finance_transactions_owner_id_cash_account_id_fkey FOREIGN KEY(owner_id,cash_account_id) REFERENCES cash_accounts(owner_id,id) ON DELETE RESTRICT ON UPDATE RESTRICT;
+ALTER TABLE crypto_trades ADD COLUMN cash_account_id UUID;
+ALTER TABLE crypto_trades ADD COLUMN cash_amount_thb DECIMAL(20,2);
+ALTER TABLE crypto_trades ADD CONSTRAINT crypto_trades_cash_settlement_check CHECK ((cash_account_id IS NULL AND cash_amount_thb IS NULL) OR (cash_account_id IS NOT NULL AND cash_amount_thb IS NOT NULL AND cash_amount_thb > 0));
+ALTER TABLE crypto_trades ADD CONSTRAINT crypto_trades_owner_id_cash_account_id_fkey FOREIGN KEY(owner_id,cash_account_id) REFERENCES cash_accounts(owner_id,id) ON DELETE RESTRICT ON UPDATE RESTRICT;
+ALTER TABLE stock_trades ADD COLUMN cash_account_id UUID;
+ALTER TABLE stock_trades ADD COLUMN cash_amount_thb DECIMAL(20,2);
+ALTER TABLE stock_trades ADD CONSTRAINT stock_trades_cash_settlement_check CHECK ((cash_account_id IS NULL AND cash_amount_thb IS NULL) OR (cash_account_id IS NOT NULL AND cash_amount_thb IS NOT NULL AND cash_amount_thb > 0));
+ALTER TABLE stock_trades ADD CONSTRAINT stock_trades_owner_id_cash_account_id_fkey FOREIGN KEY(owner_id,cash_account_id) REFERENCES cash_accounts(owner_id,id) ON DELETE RESTRICT ON UPDATE RESTRICT;

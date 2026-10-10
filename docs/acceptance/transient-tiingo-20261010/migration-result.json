@@ -1,0 +1,23 @@
+{
+  "boundary": "verified",
+  "migration": "20261010010000_transient_personal_prices",
+  "before": {
+    "cash": 7,
+    "stockTrades": 14,
+    "holdings": 9,
+    "cryptoTrades": 5,
+    "finance": 11,
+    "activeKeys": 1,
+    "personalTiingoCaches": 0
+  },
+  "after": {
+    "cash": 7,
+    "stockTrades": 14,
+    "holdings": 9,
+    "cryptoTrades": 5,
+    "finance": 11,
+    "activeKeys": 1,
+    "personalTiingoCaches": 0
+  },
+  "constraint": true
+}

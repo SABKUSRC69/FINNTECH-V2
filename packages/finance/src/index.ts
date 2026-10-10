@@ -1,6 +1,7 @@
 import { Decimal } from 'decimal.js'
 export { replayCryptoTrades, LedgerError, type LedgerTrade, type LedgerResult } from './ledger.js'
-export { expenseBreakdown, valueAssets, valuePosition,valueMixedAssets } from './analytics.js'
+export { expenseBreakdown, valueAssets, valuePosition,valueMixedAssets,summarizeStockHoldings } from './analytics.js'
+export * from './market-calendar.js'
 
 export const FINANCE_DECIMAL_PRECISION = 80 as const
 export const FINANCE_DECIMAL_ROUNDING = Decimal.ROUND_HALF_EVEN

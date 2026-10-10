@@ -1,0 +1,16 @@
+{
+  "commit": "ebc5a148f12209b7372a32c322904c5166f56e09",
+  "previousCommit": "afbc953e0ad5a2424e7aa29df8e4be2f539b3bd4",
+  "branch": "codex/student-real-use",
+  "files": [
+    "apps/api/src/tracker/fx.ts",
+    "apps/api/src/tracker/routes.ts",
+    "apps/web/src/tracker/Assets.tsx"
+  ],
+  "secretScan": {
+    "status": "PASS",
+    "scanned": 5,
+    "found": 0
+  },
+  "rootRepositoryCommitted": false
+}

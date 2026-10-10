@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
-import { BACKUP_MAX_BYTES, backupDocumentSchema, backupPreviewSchema, backupSummarySchema, type BackupDocument, type BackupPreview } from '@finntech/contracts'
-import { displayDecimal, trackerRequest, TrackerRequestError } from './client'
+import { BACKUP_MAX_BYTES, BACKUP_MAX_ROWS, backupDocumentSchema, backupPreviewSchema, backupSummarySchema, type BackupDocument, type BackupPreview } from '@finntech/contracts'
+import { BACKUP_REQUEST_TIMEOUT_MS, displayDecimal, trackerRequest, TrackerRequestError } from './client'
 import { usePresentation } from '../presentation'
 
 type PendingRestore = { body: { backup: BackupDocument; previewDigest: string; consent: true }; key: string }
@@ -24,7 +24,7 @@ export default function Backup({ lock, restored, expired }: { lock: (value: bool
     running.current = true; setBusy(true); setMessage('')
     let url: string | undefined
     try {
-      const data = backupDocumentSchema.parse(await trackerRequest('backup'))
+      const data = backupDocumentSchema.parse(await trackerRequest('backup', 'GET', undefined, undefined, BACKUP_REQUEST_TIMEOUT_MS))
       const file = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
       // Formatting can enlarge an otherwise valid export; retain the compact complete file if needed.
       const bytes = file.size > BACKUP_MAX_BYTES ? new Blob([JSON.stringify(data)], { type: 'application/json' }) : file
@@ -40,12 +40,12 @@ export default function Backup({ lock, restored, expired }: { lock: (value: bool
     if (!file || running.current || disabled) return
     running.current = true; setBusy(true); setBackup(null); setPreview(null); setConsent(false); setMessage('')
     try {
-      if (file.size > BACKUP_MAX_BYTES) { setMessage('ไฟล์เกิน 2 MiB กรุณาเลือกไฟล์สำรองที่ระบบรองรับ'); return }
+      if (file.size > BACKUP_MAX_BYTES) { setMessage(`ไฟล์เกิน ${BACKUP_MAX_BYTES / 1024 / 1024} MiB กรุณาเลือกไฟล์สำรองที่ระบบรองรับ`); return }
       let parsed: unknown
       try { parsed = JSON.parse(await file.text()) } catch { setMessage('ไฟล์ไม่ใช่ JSON ที่ถูกต้อง'); return }
       const checked = backupDocumentSchema.safeParse(parsed)
       if (!checked.success) { setMessage('ไม่ใช่ไฟล์สำรอง FINNTECH tracker รุ่นที่รองรับ หรือข้อมูลไม่ครบ/ไม่ถูกต้อง'); return }
-      const view = backupPreviewSchema.parse(await trackerRequest('backup/preview', 'POST', checked.data))
+      const view = backupPreviewSchema.parse(await trackerRequest('backup/preview', 'POST', checked.data, undefined, BACKUP_REQUEST_TIMEOUT_MS))
       setBackup(checked.data); setPreview(view)
     } catch (error) { setMessage(errorMessage(error)) }
     finally { running.current = false; setBusy(false) }
@@ -54,7 +54,7 @@ export default function Backup({ lock, restored, expired }: { lock: (value: bool
     if (running.current) return
     running.current = true; setBusy(true); setMessage('')
     try {
-      const result = await trackerRequest('backup/restore', 'POST', request.body, request.key) as { digest?: unknown; summary?: unknown }
+      const result = await trackerRequest('backup/restore', 'POST', request.body, request.key, BACKUP_REQUEST_TIMEOUT_MS) as { digest?: unknown; summary?: unknown }
       const summary = backupSummarySchema.parse(result.summary)
       if (result.digest !== request.body.previewDigest || JSON.stringify(summary) !== JSON.stringify(preview?.summary)) throw new Error('Unknown restore receipt')
       setPending(null); setConsent(false); setBackup(null); setPreview(null)
@@ -67,7 +67,7 @@ export default function Backup({ lock, restored, expired }: { lock: (value: bool
   return <section className="journal-backup-layout" aria-label="สำรองและกู้คืน">
     <div className="tracker-card notebook-export rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><p className="journal-kicker">เก็บสำเนา · EXPORT</p><h2 className="text-xl font-semibold">สำรองและกู้คืนข้อมูล</h2>
       <p className="mt-3 text-sm leading-7 text-slate-600">สำรองรายรับรายจ่ายทุกเดือน หมวดหมู่ งบประมาณ พอร์ต ประวัติคริปโตและยอดเงินสด รวมรายการที่ยกเลิก เก็บไฟล์ไว้ในที่ส่วนตัว เพราะมีข้อมูลการเงินและบันทึกช่วยจำของคุณ</p>
-      <p className="mt-2 text-sm leading-7 text-slate-600">ไฟล์นี้ไม่มีข้อมูลบัญชีล็อกอินหรือการตั้งค่า server ไม่รวม legacy DEMO ราคาตลาด หรือ credentials · v4 รวมพอร์ตหุ้น สินทรัพย์ประเมินเอง และราคา/อัตราที่กรอกเองพร้อมวันอ้างอิง อ่าน v1/v2/v3 เดิมได้ เป็นสำเนาข้อมูล tracker สูงสุด 2,000 รายการ / 2 MiB</p>
+      <p className="mt-2 text-sm leading-7 text-slate-600">ไฟล์นี้ไม่มีข้อมูลบัญชีล็อกอินหรือการตั้งค่า server ไม่รวม legacy DEMO ราคาตลาด หรือ credentials · v4 รวมพอร์ตหุ้น สินทรัพย์ประเมินเอง และราคา/อัตราที่กรอกเองพร้อมวันอ้างอิง อ่าน v1/v2/v3 เดิมได้ เป็นสำเนาข้อมูล tracker สูงสุด {BACKUP_MAX_ROWS.toLocaleString('en-US')} รายการ / {BACKUP_MAX_BYTES / 1024 / 1024} MiB · ไม่รวมรูปใบเสร็จและรูปโปรไฟล์ (เก็บแยกในบัญชี)</p>
       <button className="auth-primary mt-4" disabled={disabled} onClick={() => { void download() }}>ดาวน์โหลดไฟล์สำรอง</button>
     </div>
     <div className="tracker-card notebook-import rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><p className="journal-kicker">ตรวจแล้วค่อยนำเข้า · RESTORE</p><h3 className="font-semibold">ตรวจไฟล์ก่อนกู้คืน</h3>

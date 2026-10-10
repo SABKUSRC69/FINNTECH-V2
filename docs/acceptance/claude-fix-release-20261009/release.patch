@@ -1,0 +1,647 @@
+diff --git a/apps/api/src/app.ts b/apps/api/src/app.ts
+index fea2492..8215094 100644
+--- a/apps/api/src/app.ts
++++ b/apps/api/src/app.ts
+@@ -89,6 +89,16 @@ export function createApp(options: ApiAppOptions = {}): Express {
+         const denied = await demoGuard(request) ?? await betaGuard?.(request) ?? await realGuard?.(request)
+         if (denied) return denied
+         let result = await registerPassword?.(request) ?? await options.recovery?.handle(request) ?? await options.auth!.handler(request)
++        if (real && new URL(request.url).pathname === '/api/auth/sign-in/email' && result.ok) {
++          // Only after Better Auth verified the password: a wrong password stays an ordinary 401, so
++          // deletion state is never disclosed to someone who does not hold the credential.
++          const signedIn = await result.clone().json() as { user?: { id?: string } } | null
++          const userId = signedIn?.user?.id
++          if (userId && (await options.database!.authRecoveryEnrollment.findUnique({ where: { userId }, select: { blocked: true } }))?.blocked) {
++            await options.database!.authSession.deleteMany({ where: { userId } })
++            return globalThis.Response.json({ error: { code: 'ACCOUNT_DELETION_PENDING' } }, { status: 403, headers: { 'cache-control': 'no-store' } })
++          }
++        }
+         if (new URL(request.url).pathname === '/api/auth/get-session' && result.ok) {
+           const snapshot = await result.clone().json() as { user?: { id?: string } } | null
+           if (snapshot?.user?.id && !await authSubjectAllowed(options.auth!, options.database!, snapshot.user.id)) result = globalThis.Response.json(null)
+diff --git a/apps/api/src/auth/real.ts b/apps/api/src/auth/real.ts
+index b854384..9c25b8e 100644
+--- a/apps/api/src/auth/real.ts
++++ b/apps/api/src/auth/real.ts
+@@ -32,6 +32,9 @@ export async function realStorageAvailable(database: PrismaClient | Prisma.Trans
+ export function registerReal(auth: AuthRuntime, config: RealConfiguration): void { configurations.set(auth, config) }
+ export function realFor(auth: AuthRuntime): RealConfiguration | undefined { return configurations.get(auth) }
+ 
++/** Per-email-hash attempts and a site-wide ceiling sized for password hashing on the free instance. */
++export const AUTH_BUDGET = { perEmailBucket: 10, global: 120 } as const
++
+ // Fixed buckets: attacker-controlled identities cannot grow the rate table indefinitely.
+ export async function consumeRealBudget(tx: Prisma.TransactionClient, key: string, limit: number, seconds: number, now = new Date()): Promise<boolean> {
+   await tx.$executeRaw`SELECT pg_advisory_xact_lock(734031)`
+@@ -87,13 +90,15 @@ export function createRealAuthGuard(database: PrismaClient, config: RealConfigur
+     const body = await boundedAuthBody(request)
+     if (!body) return Response.json({ error: { code: 'INVALID_REQUEST' } }, { status: 400 })
+     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 254) : ''
+-    const bucket = Number.parseInt(createHmac('sha256', secret).update(email).digest('hex').slice(0, 4), 16) % 256
+-    const allowed = await database.$transaction(async tx => {
+-      const global = await consumeRealBudget(tx, 'auth:global', 60, 60)
+-      const account = await consumeRealBudget(tx, `auth:bucket:${bucket}`, 10, 60)
+-      return global && account
+-    })
+-    if (!allowed) return Response.json({ error: { code: 'RATE_LIMITED' } }, { status: 429 })
++    // Sign-out only ends the caller's own session; budgeting it would let other visitors block logout.
++    if (!route.endsWith('/sign-out')) {
++      const bucket = Number.parseInt(createHmac('sha256', secret).update(email).digest('hex').slice(0, 4), 16) % 256
++      const allowed = await database.$transaction(async tx => {
++        const account = await consumeRealBudget(tx, `auth:bucket:${bucket}`, AUTH_BUDGET.perEmailBucket, 60)
++        return account && await consumeRealBudget(tx, 'auth:global', AUTH_BUDGET.global, 60)
++      })
++      if (!allowed) return Response.json({ error: { code: 'RATE_LIMITED' } }, { status: 429 })
++    }
+     if (route.endsWith('/sign-up/email') && !realSignupAllowed(config, email)) return Response.json({ error: { code: 'REGISTRATION_CLOSED' } }, { status: 403 })
+     if (route.endsWith('/sign-in/email') && !realEmailAllowed(config, email)) return Response.json({ error: { code: 'ACCOUNT_NOT_READY' } }, { status: 403 })
+     return undefined
+diff --git a/apps/api/src/auth/runtime.ts b/apps/api/src/auth/runtime.ts
+index ab06b88..287cae0 100644
+--- a/apps/api/src/auth/runtime.ts
++++ b/apps/api/src/auth/runtime.ts
+@@ -64,7 +64,10 @@ export function createAuthRuntime(database: PrismaClient, config: AuthConfigurat
+       cookiePrefix: 'finntech', useSecureCookies: config.secureCookies,
+       defaultCookieAttributes: { httpOnly: true, sameSite: 'lax', secure: config.secureCookies, path: '/' },
+     },
+-    rateLimit: { enabled: true, storage: 'memory', window: 60, max: 100 },
++    // Real mode has no trustworthy client IP (Render appends to client-supplied X-Forwarded-For), so
++    // Better Auth's limiter would key every visitor to one shared "no-trusted-ip" bucket (3 sign-ins
++    // per 10 s site-wide). createRealAuthGuard enforces per-email and global budgets instead.
++    rateLimit: config.real ? { enabled: false } : { enabled: true, storage: 'memory', window: 60, max: 100 },
+     // Driver exceptions can contain credentials/PII. Log the event class only.
+     logger: { level: 'warn', log: (level) => { console.error(`Auth ${level}: details withheld`) } },
+     onAPIError: { onError: () => { /* The HTTP wrapper returns a generic failure; no raw driver/request logs. */ } },
+diff --git a/apps/api/src/server.ts b/apps/api/src/server.ts
+index fd553af..289c9eb 100644
+--- a/apps/api/src/server.ts
++++ b/apps/api/src/server.ts
+@@ -62,7 +62,8 @@ const deliveryTimer = database && authConfig?.recovery ? setInterval(() => {
+     .finally(() => { draining = false })
+ }, 1000) : undefined
+ deliveryTimer?.unref()
+-server.requestTimeout = 10000
++// Long enough to receive a maximum-size backup upload on a slow connection; headers stay bounded.
++server.requestTimeout = 60000
+ server.headersTimeout = 10000
+ server.keepAliveTimeout = 5000
+ 
+diff --git a/apps/api/src/tracker/backup.ts b/apps/api/src/tracker/backup.ts
+index eff43bf..37f7ec2 100644
+--- a/apps/api/src/tracker/backup.ts
++++ b/apps/api/src/tracker/backup.ts
+@@ -7,8 +7,14 @@ import { ownedMutation, thaiDay, TrackerError } from './service.js'
+ import { replayStockScope } from './stock-ledger.js'
+ 
+ type Tx = Prisma.TransactionClient
+-export function prepareBackup(input: unknown) {
+-  const backup = backupDocumentSchema.parse(input)
++/** Whole-dataset export/restore runs longer than an ordinary write; measured against the row limit. */
++export const BACKUP_TRANSACTION_TIMEOUT_MS = 120000
++/**
++ * `validated` skips only the schema re-parse of a document this process already validated (the
++ * restore request or the read-back of our own rows); replay and accounting checks always run.
++ */
++export function prepareBackup(input: unknown, validated?: BackupDocument) {
++  const backup = validated ?? backupDocumentSchema.parse(input)
+   if (Buffer.byteLength(JSON.stringify(backup)) > BACKUP_MAX_BYTES) throw new TrackerError('BACKUP_TOO_LARGE', 413)
+   const months = new Map<string, { income: ReturnType<typeof parseThbDecimal>; expense: ReturnType<typeof parseThbDecimal> }>()
+   for (const row of backup.transactions) {
+@@ -64,6 +70,12 @@ async function emptyDataset(tx: Tx, ownerId: string): Promise<boolean> {
+ }
+ 
+ async function readDocument(tx: Tx, ownerId: string): Promise<BackupDocument> {
++  // Count first so an oversized dataset is refused before any rows are loaded into memory.
++  const counts = await Promise.all([tx.financeCategory.count({ where: { ownerId } }), tx.financeTransaction.count({ where: { ownerId, provenance: 'USER_ENTERED' } }),
++    tx.budget.count({ where: { ownerId } }), tx.cryptoPortfolio.count({ where: { ownerId } }), tx.cryptoTrade.count({ where: { ownerId, provenance: 'USER_ENTERED' } }),
++    tx.cashAccount.count({ where: { ownerId } }), tx.stockPortfolio.count({ where: { ownerId } }), tx.stockTrade.count({ where: { ownerId } }),
++    tx.manualAsset.count({ where: { ownerId } }), tx.valuationReference.count({ where: { ownerId } })])
++  if (counts.reduce((sum, count) => sum + count, 0) > BACKUP_MAX_ROWS) throw new TrackerError('BACKUP_TOO_LARGE', 413)
+   const orderBy = { id: 'asc' as const }, take = BACKUP_MAX_ROWS + 1
+   const [categories, transactions, budgets, portfolios, trades, cashAccounts,stockPortfolios,stockTrades,manualAssets,valuationReferences] = await Promise.all([
+     tx.financeCategory.findMany({ where: { ownerId }, orderBy, take }), tx.financeTransaction.findMany({ where: { ownerId, provenance: 'USER_ENTERED' }, orderBy, take }),
+@@ -91,7 +103,8 @@ async function readDocument(tx: Tx, ownerId: string): Promise<BackupDocument> {
+ 
+ export async function exportBackup(db: PrismaClient, owner: string): Promise<BackupDocument> {
+   return db.$transaction(async tx => {
+-    const plan = prepareBackup(await readDocument(tx, owner))
++    const document = await readDocument(tx, owner)
++    const plan = prepareBackup(document, document)
+     const stored = await tx.portfolioHolding.findMany({ where: { ownerId: owner }, include: { asset: true } })
+     for (const holding of plan.summary.holdings) {
+       const row = stored.find(h => h.portfolioId === holding.portfolioId && h.asset.symbol === holding.asset)
+@@ -103,7 +116,7 @@ export async function exportBackup(db: PrismaClient, owner: string): Promise<Bac
+     if(stockStored.length!==plan.summary.stockHoldings.length)throw new TrackerError('BACKUP_INCONSISTENT',409)
+     for(const holding of plan.summary.stockHoldings){const row=stockStored.find(h=>h.portfolioId===holding.portfolioId&&h.symbol===holding.symbol);if(!row||cryptoForApi(row.quantity)!==holding.quantity||cryptoForApi(row.totalCost)!==holding.totalCost||cryptoForApi(row.realizedPnl)!==holding.realizedPnl)throw new TrackerError('BACKUP_INCONSISTENT',409)}
+     return plan.backup
+-  }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 15000 })
++  }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, maxWait: 5000, timeout: BACKUP_TRANSACTION_TIMEOUT_MS })
+ }
+ 
+ export async function previewBackup(db: PrismaClient, owner: string, input: unknown) {
+@@ -119,7 +132,7 @@ function idMap(rows: { id: string }[]): Map<string, string> {
+ }
+ 
+ export async function restoreBackup(db: PrismaClient, owner: string, key: unknown, input: unknown) {
+-  const value = backupRestoreSchema.parse(input), plan = prepareBackup(value.backup)
++  const value = backupRestoreSchema.parse(input), plan = prepareBackup(value.backup, value.backup)
+   if (value.previewDigest !== plan.digest) throw new TrackerError('BACKUP_PREVIEW_CHANGED', 409)
+   return ownedMutation(db, owner, 'backup.restore', key, { digest: plan.digest, consent: true }, async tx => {
+     if (!await emptyDataset(tx, owner)) throw new TrackerError('BACKUP_TARGET_NOT_EMPTY', 409)
+@@ -142,16 +155,18 @@ export async function restoreBackup(db: PrismaClient, owner: string, key: unknow
+       const asset = await tx.cryptoAsset.upsert({ where: { symbol }, create: { symbol }, update: {} }); assets.set(symbol, asset.id)
+     }
+     if (backup.trades.length) await tx.cryptoTrade.createMany({ data: backup.trades.map(row => ({ id: trades.get(row.id)!, ownerId: owner, portfolioId: portfolios.get(row.portfolioId)!, assetId: assets.get(row.asset)!, quoteCurrency: 'USDT', side: row.side === 'buy' ? 'BUY' : 'SELL', quantity: row.quantity, price: row.price, fee: row.fee, ...row.accounting, occurredAt: new Date(`${row.date}T00:00:00+07:00`), createdAt: new Date(row.createdAt), voidedAt: row.voidedAt ? new Date(row.voidedAt) : null, voidReason: row.voidReason })) })
++    // prepareBackup rejected any trade whose stored accounting differs from the replay, so the inserted
++    // accounting is already exact; the final read-back verification below re-checks it.
+     for (const scope of plan.results) {
+-      for (const trade of scope.result.trades) await tx.cryptoTrade.update({ where: { id: trades.get(trade.id)! }, data: { gross: trade.gross, costRemoved: trade.costRemoved, realizedPnl: trade.realizedPnl } })
+       await tx.portfolioHolding.create({ data: { ownerId: owner, portfolioId: portfolios.get(scope.portfolioId)!, assetId: assets.get(scope.asset)!, quoteCurrency: 'USDT', quantity: scope.result.quantity, totalCost: scope.result.totalCost, realizedPnl: scope.result.realizedPnl, state: 'READY', version: 1, lastTradeId: scope.rows.length ? trades.get(scope.rows.at(-1)!.id)! : null } })
+     }
+-    const verified = prepareBackup(await readDocument(tx, owner)).summary
++    const stored = await readDocument(tx, owner)
++    const verified = prepareBackup(stored, stored).summary
+     const inversePortfolios = new Map([...portfolios].map(([source, target]) => [target, source]))
+     verified.holdings = verified.holdings.map(row => ({ ...row, portfolioId: inversePortfolios.get(row.portfolioId)! })).sort((a, b) => `${a.portfolioId}|${a.asset}`.localeCompare(`${b.portfolioId}|${b.asset}`))
+     const inverseStock=new Map([...stockPortfolios].map(([source,target])=>[target,source]))
+     verified.stockHoldings=verified.stockHoldings.map(row=>({...row,portfolioId:inverseStock.get(row.portfolioId)!})).sort((a,b)=>`${a.portfolioId}|${a.symbol}`.localeCompare(`${b.portfolioId}|${b.symbol}`))
+     if (JSON.stringify(verified) !== JSON.stringify(plan.summary)) throw new TrackerError('BACKUP_VERIFY_FAILED', 409)
+     return { digest: plan.digest, summary: plan.summary }
+-  }, 'exclusive')
++  }, 'exclusive', BACKUP_TRANSACTION_TIMEOUT_MS)
+ }
+diff --git a/apps/api/src/tracker/crypto-stream.ts b/apps/api/src/tracker/crypto-stream.ts
+index 9855bf8..48ac00c 100644
+--- a/apps/api/src/tracker/crypto-stream.ts
++++ b/apps/api/src/tracker/crypto-stream.ts
+@@ -71,16 +71,21 @@ export class MarketRelay {
+     const changed=[...approved].join(',')!==[...this.approved].join(',');this.approved=approved;this.checkedAt=this.now();if(changed)this.disconnect(false)
+    }
+    this.connect()
++   // One failing symbol must not withhold REST snapshots for the others; the failure still backs off.
++   let failed=false
+    for(const symbol of this.approved){
+     const previous=this.quotes.get(symbol)
+     if(previous?.kind==='TRADE'&&this.now()-previous.observed!<=30_000)continue
+-    const before=this.quotes.get(symbol),result=await this.request(`${upstream}/ticker/price?symbol=${symbol}`,{signal:AbortSignal.timeout(5000),redirect:'error'})
+-    if(!result.ok)throw Error('price_unavailable')
+-    const quote=providerPriceSchema.parse(await result.json());if(quote.symbol!==symbol)throw Error('symbol_mismatch')
+-    // Object identity also catches a trade arriving in the same millisecond as REST.
+-    if(this.quotes.get(symbol)!==before)continue
+-    this.quotes.set(symbol,{price:serializeCrypto(parseCryptoDecimal(quote.price)),received:this.now(),observed:null,sequence:0,kind:'REST_SNAPSHOT'})
++    try{
++     const before=this.quotes.get(symbol),result=await this.request(`${upstream}/ticker/price?symbol=${symbol}`,{signal:AbortSignal.timeout(5000),redirect:'error'})
++     if(!result.ok)throw Error('price_unavailable')
++     const quote=providerPriceSchema.parse(await result.json());if(quote.symbol!==symbol)throw Error('symbol_mismatch')
++     // Object identity also catches a trade arriving in the same millisecond as REST.
++     if(this.quotes.get(symbol)!==before)continue
++     this.quotes.set(symbol,{price:serializeCrypto(parseCryptoDecimal(quote.price)),received:this.now(),observed:null,sequence:0,kind:'REST_SNAPSHOT'})
++    }catch{failed=true}
+    }
++   if(failed)throw Error('price_unavailable')
+    this.failures=0
+   }catch{this.failures=Math.min(this.failures+1,5)}
+   finally{this.nextAttempt=this.now()+Math.min(15_000*2**this.failures,300_000)}
+diff --git a/apps/api/src/tracker/replay-persist.ts b/apps/api/src/tracker/replay-persist.ts
+new file mode 100644
+index 0000000..95b5249
+--- /dev/null
++++ b/apps/api/src/tracker/replay-persist.ts
+@@ -0,0 +1,30 @@
++import { Prisma } from '../generated/prisma/client.js'
++import { cryptoForApi } from '../persistence/decimal.js'
++
++type StoredAccounting = { id: string; gross: Prisma.Decimal | null; costRemoved: Prisma.Decimal | null; realizedPnl: Prisma.Decimal | null }
++type ReplayedAccounting = { id: string; gross: string; costRemoved: string; realizedPnl: string }
++const tables = { crypto: Prisma.raw('crypto_trades'), stock: Prisma.raw('stock_trades') } as const
++const CHUNK = 500
++
++const unchanged = (stored: Prisma.Decimal | null, value: string) => stored !== null && cryptoForApi(stored) === value
++
++/**
++ * Writes replayed accounting only for rows whose stored values differ, in bounded bulk statements.
++ * Appending a trade at the end of history therefore updates one row instead of the whole scope.
++ */
++export async function persistReplay(tx: Prisma.TransactionClient, kind: keyof typeof tables, owner: string,
++  stored: readonly StoredAccounting[], replayed: readonly ReplayedAccounting[]): Promise<number> {
++  const byId = new Map(stored.map(row => [row.id, row]))
++  const changed = replayed.filter(row => {
++    const current = byId.get(row.id)
++    return !current || !(unchanged(current.gross, row.gross) && unchanged(current.costRemoved, row.costRemoved) && unchanged(current.realizedPnl, row.realizedPnl))
++  })
++  for (let start = 0; start < changed.length; start += CHUNK) {
++    const values = Prisma.join(changed.slice(start, start + CHUNK).map(row =>
++      Prisma.sql`(${row.id}::uuid, ${row.gross}::numeric, ${row.costRemoved}::numeric, ${row.realizedPnl}::numeric)`))
++    await tx.$executeRaw`UPDATE ${tables[kind]} AS t SET gross = v.gross, cost_removed = v.cost_removed, realized_pnl = v.realized_pnl
++      FROM (VALUES ${values}) AS v(id, gross, cost_removed, realized_pnl)
++      WHERE t.id = v.id AND t.owner_id = ${owner}::uuid`
++  }
++  return changed.length
++}
+diff --git a/apps/api/src/tracker/routes.ts b/apps/api/src/tracker/routes.ts
+index 97f5c5a..62c2463 100644
+--- a/apps/api/src/tracker/routes.ts
++++ b/apps/api/src/tracker/routes.ts
+@@ -3,7 +3,7 @@ import { DecimalInputError, LedgerError } from '@finntech/finance'
+ import type { PrismaClient } from '../generated/prisma/client.js'
+ import type { AuthRuntime } from '../auth/runtime.js'
+ import { requireOwner, type OwnerContext } from '../auth/authorization.js'
+-import { createCategory, renameCategory, createEntry, correctEntry, setBudget, createPortfolio, createTrade, correctTrade, financeOverview, cryptoOverview, TrackerError } from './service.js'
++import { createCategory, addStarterCategories, renameCategory, createEntry, correctEntry, setBudget, createPortfolio, createTrade, correctTrade, financeOverview, cryptoOverview, TrackerError } from './service.js'
+ import { MarketRelay } from './market.js'
+ import type { StockMarketRelay } from './stocks.js'
+ import { BACKUP_MAX_BYTES } from '@finntech/contracts'
+@@ -20,7 +20,7 @@ export function trackerRouter(auth: AuthRuntime, database: PrismaClient, market
+   const normalJson = json({ limit: '64kb' }), backupJson = json({ limit: BACKUP_MAX_BYTES + 1024 })
+   router.use((req, _res, next) => {
+     const readable = req.method === 'GET' && ['/finance', '/crypto', '/crypto/market', '/stocks/market', '/backup', '/cash', '/reference-rate'].includes(req.path)
+-    const writable = req.method === 'POST' && ['/finance/categories', '/finance/transactions', '/finance/budgets', '/crypto/portfolios', '/crypto/trades', '/backup/preview', '/backup/restore', '/cash'].includes(req.path)
++    const writable = req.method === 'POST' && ['/finance/categories', '/finance/categories/starter', '/finance/transactions', '/finance/budgets', '/crypto/portfolios', '/crypto/trades', '/backup/preview', '/backup/restore', '/cash'].includes(req.path)
+     const rename = req.method === 'PATCH' && /^\/finance\/categories\/[^/]+$/.test(req.path)
+     const correction = req.method === 'POST' && /^\/(finance\/transactions|crypto\/trades)\/[^/]+\/corrections$/.test(req.path)
+     const assetRead=req.method==='GET'&&['/stocks','/assets/manual','/valuation/references'].includes(req.path)
+@@ -67,7 +67,7 @@ export function trackerRouter(auth: AuthRuntime, database: PrismaClient, market
+     res.json(await stocks.snapshot())
+   })
+   for (const [path, operation] of [
+-    ['/finance/categories', createCategory], ['/finance/transactions', createEntry], ['/finance/budgets', setBudget],
++    ['/finance/categories', createCategory], ['/finance/categories/starter', addStarterCategories], ['/finance/transactions', createEntry], ['/finance/budgets', setBudget],
+     ['/crypto/portfolios', createPortfolio], ['/crypto/trades', createTrade],
+     ['/stocks/portfolios',createStockPortfolio],['/stocks/trades',createStockTrade],
+   ] as const) {
+diff --git a/apps/api/src/tracker/service.ts b/apps/api/src/tracker/service.ts
+index 28d0d53..a8f123d 100644
+--- a/apps/api/src/tracker/service.ts
++++ b/apps/api/src/tracker/service.ts
+@@ -3,18 +3,20 @@ import { createHash } from 'node:crypto'
+ import {
+   budgetInputSchema, calendarMonthSchema, categoryInputSchema, categoryRenameSchema,
+   financeEntrySchema, portfolioInputSchema, tradeEntrySchema, resourceIdSchema, idempotencyKeySchema,
+-  financeCorrectionSchema, tradeCorrectionSchema,
++  financeCorrectionSchema, tradeCorrectionSchema, starterCategoriesInputSchema, STARTER_CATEGORIES,
+   type FinanceOverview,
+ } from '@finntech/contracts'
+ import { parseThbDecimal, serializeThb, replayCryptoTrades } from '@finntech/finance'
+ import { Prisma, type PrismaClient } from '../generated/prisma/client.js'
+ import { thbForApi, cryptoForApi } from '../persistence/decimal.js'
+ import { realDatabaseFor, realStorageAvailable, consumeRealBudget } from '../auth/real.js'
++import { persistReplay } from './replay-persist.js'
+ 
+ export class TrackerError extends Error {
+   constructor(readonly code: string, readonly status = 400) { super(code) }
+ }
+ type Receipt = Prisma.InputJsonObject
++export const WRITE_BUDGET = { owner: 120, global: 1200 } as const
+ export function thaiDay(value: Date): string {
+   return new Date(value.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10)
+ }
+@@ -32,6 +34,7 @@ export async function ownedMutation(
+   database: PrismaClient, ownerId: string, endpoint: string, key: unknown, payload: unknown,
+   operation: (tx: Prisma.TransactionClient) => Promise<Receipt>,
+   datasetMode: 'shared' | 'exclusive' = 'shared',
++  timeout = 15000,
+ ): Promise<Receipt> {
+   const requestKey = idempotencyKeySchema.parse(key)
+   const hash = createHash('sha256').update(JSON.stringify(payload)).digest('hex')
+@@ -59,7 +62,10 @@ export async function ownedMutation(
+     const real = realDatabaseFor(database)
+     if (real) {
+       if (!await realStorageAvailable(tx, real)) throw new TrackerError('STORAGE_PAUSED', 503)
+-      if (!await consumeRealBudget(tx, 'writes:global', 120, 60)) throw new TrackerError('WRITE_RATE_LIMITED', 429)
++      // Each owner has its own budget so one account cannot block everyone; the much higher global
++      // ceiling only protects the free database. Owner keys are bounded by the account limit.
++      if (!await consumeRealBudget(tx, `writes:owner:${ownerId}`, WRITE_BUDGET.owner, 60)) throw new TrackerError('WRITE_RATE_LIMITED', 429)
++      if (!await consumeRealBudget(tx, 'writes:global', WRITE_BUDGET.global, 60)) throw new TrackerError('SERVICE_BUSY', 429)
+     }
+     const receipt = await operation(tx)
+     const record = await tx.idempotencyKey.create({ data: { ownerId, endpoint, key: requestKey, requestSha256: hash, receipt } })
+@@ -69,7 +75,7 @@ export async function ownedMutation(
+       eventType: 'USER_MUTATION', entityType: endpoint, entityId: typeof receipt.id === 'string' ? receipt.id : null,
+     } })
+     return receipt
+-  }, { maxWait: 5000, timeout: 15000 })
++  }, { maxWait: 5000, timeout })
+ }
+ 
+ export async function financeOverview(database: PrismaClient, ownerId: string, selectedMonth: unknown): Promise<FinanceOverview> {
+@@ -113,6 +119,16 @@ export async function createCategory(db: PrismaClient, owner: string, key: unkno
+     return { id: category.id }
+   })
+ }
++/** Adds only missing starter labels per type; existing categories, IDs and references are untouched. */
++export async function addStarterCategories(db: PrismaClient, owner: string, key: unknown, body: unknown): Promise<Receipt> {
++  const value = starterCategoriesInputSchema.parse(body)
++  return ownedMutation(db, owner, 'finance.categories.starter', key, value, async tx => {
++    const rows = (['expense', 'income'] as const).flatMap(type => STARTER_CATEGORIES[type].map(name => ({ ownerId: owner, name, type: type === 'income' ? 'INCOME' as const : 'EXPENSE' as const })))
++    // The (owner, type, name) unique index makes concurrent starter requests converge without duplicates.
++    const created = await tx.financeCategory.createMany({ data: rows, skipDuplicates: true })
++    return { id: owner, created: created.count }
++  })
++}
+ export async function renameCategory(db: PrismaClient, owner: string, id: unknown, key: unknown, body: unknown): Promise<Receipt> {
+   const categoryId = resourceIdSchema.parse(id), value = categoryRenameSchema.parse(body)
+   return ownedMutation(db, owner, 'finance.categories.rename', key, { categoryId, ...value }, async tx => {
+@@ -175,7 +191,7 @@ async function replayScope(tx: Prisma.TransactionClient, owner: string, portfoli
+   const trades = await tx.cryptoTrade.findMany({ where: { ownerId: owner, portfolioId, assetId, quoteCurrency: 'USDT', provenance: 'USER_ENTERED', voidedAt: null },
+     orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }] })
+   const result = replayCryptoTrades(trades.map(t => ({ id: t.id, side: t.side === 'BUY' ? 'buy' : 'sell', quantity: cryptoForApi(t.quantity), price: cryptoForApi(t.price), fee: cryptoForApi(t.fee) })))
+-  for (const trade of result.trades) await tx.cryptoTrade.update({ where: { id: trade.id }, data: { gross: trade.gross, costRemoved: trade.costRemoved, realizedPnl: trade.realizedPnl } })
++  await persistReplay(tx, 'crypto', owner, trades, result.trades)
+   const scope = { ownerId: owner, portfolioId, assetId, quoteCurrency: 'USDT' }
+   const projection = { quantity: result.quantity, totalCost: result.totalCost, realizedPnl: result.realizedPnl, state: 'READY' as const, lastTradeId: trades.at(-1)?.id ?? null }
+   await tx.portfolioHolding.upsert({ where: { ownerId_portfolioId_assetId_quoteCurrency: scope }, create: { ...scope, ...projection, version: 1 }, update: { ...projection, version: { increment: 1 } } })
+@@ -210,6 +226,8 @@ export async function createTrade(db: PrismaClient, owner: string, key: unknown,
+ export async function correctTrade(db: PrismaClient, owner: string, id: unknown, key: unknown, body: unknown): Promise<Receipt> {
+   const tradeId = resourceIdSchema.parse(id), value = tradeCorrectionSchema.parse(body)
+   return ownedMutation(db, owner, 'crypto.trades.correct', key, { tradeId, ...value }, async tx => {
++    // Same lock order as createTrade (media, then portfolio) so concurrent writes cannot deadlock.
++    await mediaLock(tx)
+     const record = await tx.cryptoTrade.findFirst({ where: { ownerId: owner, id: tradeId, provenance: 'USER_ENTERED' } })
+     if (!record) throw new TrackerError('TRADE_NOT_FOUND', 404)
+     const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM crypto_portfolios WHERE owner_id = ${owner}::uuid AND id = ${record.portfolioId}::uuid FOR UPDATE`
+diff --git a/apps/api/src/tracker/stock-ledger.ts b/apps/api/src/tracker/stock-ledger.ts
+index 5f8caca..c36d7e7 100644
+--- a/apps/api/src/tracker/stock-ledger.ts
++++ b/apps/api/src/tracker/stock-ledger.ts
+@@ -4,6 +4,7 @@ import { replayCryptoTrades } from '@finntech/finance'
+ import { Prisma,type PrismaClient } from '../generated/prisma/client.js'
+ import { cryptoForApi } from '../persistence/decimal.js'
+ import { ownedMutation,TrackerError,thaiDay } from './service.js'
++import { persistReplay } from './replay-persist.js'
+ type Tx=Prisma.TransactionClient
+ async function lock(tx:Tx,owner:string,portfolioId:string){
+  const rows=await tx.$queryRaw<{id:string}[]>`SELECT id FROM stock_portfolios WHERE owner_id=${owner}::uuid AND id=${portfolioId}::uuid FOR UPDATE`
+@@ -13,7 +14,7 @@ export async function replayStockScope(tx:Tx,owner:string,portfolioId:string,sym
+  const rows=await tx.stockTrade.findMany({where:{ownerId:owner,portfolioId,symbol,voidedAt:null},orderBy:[{occurredAt:'asc'},{createdAt:'asc'},{id:'asc'}]})
+  // Same Decimal weighted-average kernel; USD scopes never mix with crypto USDT scopes.
+  const result=replayCryptoTrades(rows.map(t=>({id:t.id,side:t.side==='BUY'?'buy':'sell',quantity:cryptoForApi(t.quantity),price:cryptoForApi(t.price),fee:cryptoForApi(t.fee)})))
+- for(const row of result.trades)await tx.stockTrade.update({where:{id:row.id},data:{gross:row.gross,costRemoved:row.costRemoved,realizedPnl:row.realizedPnl}})
++ await persistReplay(tx,'stock',owner,rows,result.trades)
+  const scope={ownerId:owner,portfolioId,symbol},data={quantity:result.quantity,totalCost:result.totalCost,realizedPnl:result.realizedPnl}
+  await tx.stockHolding.upsert({where:{ownerId_portfolioId_symbol:scope},create:{...scope,...data,quoteCurrency:'USD'},update:data})
+ }
+@@ -36,6 +37,8 @@ export async function createStockTrade(db:PrismaClient,owner:string,key:unknown,
+ export async function correctStockTrade(db:PrismaClient,owner:string,id:unknown,key:unknown,body:unknown){
+  const tradeId=resourceIdSchema.parse(id),value=stockCorrectionSchema.parse(body)
+  return ownedMutation(db,owner,'stocks.trades.correct',key,{tradeId,...value},async tx=>{
++  // Media before portfolio, matching createStockTrade, so concurrent writes cannot deadlock.
++  await mediaLock(tx)
+   const row=await tx.stockTrade.findFirst({where:{ownerId:owner,id:tradeId}});if(!row)throw new TrackerError('TRADE_NOT_FOUND',404)
+   await lock(tx,owner,row.portfolioId)
+   const original=await tx.stockTrade.findUniqueOrThrow({where:{id:tradeId}})
+diff --git a/apps/web/src/auth/client.ts b/apps/web/src/auth/client.ts
+index 1df4167..aad421a 100644
+--- a/apps/web/src/auth/client.ts
++++ b/apps/web/src/auth/client.ts
+@@ -87,6 +87,10 @@ export async function submitAuth(action: AuthAction, input: { email?: string; pa
+   }
+   if (response.status === 429) throw new AuthRequestError('ทำรายการถี่เกินไป กรุณารอสักครู่แล้วลองอีกครั้ง')
+   if (response.status >= 500) throw new AuthRequestError('ระบบยังไม่พร้อม กรุณาตรวจสอบสถานะก่อนลองอีกครั้ง', true)
++  const code = response.body && typeof response.body === 'object' && 'error' in response.body && response.body.error && typeof response.body.error === 'object' && 'code' in response.body.error ? response.body.error.code : undefined
++  if (response.status === 403 && action === 'sign-in' && code === 'ACCOUNT_DELETION_PENDING') {
++    throw new AuthRequestError('บัญชีนี้มีคำขอลบบัญชีอยู่ระหว่างดำเนินการ จึงเข้าสู่ระบบไม่ได้ ดูสถานะได้ด้วยรหัสคำขอที่บันทึกไว้ตอนขอลบ')
++  }
+   if (response.status === 403) throw new AuthRequestError('คำขอถูกปฏิเสธ กรุณาเปิดหน้าเว็บใหม่แล้วลองอีกครั้ง')
+   if (action === 'sign-in') throw new AuthRequestError('อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาลองอีกครั้ง')
+   if (action === 'sign-up') throw new AuthRequestError('สมัครบัญชีไม่สำเร็จ หากเคยสมัครแล้ว กรุณาเข้าสู่ระบบ')
+diff --git a/apps/web/src/tracker/Assets.tsx b/apps/web/src/tracker/Assets.tsx
+index 6cfcff4..48b1750 100644
+--- a/apps/web/src/tracker/Assets.tsx
++++ b/apps/web/src/tracker/Assets.tsx
+@@ -79,7 +79,7 @@ export default function Assets({ crypto, market, now, expired, lock }: { crypto:
+   const display = (value: string | null | undefined) => value == null ? 'N/A' : money(displayDecimal(value))
+   return <section className="journal-assets" aria-label="สินทรัพย์รวม">
+     <div className="journal-assets-heading"><h2 className="text-xl font-semibold">สินทรัพย์รวมของคุณ</h2><p className="mt-2 text-sm text-slate-500">เงินสด + คริปโต + หุ้น/ETF + สินทรัพย์ประเมินเอง · แยกสกุลและวันที่ประเมิน</p></div>
+-    <div className="journal-assets-summary"><div className="tracker-card tracker-balance-card rounded-2xl p-5"><p className="text-sm">สินทรัพย์รวมเทียบบาท · มูลค่าอ้างอิง</p><p className="mt-3 break-all text-3xl font-semibold tabular-nums" data-testid="assets-total">{display(mixed?.totalThb)} <span className="text-sm">THB</span></p><p className="mt-2 text-xs">{mixed?.complete ? 'ครบตามสินทรัพย์ที่บันทึก · ประมาณการตามแหล่งและวันอ้างอิงด้านล่าง ไม่ใช่มูลค่าที่รับประกันซื้อขายได้' : 'ข้อมูลยังไม่ครบ · ราคา/อัตราไม่พร้อม หรือยอดเกินขอบเขต'}</p></div>
++    <div className="journal-assets-summary"><div className="tracker-card tracker-balance-card rounded-2xl p-5"><p className="text-sm">สินทรัพย์รวมเทียบบาท · มูลค่าอ้างอิง</p><p className="mt-3 break-all text-3xl font-semibold tabular-nums" data-testid="assets-total">{!mixed && loading ? 'กำลังโหลด…' : <>{display(mixed?.totalThb)} <span className="text-sm">THB</span></>}</p><p className="mt-2 text-xs">{!mixed && loading ? 'กำลังโหลดยอดและราคาอ้างอิง' : mixed?.complete ? 'ครบตามสินทรัพย์ที่บันทึก · ประมาณการตามแหล่งและวันอ้างอิงด้านล่าง ไม่ใช่มูลค่าที่รับประกันซื้อขายได้' : 'ข้อมูลยังไม่ครบ · ราคา/อัตราไม่พร้อม หรือยอดเกินขอบเขต'}</p></div>
+       <div className="tracker-card rounded-2xl p-5"><p className="text-sm">เงินสดที่บันทึก</p><p className="mt-3 break-all text-2xl font-semibold">{display(valued?.cashThb)} THB</p>{!mixed?.complete && <p className="mt-2 break-all text-sm">ยอดที่ประเมินได้บางส่วน: {display(mixed?.knownThb)} THB · ไม่ใช่ยอดรวมทั้งหมด</p>}</div></div>
+     <section className="tracker-card rounded-2xl p-5 space-y-3"><h3 className="font-semibold">ยอดตามสกุล · ไม่ใช่ยอดที่บวกข้ามสกุลได้</h3><p className="break-all">เงินสดและสินทรัพย์ประเมินเอง THB: {display(mixed?.native.THB)} THB</p><p className="break-all">คริปโตและสินทรัพย์ประเมินเอง USDT: {display(mixed?.native.USDT)} USDT</p><p className="break-all">หุ้นและสินทรัพย์ประเมินเอง USD: {display(mixed?.native.USD)} USD</p><p className="break-all text-sm">USD ที่ประเมินได้บางส่วน: {display(mixed?.knownNative.USD)} USD · มูลค่าหุ้นคูณอัตรา USD/THB แยกจาก USDT/THB</p>
+      {stocks?.holdings.map(row=>{const reference=selectedStocks.get(row.symbol)!,position=stockPosition(row.quantity,row.totalCost,reference.value);return <article className="border-t pt-3 space-y-2 break-all" key={row.portfolioId+row.symbol}><p>{row.symbol} · {money(row.quantity)} หุ้น · ต้นทุน {display(row.totalCost)} USD</p><p>มูลค่าอ้างอิง {display(position.value)} USD · กำไร/ขาดทุนยังไม่รับรู้ {display(position.unrealized)} USD</p><p className="text-xs">ราคา {display(reference.value)} USD ต่อหุ้น · {reference.source} · {reference.state} · {reference.asOf?new Date(reference.asOf).toLocaleString('th-TH'):'ไม่มีวันอ้างอิง'}</p>{reference.value===null&&!parseCryptoDecimal(row.quantity).isZero()&&<p role="status">ขาดราคาอ้างอิง {row.symbol} จึงยังรวมมูลค่าหุ้นนี้ไม่ได้</p>}<button className="auth-secondary" disabled={disabled} onClick={()=>requestReference(row.symbol)}>ตั้งราคาอ้างอิง {row.symbol}</button></article>})}
+diff --git a/apps/web/src/tracker/Backup.tsx b/apps/web/src/tracker/Backup.tsx
+index a98287d..ecd61d0 100644
+--- a/apps/web/src/tracker/Backup.tsx
++++ b/apps/web/src/tracker/Backup.tsx
+@@ -1,6 +1,6 @@
+ import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+-import { BACKUP_MAX_BYTES, backupDocumentSchema, backupPreviewSchema, backupSummarySchema, type BackupDocument, type BackupPreview } from '@finntech/contracts'
+-import { displayDecimal, trackerRequest, TrackerRequestError } from './client'
++import { BACKUP_MAX_BYTES, BACKUP_MAX_ROWS, backupDocumentSchema, backupPreviewSchema, backupSummarySchema, type BackupDocument, type BackupPreview } from '@finntech/contracts'
++import { BACKUP_REQUEST_TIMEOUT_MS, displayDecimal, trackerRequest, TrackerRequestError } from './client'
+ import { usePresentation } from '../presentation'
+ 
+ type PendingRestore = { body: { backup: BackupDocument; previewDigest: string; consent: true }; key: string }
+@@ -24,7 +24,7 @@ export default function Backup({ lock, restored, expired }: { lock: (value: bool
+     running.current = true; setBusy(true); setMessage('')
+     let url: string | undefined
+     try {
+-      const data = backupDocumentSchema.parse(await trackerRequest('backup'))
++      const data = backupDocumentSchema.parse(await trackerRequest('backup', 'GET', undefined, undefined, BACKUP_REQUEST_TIMEOUT_MS))
+       const file = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+       // Formatting can enlarge an otherwise valid export; retain the compact complete file if needed.
+       const bytes = file.size > BACKUP_MAX_BYTES ? new Blob([JSON.stringify(data)], { type: 'application/json' }) : file
+@@ -40,12 +40,12 @@ export default function Backup({ lock, restored, expired }: { lock: (value: bool
+     if (!file || running.current || disabled) return
+     running.current = true; setBusy(true); setBackup(null); setPreview(null); setConsent(false); setMessage('')
+     try {
+-      if (file.size > BACKUP_MAX_BYTES) { setMessage('ไฟล์เกิน 2 MiB กรุณาเลือกไฟล์สำรองที่ระบบรองรับ'); return }
++      if (file.size > BACKUP_MAX_BYTES) { setMessage(`ไฟล์เกิน ${BACKUP_MAX_BYTES / 1024 / 1024} MiB กรุณาเลือกไฟล์สำรองที่ระบบรองรับ`); return }
+       let parsed: unknown
+       try { parsed = JSON.parse(await file.text()) } catch { setMessage('ไฟล์ไม่ใช่ JSON ที่ถูกต้อง'); return }
+       const checked = backupDocumentSchema.safeParse(parsed)
+       if (!checked.success) { setMessage('ไม่ใช่ไฟล์สำรอง FINNTECH tracker รุ่นที่รองรับ หรือข้อมูลไม่ครบ/ไม่ถูกต้อง'); return }
+-      const view = backupPreviewSchema.parse(await trackerRequest('backup/preview', 'POST', checked.data))
++      const view = backupPreviewSchema.parse(await trackerRequest('backup/preview', 'POST', checked.data, undefined, BACKUP_REQUEST_TIMEOUT_MS))
+       setBackup(checked.data); setPreview(view)
+     } catch (error) { setMessage(errorMessage(error)) }
+     finally { running.current = false; setBusy(false) }
+@@ -54,7 +54,7 @@ export default function Backup({ lock, restored, expired }: { lock: (value: bool
+     if (running.current) return
+     running.current = true; setBusy(true); setMessage('')
+     try {
+-      const result = await trackerRequest('backup/restore', 'POST', request.body, request.key) as { digest?: unknown; summary?: unknown }
++      const result = await trackerRequest('backup/restore', 'POST', request.body, request.key, BACKUP_REQUEST_TIMEOUT_MS) as { digest?: unknown; summary?: unknown }
+       const summary = backupSummarySchema.parse(result.summary)
+       if (result.digest !== request.body.previewDigest || JSON.stringify(summary) !== JSON.stringify(preview?.summary)) throw new Error('Unknown restore receipt')
+       setPending(null); setConsent(false); setBackup(null); setPreview(null)
+@@ -67,7 +67,7 @@ export default function Backup({ lock, restored, expired }: { lock: (value: bool
+   return <section className="journal-backup-layout" aria-label="สำรองและกู้คืน">
+     <div className="tracker-card notebook-export rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><p className="journal-kicker">เก็บสำเนา · EXPORT</p><h2 className="text-xl font-semibold">สำรองและกู้คืนข้อมูล</h2>
+       <p className="mt-3 text-sm leading-7 text-slate-600">สำรองรายรับรายจ่ายทุกเดือน หมวดหมู่ งบประมาณ พอร์ต ประวัติคริปโตและยอดเงินสด รวมรายการที่ยกเลิก เก็บไฟล์ไว้ในที่ส่วนตัว เพราะมีข้อมูลการเงินและบันทึกช่วยจำของคุณ</p>
+-      <p className="mt-2 text-sm leading-7 text-slate-600">ไฟล์นี้ไม่มีข้อมูลบัญชีล็อกอินหรือการตั้งค่า server ไม่รวม legacy DEMO ราคาตลาด หรือ credentials · v4 รวมพอร์ตหุ้น สินทรัพย์ประเมินเอง และราคา/อัตราที่กรอกเองพร้อมวันอ้างอิง อ่าน v1/v2/v3 เดิมได้ เป็นสำเนาข้อมูล tracker สูงสุด 2,000 รายการ / 2 MiB</p>
++      <p className="mt-2 text-sm leading-7 text-slate-600">ไฟล์นี้ไม่มีข้อมูลบัญชีล็อกอินหรือการตั้งค่า server ไม่รวม legacy DEMO ราคาตลาด หรือ credentials · v4 รวมพอร์ตหุ้น สินทรัพย์ประเมินเอง และราคา/อัตราที่กรอกเองพร้อมวันอ้างอิง อ่าน v1/v2/v3 เดิมได้ เป็นสำเนาข้อมูล tracker สูงสุด {BACKUP_MAX_ROWS.toLocaleString('en-US')} รายการ / {BACKUP_MAX_BYTES / 1024 / 1024} MiB · ไม่รวมรูปใบเสร็จและรูปโปรไฟล์ (เก็บแยกในบัญชี)</p>
+       <button className="auth-primary mt-4" disabled={disabled} onClick={() => { void download() }}>ดาวน์โหลดไฟล์สำรอง</button>
+     </div>
+     <div className="tracker-card notebook-import rounded-2xl border border-slate-200 bg-white p-5 sm:p-6"><p className="journal-kicker">ตรวจแล้วค่อยนำเข้า · RESTORE</p><h3 className="font-semibold">ตรวจไฟล์ก่อนกู้คืน</h3>
+diff --git a/apps/web/src/tracker/Dashboard.tsx b/apps/web/src/tracker/Dashboard.tsx
+index bd6ffe1..52eb04b 100644
+--- a/apps/web/src/tracker/Dashboard.tsx
++++ b/apps/web/src/tracker/Dashboard.tsx
+@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
+ import {
+   budgetInputSchema, categoryInputSchema, financeEntrySchema, financeOverviewSchema,
+   cryptoOverviewSchema, marketSnapshotSchema, portfolioInputSchema, tradeEntrySchema,
+-  financeCorrectionSchema, tradeCorrectionSchema,
++  financeCorrectionSchema, tradeCorrectionSchema, starterCategoriesInputSchema, STARTER_CATEGORIES,
+   type FinanceOverview, type CryptoOverview, type MarketSnapshot,
+ } from '@finntech/contracts'
+ import { parseCryptoDecimal, serializeCrypto, serializeThb } from '@finntech/finance'
+@@ -53,6 +53,9 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery =
+   const [date, setDate] = useState(today())
+   const [note, setNote] = useState('')
+   const [categoryName, setCategoryName] = useState('')
++  const [inlineCategory, setInlineCategory] = useState('')
++  const [inlineType, setInlineType] = useState<'income' | 'expense'>('expense')
++  const [inlineOpen, setInlineOpen] = useState(false)
+   const [budgetCategory, setBudgetCategory] = useState('')
+   const [budgetAmount, setBudgetAmount] = useState('')
+   const [portfolioName, setPortfolioName] = useState('')
+@@ -169,11 +172,19 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery =
+     if (writing.current) return
+     writing.current = true; setBusy(true); setMessage('')
+     try {
+-      await trackerRequest(request.path, request.method, request.body, request.key)
+-      if(request.path.startsWith('finance/transactions')||request.path.startsWith('crypto/trades')){setFinanceImage(undefined);setCryptoImage(undefined);setReceiptReset(v=>v+1)}
+-      setPending(null); setAmount(''); setNote(''); setQuantity(''); setPrice('')
+-      cancelCorrection()
+-      setCategoryName(''); setPortfolioName(''); setRename(''); setRenameId('')
++      const result = await trackerRequest(request.path, request.method, request.body, request.key) as { id?: unknown } | null
++      setPending(null)
++      // Reset only the form that was written, so a draft transaction survives category/portfolio setup.
++      if (request.path.startsWith('finance/transactions') || request.path.startsWith('crypto/trades')) {
++        setFinanceImage(undefined); setCryptoImage(undefined); setReceiptReset(v => v + 1)
++        setAmount(''); setNote(''); setQuantity(''); setPrice('')
++        cancelCorrection()
++      } else if (request.path === 'finance/categories') {
++        setCategoryName(''); setInlineCategory(''); setInlineOpen(false)
++        const created = request.body as { type?: string }
++        if (created.type === type && typeof result?.id === 'string') setCategoryId(result.id)
++      } else if (request.path.startsWith('finance/categories/')) { setRename(''); setRenameId('') }
++      else if (request.path === 'crypto/portfolios') setPortfolioName('')
+       setMessage('บันทึกสำเร็จ'); await load()
+     } catch (error) {
+       setMessage(error instanceof Error ? error.message : 'บันทึกไม่สำเร็จ')
+@@ -183,12 +194,16 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery =
+   }
+   function submit(event: FormEvent, path: string, schema: { safeParse: (value: unknown) => { success: boolean; data?: unknown } }, body: unknown, method = 'POST'): void {
+     event.preventDefault()
++    write(path, schema, body, method)
++  }
++  function write(path: string, schema: { safeParse: (value: unknown) => { success: boolean; data?: unknown } }, body: unknown, method = 'POST'): void {
+     if (disabled || writing.current) return
+     const result = schema.safeParse(body)
+     if (!result.success) { setMessage('ข้อมูลไม่ถูกต้อง เงิน THB รับทศนิยมไม่เกิน 2 ตำแหน่ง คริปโตไม่เกิน 18 ตำแหน่ง และต้องเป็นจำนวนบวก'); return }
+     void send({ path, body: result.data, key: globalThis.crypto.randomUUID(), method })
+   }
+   const categories = finance?.categories ?? []
++  const typeCategories = categories.filter(c => c.type === type)
+   const categoryLabel = (id: string) => categories.find(c => c.id === id)?.name ?? 'ไม่ระบุหมวดหมู่'
+   const portfolios = crypto?.portfolios ?? []
+   const holdings = (crypto?.holdings ?? []).filter(h => h.portfolioId === portfolioId)
+@@ -244,8 +259,19 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery =
+           if (editingFinance) submit(e, `finance/transactions/${editingFinance}/corrections`, financeCorrectionSchema, { action: 'replace', reason: correctionReason, entry })
+           else submit(e, 'finance/transactions', financeEntrySchema, entry)
+         }}>
+-          <label className="auth-label">ประเภทรายการ<select className={input} value={type} disabled={disabled} onChange={e => { setType(e.target.value as typeof type); setCategoryId('') }}><option value="expense">รายจ่าย</option><option value="income">รายรับ</option></select></label>
+-          <label className="auth-label">หมวดหมู่<select className={input} required value={categoryId} disabled={disabled} onChange={e => setCategoryId(e.target.value)}><option value="">เลือกหมวดหมู่</option>{categories.filter(c => c.type === type).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
++          <label className="auth-label">ประเภทรายการ<select className={input} value={type} disabled={disabled} onChange={e => { const next = e.target.value as typeof type; setType(next); setInlineType(next); setCategoryId('') }}><option value="expense">รายจ่าย</option><option value="income">รายรับ</option></select></label>
++          <label className="auth-label">หมวดหมู่<select className={input} required value={categoryId} disabled={disabled} onChange={e => setCategoryId(e.target.value)}><option value="">เลือกหมวดหมู่</option>{typeCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
++          {!editingFinance && <div className="journal-category-helper sm:col-span-2 space-y-3" data-testid="category-helper">
++            {loading && !finance && <p role="status" className="text-sm">กำลังโหลดหมวดหมู่…</p>}
++            {!loading && !available && <div role="alert" className="text-sm">โหลดหมวดหมู่ไม่สำเร็จ ข้อมูลที่กรอกยังอยู่ <button type="button" className="auth-secondary ml-2" disabled={busy || !!pending} onClick={() => { void load() }}>ลองโหลดหมวดหมู่อีกครั้ง</button></div>}
++            {available && typeCategories.length === 0 && <p role="status" className="text-sm">ยังไม่มีหมวด{type === 'expense' ? 'รายจ่าย' : 'รายรับ'} เพิ่มหมวดหมู่เพื่อเริ่มบันทึก</p>}
++            {available && (typeCategories.length === 0 || inlineOpen) ? <div className="grid gap-3 sm:grid-cols-3 sm:items-end">
++              <label className="auth-label">ชื่อหมวดใหม่<input className={input} maxLength={100} value={inlineCategory} disabled={disabled} onChange={e => setInlineCategory(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); write('finance/categories', categoryInputSchema, { name: inlineCategory, type: inlineType }) } }} /></label>
++              <label className="auth-label">ประเภทหมวด<select className={input} value={inlineType} disabled={disabled} onChange={e => setInlineType(e.target.value as typeof inlineType)}><option value="expense">รายจ่าย</option><option value="income">รายรับ</option></select></label>
++              <button type="button" className="auth-secondary" disabled={disabled || !inlineCategory.trim()} onClick={() => write('finance/categories', categoryInputSchema, { name: inlineCategory, type: inlineType })}>เพิ่มหมวดนี้</button>
++              <div className="sm:col-span-3 flex flex-wrap items-center gap-3"><button type="button" className="auth-secondary" disabled={disabled} onClick={() => write('finance/categories/starter', starterCategoriesInputSchema, {})}>เพิ่มหมวดหมู่พื้นฐาน</button><p className="text-xs text-slate-500">เพิ่มเฉพาะชื่อหมวดที่ยังไม่มี เช่น {STARTER_CATEGORIES[type].slice(0, 3).join(', ')} · ไม่สร้างจำนวนเงินหรือรายการ เปลี่ยนชื่อหรือเพิ่มเองได้ภายหลัง</p></div>
++            </div> : available && <button type="button" className="auth-secondary" disabled={disabled} onClick={() => setInlineOpen(true)}>+ เพิ่มหมวดใหม่โดยไม่ล้างข้อมูลที่กรอก</button>}
++          </div>}
+           <label className="auth-label">จำนวนเงิน THB<input className={input} inputMode="decimal" required value={amount} disabled={disabled} onChange={e => setAmount(e.target.value)} placeholder="0.00" /></label>
+           <label className="auth-label">วันที่<input className={input} type="date" required value={date} disabled={disabled} onChange={e => setDate(e.target.value)} /></label>
+           <label className="auth-label sm:col-span-2">บันทึกช่วยจำ<input className={input} maxLength={500} value={note} disabled={disabled} onChange={e => setNote(e.target.value)} /></label>
+@@ -263,7 +289,7 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery =
+       <FinanceHistory mediaEnabled={!demo} mediaLock={setMediaLocked} expired={expired} finance={finance} categoryLabel={categoryLabel} money={money} disabled={disabled} edit={editFinance} cancel={row => { cancelCorrection(); setVoiding({ kind: 'finance', id: row.id, label: `${categoryLabel(row.categoryId)} ${money(displayDecimal(row.amount))} THB` }) }} />
+     </div>}
+     {section === 'budget' && <div className="journal-budget-layout"><section className={card}><h2 className="text-lg font-semibold">ตั้งงบประมาณรายเดือน</h2><form aria-label="ตั้งงบประมาณ" className="mt-5 space-y-4" onSubmit={e => submit(e, 'finance/budgets', budgetInputSchema, { categoryId: budgetCategory, month, amount: budgetAmount, currency: 'THB' })}>
+-      <label className="auth-label">หมวดรายจ่าย<select className={input} required value={budgetCategory} disabled={disabled} onChange={e => setBudgetCategory(e.target.value)}><option value="">เลือกหมวดหมู่</option>{categories.filter(c => c.type === 'expense').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label className="auth-label">งบ THB<input className={input} inputMode="decimal" required value={budgetAmount} disabled={disabled} onChange={e => setBudgetAmount(e.target.value)} /></label><button disabled={disabled} className="auth-primary w-full">บันทึกงบประมาณ</button><p className="text-xs leading-6 text-slate-500">บันทึกซ้ำหมวดและเดือนเดิมเป็นการปรับงบ ไม่มีการสร้างรายการรายจ่าย</p>
++      <label className="auth-label">หมวดรายจ่าย<select className={input} required value={budgetCategory} disabled={disabled} onChange={e => setBudgetCategory(e.target.value)}><option value="">เลือกหมวดหมู่</option>{categories.filter(c => c.type === 'expense').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>{available && !categories.some(c => c.type === 'expense') && <p role="status" className="text-sm">ยังไม่มีหมวดรายจ่าย เพิ่มหมวดหรือหมวดหมู่พื้นฐานได้ที่หน้ารายรับรายจ่าย</p>}<label className="auth-label">งบ THB<input className={input} inputMode="decimal" required value={budgetAmount} disabled={disabled} onChange={e => setBudgetAmount(e.target.value)} /></label><button disabled={disabled} className="auth-primary w-full">บันทึกงบประมาณ</button><p className="text-xs leading-6 text-slate-500">บันทึกซ้ำหมวดและเดือนเดิมเป็นการปรับงบ ไม่มีการสร้างรายการรายจ่าย</p>
+     </form></section><section className={`${card} journal-budget-track`}><h2 className="text-lg font-semibold">ติดตามงบเดือนนี้</h2><div className="mt-5 space-y-4">{finance?.budgets.length === 0 && <p className="text-sm text-slate-500">ยังไม่ได้ตั้งงบประมาณ</p>}{finance?.budgets.map(b => <div key={b.id} className="rounded-xl border border-slate-200 p-4"><p className="font-medium">{categoryLabel(b.categoryId)}</p><p className="mt-2 break-all text-sm">ใช้ไป {money(displayDecimal(b.spent))} / {money(displayDecimal(b.amount))} THB</p><p className={`mt-1 break-all text-sm ${b.remaining.startsWith('-') ? 'text-rose-700' : 'text-teal-700'}`}>{b.remaining.startsWith('-') ? 'เกินงบ ' : 'เหลือ '}{money(displayDecimal(b.remaining.replace(/^-/, '')))} THB</p></div>)}</div></section></div>}
+     {section === 'assets' && <Assets crypto={available ? crypto : null} market={market} now={marketTime} expired={expired} lock={setBackupLocked} />}
+     {section === 'crypto' && <div className="journal-crypto-layout">
+diff --git a/apps/web/src/tracker/client.ts b/apps/web/src/tracker/client.ts
+index dde37ac..2e9d6ac 100644
+--- a/apps/web/src/tracker/client.ts
++++ b/apps/web/src/tracker/client.ts
+@@ -1,3 +1,4 @@
++import { BACKUP_MAX_BYTES, BACKUP_MAX_ROWS } from '@finntech/contracts'
+ export class TrackerRequestError extends Error {
+   constructor(message: string, readonly unknownOutcome: boolean, readonly expired = false) { super(message) }
+ }
+@@ -17,16 +18,20 @@ const messages: Record<string, string> = {
+   RECORD_ALREADY_CORRECTED: 'รายการนี้ถูกแก้หรือยกเลิกแล้ว กรุณาโหลดข้อมูลล่าสุดก่อนทำต่อ',
+   ENTRY_NOT_FOUND: 'ไม่พบรายการรายรับรายจ่ายนี้',
+   TRADE_NOT_FOUND: 'ไม่พบประวัติคริปโตนี้',
+-  BACKUP_TOO_LARGE: 'ข้อมูลเกินขนาดสำรองที่รองรับ (2 MiB / 2,000 รายการ) ระบบไม่ส่งออกบางส่วน',
++  BACKUP_TOO_LARGE: `ข้อมูลเกินขนาดสำรองที่รองรับ (${BACKUP_MAX_BYTES / 1024 / 1024} MiB / ${BACKUP_MAX_ROWS.toLocaleString('en-US')} รายการ) ระบบไม่ส่งออกบางส่วน`,
+   BODY_TOO_LARGE: 'ไฟล์หรือคำขอมีขนาดเกินที่ระบบรองรับ',
++  WRITE_RATE_LIMITED: 'บัญชีของคุณบันทึกถี่เกินโควตาต่อนาที รายการนี้ยังไม่ถูกบันทึก กรุณารอสักครู่แล้วบันทึกใหม่',
++  SERVICE_BUSY: 'ระบบมีผู้ใช้บันทึกพร้อมกันจำนวนมาก รายการนี้ยังไม่ถูกบันทึก กรุณารอสักครู่แล้วบันทึกใหม่',
+   BACKUP_INCONSISTENT: 'ยอดบัญชีไม่ตรงกับประวัติในไฟล์ จึงยังสำรองหรือกู้คืนไม่ได้',
+   BACKUP_PREVIEW_CHANGED: 'ไฟล์ไม่ตรงกับ preview กรุณาตรวจไฟล์ใหม่',
+   BACKUP_TARGET_NOT_EMPTY: 'บัญชีนี้มีข้อมูลการเงินแล้ว ระบบจะไม่เขียนทับหรือรวมข้อมูล',
+   BACKUP_VERIFY_FAILED: 'ตรวจยอดหลังนำเข้าไม่ตรง ระบบยกเลิกการกู้คืนทั้งหมดแล้ว',
+ }
+-export async function trackerRequest(path: string, method = 'GET', body?: unknown, key?: string): Promise<unknown> {
++/** Whole-dataset backup requests may run far longer than ordinary reads/writes on the free instance. */
++export const BACKUP_REQUEST_TIMEOUT_MS = 150000
++export async function trackerRequest(path: string, method = 'GET', body?: unknown, key?: string, timeoutMs = 10000): Promise<unknown> {
+   const controller = new AbortController()
+-  const timeout = setTimeout(() => controller.abort(), 10000)
++  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+   try {
+     const response = await fetch(`/api/${path}`, {
+       method, credentials: 'same-origin', cache: 'no-store', signal: controller.signal,
+diff --git a/apps/web/src/tracker/valuationPolicy.ts b/apps/web/src/tracker/valuationPolicy.ts
+index 47e1a92..cd1f15f 100644
+--- a/apps/web/src/tracker/valuationPolicy.ts
++++ b/apps/web/src/tracker/valuationPolicy.ts
+@@ -11,6 +11,8 @@ export function selectReference(symbol:string, overview:ValuationOverview|null,m
+   if(fx?.status==='DAILY'&&valid(fx.asOf,now,REFERENCE_MAX_AGE)&&fx.rate)return {value:fx.rate,source:'ECB · อ้างอิงรายวัน (THB/EUR ÷ USD/EUR)',asOf:fx.asOf,state:'DAILY'}
+   return {value:null,source:'ECB · อ้างอิงรายวัน',asOf:fx?.asOf??null,state:fx?.status==='ERROR'?'ERROR':fx?.asOf?'STALE':'MISSING'}
+  }
++ // An unconfigured feed is not a provider failure: guide the owner to a manual reference instead.
++ if(market?.connection==='NOT_CONFIGURED')return {value:null,source:'ยังไม่มี feed ราคาอัตโนมัติ · ตั้งราคาอ้างอิงเองได้',asOf:null,state:'MISSING'}
+  const q=market?.quotes.find(q=>q.symbol===symbol)
+  if(q?.status==='LIVE'&&q.price&&valid(q.observedAt??null,now,30000)&&valid(q.receivedAt,now,30000))return {value:q.price,source:market!.source,asOf:q.observedAt!,state:'LIVE'}
+  return {value:null,source:market?.source??'ยังไม่มี feed ที่อนุญาต',asOf:q?.observedAt??null,state:q?.price?'STALE':q?.status==='UNAVAILABLE'?'ERROR':'MISSING'}
+diff --git a/packages/contracts/src/index.ts b/packages/contracts/src/index.ts
+index 1c98cc2..4476f11 100644
+--- a/packages/contracts/src/index.ts
++++ b/packages/contracts/src/index.ts
+@@ -91,6 +91,12 @@ export const categoryInputSchema = z.object({
+   name: z.string().trim().min(1).max(100), type: z.enum(['income', 'expense']),
+ }).strict()
+ export const categoryRenameSchema = z.object({ name: z.string().trim().min(1).max(100) }).strict()
++/** Category labels only: the starter action never creates amounts, transactions, budgets or trades. */
++export const STARTER_CATEGORIES = {
++  expense: ['อาหารและเครื่องดื่ม', 'เดินทาง', 'ที่พัก', 'ค่าน้ำไฟและอินเทอร์เน็ต', 'สุขภาพ', 'การศึกษา', 'ซื้อของ', 'อื่น ๆ'],
++  income: ['เงินเดือน', 'งานเสริม', 'รายได้จากการลงทุน', 'ของขวัญ', 'อื่น ๆ'],
++} as const
++export const starterCategoriesInputSchema = z.object({}).strict()
+ export const financeEntrySchema = financeTransactionInputSchema.extend({
+   attachmentId: z.string().uuid().optional(), categoryId: z.string().uuid(), date: calendarDateSchema, note: z.string().trim().max(500).default(''),
+ }).strict()
+@@ -214,8 +220,11 @@ export type DailyUsdRate=z.infer<typeof dailyUsdRateSchema>
+ export const valuationOverviewSchema=z.object({references:z.array(valuationReferenceSchema).max(STOCK_INSTRUMENTS.length+1),usdThb:dailyUsdRateSchema})
+ export type ValuationOverview=z.infer<typeof valuationOverviewSchema>
+ 
+-export const BACKUP_MAX_BYTES = 2 * 1024 * 1024
+-export const BACKUP_MAX_ROWS = 2000
++// Chosen from measurements on a 0.1 CPU / 512 MB container (Render Free): at 5,000 mixed rows export
++// took ~19 s, restore ~47 s and peak memory ~285 MiB; 20,000 rows was not safe on that CPU budget.
++// See docs/acceptance/claude-fix-release-20261009.md before raising either value.
++export const BACKUP_MAX_BYTES = 5 * 1024 * 1024
++export const BACKUP_MAX_ROWS = 5000
+ const backupTimestamp = z.string().datetime().refine(value => {
+   try { return new Date(value).toISOString() === value } catch { return false }
+ }, 'Timestamp must use canonical UTC milliseconds')

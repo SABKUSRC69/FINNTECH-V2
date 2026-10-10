@@ -3,7 +3,7 @@ import { DecimalInputError, LedgerError } from '@finntech/finance'
 import type { PrismaClient } from '../generated/prisma/client.js'
 import type { AuthRuntime } from '../auth/runtime.js'
 import { requireOwner, type OwnerContext } from '../auth/authorization.js'
-import { createCategory, renameCategory, createEntry, correctEntry, setBudget, createPortfolio, createTrade, correctTrade, financeOverview, cryptoOverview, TrackerError } from './service.js'
+import { createCategory, addStarterCategories, renameCategory, createEntry, correctEntry, setBudget, createPortfolio, createTrade, correctTrade, financeOverview, cryptoOverview, TrackerError } from './service.js'
 import { MarketRelay } from './market.js'
 import type { StockMarketRelay } from './stocks.js'
 import { BACKUP_MAX_BYTES } from '@finntech/contracts'
@@ -11,22 +11,25 @@ import { exportBackup, previewBackup, restoreBackup } from './backup.js'
 import { cashOverview, createCash, updateCash } from './cash.js'
 import { ReferenceFxRelay } from './fx.js'
 import { createStockPortfolio,createStockTrade,correctStockTrade,stockOverview } from './stock-ledger.js'
-import { manualAssets,createManualAsset,updateManualAsset } from './manual-assets.js'
+import { manualAssets,createManualAsset,updateManualAsset,setManualAssetStatus } from './manual-assets.js'
 import { valuationReferences,saveValuationReference } from './valuation-references.js'
 import { DailyUsdRelay } from './usd-fx.js'
+import { DailyCloseRelay, MemoryDailyCloseStore } from './daily-close.js'
+import type { PersonalDailyCloses } from './market-keys.js'
+import { demoFor } from '../auth/demo.js'
 
-export function trackerRouter(auth: AuthRuntime, database: PrismaClient, market = new MarketRelay(), stocks?: StockMarketRelay, fx = new ReferenceFxRelay(), usd = new DailyUsdRelay()): Router {
+export function trackerRouter(auth: AuthRuntime, database: PrismaClient, market = new MarketRelay(), stocks?: StockMarketRelay, fx = new ReferenceFxRelay(), usd = new DailyUsdRelay(), daily = new DailyCloseRelay(null, null, new MemoryDailyCloseStore()), personal?: PersonalDailyCloses): Router {
   const router = Router()
   const normalJson = json({ limit: '64kb' }), backupJson = json({ limit: BACKUP_MAX_BYTES + 1024 })
   router.use((req, _res, next) => {
     const readable = req.method === 'GET' && ['/finance', '/crypto', '/crypto/market', '/stocks/market', '/backup', '/cash', '/reference-rate'].includes(req.path)
-    const writable = req.method === 'POST' && ['/finance/categories', '/finance/transactions', '/finance/budgets', '/crypto/portfolios', '/crypto/trades', '/backup/preview', '/backup/restore', '/cash'].includes(req.path)
+    const writable = req.method === 'POST' && ['/finance/categories', '/finance/categories/starter', '/finance/transactions', '/finance/budgets', '/crypto/portfolios', '/crypto/trades', '/backup/preview', '/backup/restore', '/cash'].includes(req.path)
     const rename = req.method === 'PATCH' && /^\/finance\/categories\/[^/]+$/.test(req.path)
     const correction = req.method === 'POST' && /^\/(finance\/transactions|crypto\/trades)\/[^/]+\/corrections$/.test(req.path)
-    const assetRead=req.method==='GET'&&['/stocks','/assets/manual','/valuation/references'].includes(req.path)
-    const assetWrite=req.method==='POST'&&['/stocks/portfolios','/stocks/trades','/assets/manual','/valuation/references'].includes(req.path)
+    const assetRead=req.method==='GET'&&['/stocks','/assets/manual','/valuation/references','/valuation/daily-close','/market-key'].includes(req.path)
+    const assetWrite=req.method==='POST'&&['/stocks/portfolios','/stocks/trades','/assets/manual','/valuation/references','/market-key','/market-key/remove'].includes(req.path)
     const stockCorrection=req.method==='POST'&&/^\/stocks\/trades\/[^/]+\/corrections$/.test(req.path)
-    const manualUpdate=req.method==='PATCH'&&/^\/assets\/manual\/[^/]+$/.test(req.path)
+    const manualUpdate=req.method==='PATCH'&&/^\/assets\/manual\/[^/]+(?:\/status)?$/.test(req.path)
     if (readable || writable || rename || correction || assetRead||assetWrite||stockCorrection||manualUpdate||(req.method === 'PATCH' && /^\/cash\/[^/]+$/.test(req.path))) next()
     else next('router')
   })
@@ -51,14 +54,24 @@ export function trackerRouter(auth: AuthRuntime, database: PrismaClient, market 
   router.get('/cash', async (_req, res) => { res.json(await cashOverview(database, (res.locals.owner as OwnerContext).ownerId)) })
   router.get('/stocks',async(_req,res)=>{res.json(await stockOverview(database,(res.locals.owner as OwnerContext).ownerId))})
   router.get('/assets/manual',async(_req,res)=>{res.json(await manualAssets(database,(res.locals.owner as OwnerContext).ownerId))})
-  router.get('/valuation/references',async(_req,res)=>{res.json({references:await valuationReferences(database,(res.locals.owner as OwnerContext).ownerId),usdThb:usd.snapshot()})})
+  // Personal provider keys are never stored for demo workspaces (as with media uploads).
+  const keys=()=>demoFor(auth)?undefined:personal
+  // Shared daily closes are filtered per account by the provider licence, never by client input.
+  router.get('/valuation/references',async(_req,res)=>{const owner=(res.locals.owner as OwnerContext).ownerId;res.set('Cache-Control','no-store');res.json({references:await valuationReferences(database,owner),usdThb:usd.snapshot(),dailyCloses:(await keys()?.describe(owner))??await daily.snapshotFor(owner)})})
+  // Explicit read operation. Its prices are not persisted or retained by the personal provider.
+  router.get('/valuation/daily-close',async(_req,res)=>{const owner=(res.locals.owner as OwnerContext).ownerId;res.set('Cache-Control','no-store');res.json((await keys()?.snapshotFor(owner))??await daily.snapshotFor(owner))})
+  // Personal provider key: write-only. Responses carry only status and the last four characters.
+  router.get('/market-key',async(_req,res)=>{const owner=(res.locals.owner as OwnerContext).ownerId,store=keys();res.json(store?await store.status(owner):{available:false,provider:'TIINGO',status:'NONE',hint:null,updatedAt:null,version:null})})
+  router.post('/market-key',async(req,res)=>{const store=keys();if(!store)throw new TrackerError('MARKET_KEY_UNAVAILABLE',422);res.json(await store.save((res.locals.owner as OwnerContext).ownerId,req.headers['idempotency-key'],req.body))})
+  router.post('/market-key/remove',async(req,res)=>{const store=keys();if(!store)throw new TrackerError('MARKET_KEY_UNAVAILABLE',422);res.json(await store.remove((res.locals.owner as OwnerContext).ownerId,req.headers['idempotency-key'],req.body))})
   router.post('/valuation/references',async(req,res)=>{res.json(await saveValuationReference(database,(res.locals.owner as OwnerContext).ownerId,req.headers['idempotency-key'],req.body))})
   router.post('/assets/manual',async(req,res)=>{res.json(await createManualAsset(database,(res.locals.owner as OwnerContext).ownerId,req.headers['idempotency-key'],req.body))})
   router.patch('/assets/manual/:id',async(req,res)=>{res.json(await updateManualAsset(database,(res.locals.owner as OwnerContext).ownerId,req.params.id,req.headers['idempotency-key'],req.body))})
-  router.post('/stocks/trades/:id/corrections',async(req,res)=>{res.json(await correctStockTrade(database,(res.locals.owner as OwnerContext).ownerId,req.params.id,req.headers['idempotency-key'],req.body))})
+  router.patch('/assets/manual/:id/status',async(req,res)=>{res.json(await setManualAssetStatus(database,(res.locals.owner as OwnerContext).ownerId,req.params.id,req.headers['idempotency-key'],req.body))})
+  router.post('/stocks/trades/:id/corrections',async(req,res)=>{const owner=(res.locals.owner as OwnerContext).ownerId;res.json(await correctStockTrade(database,owner,req.params.id,req.headers['idempotency-key'],req.body));stocks?.holdingsChanged(owner)})
   router.post('/cash', async (req, res) => { res.json(await createCash(database, (res.locals.owner as OwnerContext).ownerId, req.headers['idempotency-key'], req.body)) })
   router.patch('/cash/:id', async (req, res) => { res.json(await updateCash(database, (res.locals.owner as OwnerContext).ownerId, req.params.id, req.headers['idempotency-key'], req.body)) })
-  router.get('/reference-rate', (_req, res) => { res.json(fx.snapshot()) })
+  router.get('/reference-rate', async (_req, res) => { res.set('Cache-Control','no-store'); res.json(await fx.current()) })
   router.get('/stocks/market', async (_req, res) => {
     if (!stocks) { res.status(503).json({ error: { code: 'STOCK_NOT_CONFIGURED' } }); return }
     if (!stocks.allowsOwner((res.locals.owner as OwnerContext).ownerId)) {
@@ -67,11 +80,16 @@ export function trackerRouter(auth: AuthRuntime, database: PrismaClient, market 
     res.json(await stocks.snapshot())
   })
   for (const [path, operation] of [
-    ['/finance/categories', createCategory], ['/finance/transactions', createEntry], ['/finance/budgets', setBudget],
+    ['/finance/categories', createCategory], ['/finance/categories/starter', addStarterCategories], ['/finance/transactions', createEntry], ['/finance/budgets', setBudget],
     ['/crypto/portfolios', createPortfolio], ['/crypto/trades', createTrade],
     ['/stocks/portfolios',createStockPortfolio],['/stocks/trades',createStockTrade],
   ] as const) {
-    router.post(path, async (req, res) => { res.json(await operation(database, (res.locals.owner as OwnerContext).ownerId, req.headers['idempotency-key'], req.body)) })
+    router.post(path, async (req, res) => {
+      const owner = (res.locals.owner as OwnerContext).ownerId
+      res.json(await operation(database, owner, req.headers['idempotency-key'], req.body))
+      // A newly held symbol is subscribed on the next relay request instead of after the 60 s refresh.
+      if (path === '/stocks/trades') stocks?.holdingsChanged(owner)
+    })
   }
   router.patch('/finance/categories/:id', async (req, res) => { res.json(await renameCategory(database, (res.locals.owner as OwnerContext).ownerId, req.params.id, req.headers['idempotency-key'], req.body)) })
   router.post('/finance/transactions/:id/corrections', async (req, res) => { res.json(await correctEntry(database, (res.locals.owner as OwnerContext).ownerId, req.params.id, req.headers['idempotency-key'], req.body)) })

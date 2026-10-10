@@ -33,7 +33,7 @@ describe('US stock watchlist', () => {
     const body = snapshot('STREAMING', '123', 'LIVE')
     body.quotes[0]!.observedAt = '2020-01-01T00:00:00Z'
     fixture(body)
-    expect(await screen.findByText('ราคาเก่า / ตลาดอาจปิด')).toBeTruthy()
+    expect(await screen.findByText(/^(ราคาไม่สด|ตลาดปิด · ราคาล่าสุด)$/)).toBeTruthy()
     expect(screen.queryByText('ราคาสด IEX')).toBeNull()
   })
   it('rejects provider/financial JSON numbers and recovers safely from offline or denied access', async () => {

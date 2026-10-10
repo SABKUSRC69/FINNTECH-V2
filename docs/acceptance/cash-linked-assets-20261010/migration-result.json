@@ -1,0 +1,29 @@
+{
+  "boundary": "verified",
+  "migration": "20261010040000_link_cash_settlements",
+  "before": {
+    "cash": 7,
+    "stockTrades": 14,
+    "holdings": 9,
+    "cryptoTrades": 5,
+    "finance": 13,
+    "activeKeys": 1,
+    "personalTiingoCaches": 0
+  },
+  "after": {
+    "cash": 7,
+    "stockTrades": 14,
+    "holdings": 9,
+    "cryptoTrades": 5,
+    "finance": 13,
+    "activeKeys": 1,
+    "personalTiingoCaches": 0
+  },
+  "cashUnchanged": true,
+  "constraints": 5,
+  "linkedRecords": [
+    0,
+    0,
+    0
+  ]
+}

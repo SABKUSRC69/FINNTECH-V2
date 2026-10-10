@@ -71,16 +71,21 @@ export class MarketRelay {
     const changed=[...approved].join(',')!==[...this.approved].join(',');this.approved=approved;this.checkedAt=this.now();if(changed)this.disconnect(false)
    }
    this.connect()
+   // One failing symbol must not withhold REST snapshots for the others; the failure still backs off.
+   let failed=false
    for(const symbol of this.approved){
     const previous=this.quotes.get(symbol)
     if(previous?.kind==='TRADE'&&this.now()-previous.observed!<=30_000)continue
-    const before=this.quotes.get(symbol),result=await this.request(`${upstream}/ticker/price?symbol=${symbol}`,{signal:AbortSignal.timeout(5000),redirect:'error'})
-    if(!result.ok)throw Error('price_unavailable')
-    const quote=providerPriceSchema.parse(await result.json());if(quote.symbol!==symbol)throw Error('symbol_mismatch')
-    // Object identity also catches a trade arriving in the same millisecond as REST.
-    if(this.quotes.get(symbol)!==before)continue
-    this.quotes.set(symbol,{price:serializeCrypto(parseCryptoDecimal(quote.price)),received:this.now(),observed:null,sequence:0,kind:'REST_SNAPSHOT'})
+    try{
+     const before=this.quotes.get(symbol),result=await this.request(`${upstream}/ticker/price?symbol=${symbol}`,{signal:AbortSignal.timeout(5000),redirect:'error'})
+     if(!result.ok)throw Error('price_unavailable')
+     const quote=providerPriceSchema.parse(await result.json());if(quote.symbol!==symbol)throw Error('symbol_mismatch')
+     // Object identity also catches a trade arriving in the same millisecond as REST.
+     if(this.quotes.get(symbol)!==before)continue
+     this.quotes.set(symbol,{price:serializeCrypto(parseCryptoDecimal(quote.price)),received:this.now(),observed:null,sequence:0,kind:'REST_SNAPSHOT'})
+    }catch{failed=true}
    }
+   if(failed)throw Error('price_unavailable')
    this.failures=0
   }catch{this.failures=Math.min(this.failures+1,5)}
   finally{this.nextAttempt=this.now()+Math.min(15_000*2**this.failures,300_000)}

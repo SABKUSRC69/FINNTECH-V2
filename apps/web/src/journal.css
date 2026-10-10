@@ -137,7 +137,7 @@ body { margin: 0; min-width: 0; }
 .journal-assets-summary { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:20px; }
 .journal-assets-summary .text-3xl { font-size:32px; }
 .journal-asset-portfolios { grid-column:1; }
-.journal-cash-editor { grid-column:2; grid-row:3 / span 2; }
+.journal-cash-editor { grid-column:2; grid-row:4 / span 2; }
 .tracker-app .tracker-card.journal-rate { grid-column:1; background:var(--paper-pink); }
 .journal-care-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; align-items:start; }
 .journal-care-layout > *,.journal-assets > *,.journal-backup-layout > * { margin-top:0!important; }
@@ -254,3 +254,20 @@ body { margin: 0; min-width: 0; }
 .journal-review-field { display:grid; gap:8px; min-width:0; }
 .journal-avatar { display:inline-flex; width:44px; height:44px; flex:0 0 44px; border-radius:50%; overflow:hidden; align-items:center; justify-content:center; background:#e8dcd2; color:#715044; font-weight:700; }
 .journal-avatar img, .journal-avatar svg { width:100%; height:100%; object-fit:cover; }
+
+.journal-held-assets,.journal-price-tools { grid-column:1 / -1; min-width:0; }
+.journal-held-scroll { overflow-x:auto; margin-top:16px; }
+.journal-held-table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+.journal-held-table th { text-align:left; font-size:13px; color:var(--muted); padding:10px 12px; border-bottom:1px dashed var(--line); }
+.journal-held-table td { padding:16px 12px; vertical-align:top; border-bottom:1px solid var(--line); overflow-wrap:anywhere; }
+.journal-held-table tr:last-child td { border-bottom:0; }
+.journal-held-table th:first-child,.journal-held-table td:first-child { width:48%; padding-left:0; }
+.journal-held-table th:last-child,.journal-held-value { text-align:right; }
+.journal-held-quantity { white-space:nowrap; }
+@media(max-width:640px) {
+ .journal-held-table { font-size:13px; }
+ .journal-held-table th,.journal-held-table td { padding:12px 6px; }
+ .journal-held-table th:first-child,.journal-held-table td:first-child { width:42%; }
+ .journal-held-quantity { white-space:normal; }
+ .journal-held-value { min-width:88px; }
+}

@@ -1,0 +1,19 @@
+{
+  "status": "LIVE",
+  "service": "srv-db3pcll9fdbs73enrmg0 (finntech-personal, Render Free)",
+  "deploy": "dep-db4gn9dg1s2s739ckur0",
+  "trigger": "Manual Deploy > Deploy latest commit (Render dashboard)",
+  "commit": "41d2985ea872e244d369073120ac51461f06b608",
+  "previousCommit": "8058bb7b1d480600035c44f2021f69270cf11a0a",
+  "repository": "https://github.com/SABKUSRC69/finntech-beta branch codex/student-real-use",
+  "startedAt": "2026-10-09T22:43:34+07:00",
+  "duration": "1m53s",
+  "liveAssets": [
+    { "file": "index-BDYv7HwH.js", "sha256": "6bf3a3c6413807405007bd26d9d1a7704462ab6643a675d4ad23debc25298d68" },
+    { "file": "index-C6G3rOc3.css", "sha256": "df60f3f754a0df18f526467d192755a851ae1e73ca97b751ba2d524fa4b0bc4d" }
+  ],
+  "liveAssetsMatchReleaseBuild": true,
+  "ready": true,
+  "migration": "none",
+  "rollback": "Render dashboard > Deploys > 8058bb7 > Rollback (no schema change, so rollback is data-safe)"
+}

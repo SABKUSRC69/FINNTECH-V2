@@ -14,7 +14,9 @@ it('manual override is visible, reversible, bounded by observation age and never
  expect(selectReference('AAPL',{...data,references:[{...manual,asOf:new Date(now-REFERENCE_MAX_AGE-1).toISOString()}]},market,now).value).toBeNull()
  expect(selectReference('AAPL',null,null,now)).toMatchObject({value:null,state:'MISSING'})
  expect(selectReference('AAPL',data,market,now+30001)).toMatchObject({value:null,state:'STALE'})
- expect(selectReference('AAPL',data,market,now-1).value).toBeNull()
+ // Up to 2 s of provider/browser clock skew is tolerated; anything further in the future is not live.
+ expect(selectReference('AAPL',data,market,now-1).value).toBe('120')
+ expect(selectReference('AAPL',data,market,now-2001).value).toBeNull()
 })
 it('USD daily/manual policy is separate from live rates, and errors need explicit fallback',()=>{
  expect(selectReference('USDTHB',data,null,now+30001)).toMatchObject({value:'35',state:'DAILY'})

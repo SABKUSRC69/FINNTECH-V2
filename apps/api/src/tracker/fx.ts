@@ -22,6 +22,8 @@ export class ReferenceFxRelay {
     return referenceRateSchema.parse({ base: 'USDT', quote: 'THB', rate: this.rate, receivedAt: this.receivedAt,
       status: this.rate === null ? 'UNAVAILABLE' : fresh ? 'FRESH' : 'STALE', source: 'Bitkub public', kind: 'LAST_PRICE_SNAPSHOT' })
   }
+  /** A visible valuation read waits for a due refresh instead of returning the previous snapshot. */
+  async current(): Promise<ReferenceRate> { await this.refresh(); return this.snapshot() }
   async refresh(): Promise<void> {
     if (this.refreshing) return this.refreshing
     if (this.now() < this.nextAttempt) return
@@ -35,9 +37,13 @@ export class ReferenceFxRelay {
   }
   private async update(): Promise<void> {
     try {
-      const metadata = symbols.parse(await this.request(`${root}/symbols`))
+      // Both public reads are bounded by one 5 s window, within the client's 10 s read timeout.
+      const [rawMetadata, rawTickers] = await Promise.all([
+        this.request(`${root}/symbols`), this.request(`${root}/ticker?sym=usdt_thb`),
+      ])
+      const metadata = symbols.parse(rawMetadata)
       if (!metadata.result.some(row => row.symbol === 'USDT_THB' && row.base_asset === 'USDT' && row.quote_asset === 'THB' && row.status === 'active')) throw new Error('Unsupported pair')
-      const rows = tickers.parse(await this.request(`${root}/ticker?sym=usdt_thb`))
+      const rows = tickers.parse(rawTickers)
       if (rows.length !== 1 || rows[0]!.symbol !== 'USDT_THB') throw new Error('Invalid pair response')
       const rate = parseCryptoDecimal(rows[0]!.last)
       if (!rate.gt('0')) throw new Error('Invalid rate')

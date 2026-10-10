@@ -1,0 +1,29 @@
+{
+  "commit": "8687a074a861b183143996179372cba19794b4b7",
+  "previousCommit": "ebc5a148f12209b7372a32c322904c5166f56e09",
+  "branch": "codex/student-real-use",
+  "files": [
+    "apps/api/prisma/migrations/20261010040000_link_cash_settlements/migration.sql",
+    "apps/api/prisma/schema.prisma",
+    "apps/api/src/tracker/backup.ts",
+    "apps/api/src/tracker/cash-links.ts",
+    "apps/api/src/tracker/service.ts",
+    "apps/api/src/tracker/stock-ledger.ts",
+    "apps/web/src/journal.css",
+    "apps/web/src/tracker/Assets.tsx",
+    "apps/web/src/tracker/CashSettlementFields.tsx",
+    "apps/web/src/tracker/Dashboard.tsx",
+    "apps/web/src/tracker/FinanceHistory.tsx",
+    "apps/web/src/tracker/HeldAssets.tsx",
+    "apps/web/src/tracker/StockHoldings.tsx",
+    "apps/web/src/tracker/ValuationReferences.tsx",
+    "apps/web/src/tracker/client.ts",
+    "packages/contracts/src/index.ts"
+  ],
+  "secretScan": {
+    "status": "PASS",
+    "scanned": 18,
+    "found": 0
+  },
+  "rootRepositoryCommitted": false
+}

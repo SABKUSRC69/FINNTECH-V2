@@ -1,0 +1,20 @@
+[
+  {
+    "suite": "audit-fixes",
+    "exitCode": 0,
+    "counts": [
+      "ℹ tests 7",
+      "ℹ pass 7",
+      "ℹ fail 0"
+    ]
+  },
+  {
+    "suite": "password-mode",
+    "exitCode": 0,
+    "counts": [
+      "ℹ tests 5",
+      "ℹ pass 5",
+      "ℹ fail 0"
+    ]
+  }
+]

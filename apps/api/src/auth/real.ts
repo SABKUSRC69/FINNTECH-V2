@@ -32,6 +32,9 @@ export async function realStorageAvailable(database: PrismaClient | Prisma.Trans
 export function registerReal(auth: AuthRuntime, config: RealConfiguration): void { configurations.set(auth, config) }
 export function realFor(auth: AuthRuntime): RealConfiguration | undefined { return configurations.get(auth) }
 
+/** Per-email-hash attempts and a site-wide ceiling sized for password hashing on the free instance. */
+export const AUTH_BUDGET = { perEmailBucket: 10, global: 120 } as const
+
 // Fixed buckets: attacker-controlled identities cannot grow the rate table indefinitely.
 export async function consumeRealBudget(tx: Prisma.TransactionClient, key: string, limit: number, seconds: number, now = new Date()): Promise<boolean> {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(734031)`
@@ -87,13 +90,19 @@ export function createRealAuthGuard(database: PrismaClient, config: RealConfigur
     const body = await boundedAuthBody(request)
     if (!body) return Response.json({ error: { code: 'INVALID_REQUEST' } }, { status: 400 })
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 254) : ''
-    const bucket = Number.parseInt(createHmac('sha256', secret).update(email).digest('hex').slice(0, 4), 16) % 256
-    const allowed = await database.$transaction(async tx => {
-      const global = await consumeRealBudget(tx, 'auth:global', 60, 60)
-      const account = await consumeRealBudget(tx, `auth:bucket:${bucket}`, 10, 60)
-      return global && account
-    })
-    if (!allowed) return Response.json({ error: { code: 'RATE_LIMITED' } }, { status: 429 })
+    // Sign-out only ends the caller's own session; budgeting it would let other visitors block logout.
+    if (!route.endsWith('/sign-out')) {
+      // Requests without an email (reset/change password, update user) are keyed by their token or
+      // session cookie, so one visitor cannot exhaust a single bucket shared by every such request.
+      const token = typeof body.token === 'string' ? body.token.slice(0, 512) : ''
+      const identity = email ? email : token ? `token:${token}` : `session:${(request.headers.get('cookie') ?? '').slice(0, 4096)}`
+      const bucket = Number.parseInt(createHmac('sha256', secret).update(identity).digest('hex').slice(0, 4), 16) % 256
+      const allowed = await database.$transaction(async tx => {
+        const account = await consumeRealBudget(tx, `auth:bucket:${bucket}`, AUTH_BUDGET.perEmailBucket, 60)
+        return account && await consumeRealBudget(tx, 'auth:global', AUTH_BUDGET.global, 60)
+      })
+      if (!allowed) return Response.json({ error: { code: 'RATE_LIMITED' } }, { status: 429 })
+    }
     if (route.endsWith('/sign-up/email') && !realSignupAllowed(config, email)) return Response.json({ error: { code: 'REGISTRATION_CLOSED' } }, { status: 403 })
     if (route.endsWith('/sign-in/email') && !realEmailAllowed(config, email)) return Response.json({ error: { code: 'ACCOUNT_NOT_READY' } }, { status: 403 })
     return undefined

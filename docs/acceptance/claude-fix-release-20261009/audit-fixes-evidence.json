@@ -1,0 +1,59 @@
+{
+  "F1": {
+    "simultaneousSignIns": [
+      200,
+      200,
+      200,
+      200,
+      200
+    ],
+    "failuresForOneEmail": [
+      401,
+      401,
+      401,
+      401,
+      401,
+      401,
+      401,
+      401,
+      401,
+      401,
+      429
+    ]
+  },
+  "F2": {
+    "ownerA": {
+      "200": 120,
+      "429": 1
+    },
+    "ownerBFirstWrite": 200
+  },
+  "F3": {
+    "created": [
+      12,
+      0
+    ],
+    "categories": 13
+  },
+  "F10": {
+    "wrongPassword": 401,
+    "correctPassword": [
+      403,
+      "ACCOUNT_DELETION_PENDING"
+    ]
+  },
+  "F6": [
+    "fulfilled",
+    "fulfilled"
+  ],
+  "F5": {
+    "tradesInScope": 1993,
+    "appendMs": 207,
+    "midHistoryInsertMs": 204
+  },
+  "F4": {
+    "rows": 2501,
+    "bytes": 644002,
+    "refusedAbove": 413
+  }
+}

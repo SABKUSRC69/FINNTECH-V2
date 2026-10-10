@@ -79,6 +79,8 @@ model TrackerUser {
   stockHoldings StockHolding[]
   manualAssets ManualAsset[]
   valuationReferences ValuationReference[]
+  dailyClosePrices DailyClosePrice[]
+  marketKey OwnerMarketKey?
   mediaObjects MediaObject[]
   mediaAttachments MediaAttachment[]
   profile OwnerProfile?
@@ -100,6 +102,39 @@ model ValuationReference {
   version Int @default(1)
   @@unique([ownerId, symbol])
   @@map("valuation_references")
+}
+
+// Shared market data (not owner data): one unadjusted official close per provider/symbol/session.
+// Excluded from owner backups and purges; every owner's valuation reads the same row.
+model DailyClosePrice {
+  id String @id @default(uuid()) @db.Uuid
+  source String @db.VarChar(32)
+  scope String @default("shared") @db.VarChar(36)
+  ownerId String? @map("owner_id") @db.Uuid
+  owner TrackerUser? @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  symbol String @db.VarChar(16)
+  tradingDate DateTime @map("trading_date") @db.Date
+  close Decimal @db.Decimal(38,18)
+  currency String @db.VarChar(3)
+  priceType String @default("CLOSE") @map("price_type") @db.VarChar(16)
+  fetchedAt DateTime @map("fetched_at") @db.Timestamptz(3)
+  @@unique([source, scope, symbol, tradingDate])
+  @@index([ownerId], map: "daily_close_prices_owner")
+  @@map("daily_close_prices")
+}
+
+// A personal market-data key, encrypted by the server; used only for its owner's own valuation.
+model OwnerMarketKey {
+  ownerId String @id @map("owner_id") @db.Uuid
+  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  provider String @db.VarChar(16)
+  ciphertext Bytes?
+  keyHint String? @map("key_hint") @db.VarChar(4)
+  status String @db.VarChar(16)
+  personalUseConfirmedAt DateTime @map("personal_use_confirmed_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(3)
+  version Int @default(1)
+  @@map("owner_market_keys")
 }
 
 // Private immutable normalized bytes. Only unlinked staging objects expire.
@@ -155,6 +190,10 @@ model CashAccount {
   version Int @default(1)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  financeEntries FinanceTransaction[]
+  cryptoTrades CryptoTrade[]
+  stockTrades StockTrade[]
+  @@unique([ownerId, id])
   @@unique([ownerId, name])
   @@map("cash_accounts")
 }
@@ -341,6 +380,9 @@ model FinanceCategory {
 model FinanceTransaction {
   id String @id @default(uuid()) @db.Uuid
   ownerId String @map("owner_id") @db.Uuid
+  cashAccountId String? @map("cash_account_id") @db.Uuid
+  cashAccount CashAccount? @relation(fields: [ownerId, cashAccountId], references: [ownerId, id], onDelete: Restrict, onUpdate: Restrict)
+  cashInOpeningBalance Boolean @default(false) @map("cash_in_opening_balance")
   categoryId String? @map("category_id") @db.Uuid
   type FinanceType
   amount Decimal @db.Decimal(20, 2)
@@ -396,6 +438,10 @@ model CryptoAsset {
 model CryptoTrade {
   id String @id @default(uuid()) @db.Uuid
   ownerId String @map("owner_id") @db.Uuid
+  cashAmountThb Decimal? @map("cash_amount_thb") @db.Decimal(20, 2)
+  cashAccountId String? @map("cash_account_id") @db.Uuid
+  cashAccount CashAccount? @relation(fields: [ownerId, cashAccountId], references: [ownerId, id], onDelete: Restrict, onUpdate: Restrict)
+  cashInOpeningBalance Boolean @default(false) @map("cash_in_opening_balance")
   portfolioId String @map("portfolio_id") @db.Uuid
   assetId String @map("asset_id") @db.Uuid
   quoteCurrency String @default("USDT") @map("quote_currency") @db.VarChar(4)
@@ -572,6 +618,10 @@ model StockPortfolio {
 model StockTrade {
   id String @id @default(uuid()) @db.Uuid
   ownerId String @map("owner_id") @db.Uuid
+  cashAmountThb Decimal? @map("cash_amount_thb") @db.Decimal(20, 2)
+  cashAccountId String? @map("cash_account_id") @db.Uuid
+  cashAccount CashAccount? @relation(fields: [ownerId, cashAccountId], references: [ownerId, id], onDelete: Restrict, onUpdate: Restrict)
+  cashInOpeningBalance Boolean @default(false) @map("cash_in_opening_balance")
   owner TrackerUser @relation(fields:[ownerId], references:[id], onDelete:Restrict)
   portfolioId String @map("portfolio_id") @db.Uuid
   quoteCurrency String @default("USD") @map("quote_currency") @db.VarChar(3)
@@ -621,6 +671,7 @@ model ManualAsset {
   date String @db.VarChar(10)
   note String @db.VarChar(500)
   version Int @default(1)
+  archived Boolean @default(false)
   @@unique([ownerId,name])
   @@map("manual_assets")
 }

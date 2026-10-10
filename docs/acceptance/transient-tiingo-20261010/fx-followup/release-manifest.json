@@ -1,0 +1,20 @@
+{
+  "previousCommit": "afbc953e0ad5a2424e7aa29df8e4be2f539b3bd4",
+  "files": [
+    {
+      "path": "apps/api/src/tracker/fx.ts",
+      "sha256": "9483fd0cd2edb51f6e3cd1f9c6db63409cb089990da34bf00cf4f9d159f76704",
+      "previousSha256": "c3b8a6c8426d65b88707469f01b11ad3817d83700721c23a3e841133ea1f9a80"
+    },
+    {
+      "path": "apps/api/src/tracker/routes.ts",
+      "sha256": "776b96a4b25ec0595be834141e054c2867d3106b7e85b6b3d014db75ed1c0d70",
+      "previousSha256": "c5116ef70dcb83a9dc6f17f2637ad0e6d63ac3bf875f57f553ce9252cd60c1f4"
+    },
+    {
+      "path": "apps/web/src/tracker/Assets.tsx",
+      "sha256": "b7ce22734480d3a27b6daca25bc06198694480b578acbb6e9b366ac2c354b9cc",
+      "previousSha256": "ec5c2ece0b5df995abc412ae2a5a875450c55d647bda4e333a3e81746c03ba6b"
+    }
+  ]
+}

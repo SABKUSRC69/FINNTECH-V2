@@ -1,0 +1,44 @@
+﻿[
+    {
+        "id":  "npm-test",
+        "command":  "npm test",
+        "exitCode":  0,
+        "seconds":  20
+    },
+    {
+        "id":  "npm-build",
+        "command":  "npm run build",
+        "exitCode":  0,
+        "seconds":  6
+    },
+    {
+        "id":  "tracker-typecheck",
+        "command":  "npm run tracker:typecheck",
+        "exitCode":  0,
+        "seconds":  17
+    },
+    {
+        "id":  "tracker-test",
+        "command":  "npm run tracker:test",
+        "exitCode":  0,
+        "seconds":  26
+    },
+    {
+        "id":  "tracker-build",
+        "command":  "npm run tracker:build",
+        "exitCode":  0,
+        "seconds":  16
+    },
+    {
+        "id":  "package-smoke",
+        "command":  "node --no-strip-types scripts/tracker-package-smoke.mjs",
+        "exitCode":  0,
+        "seconds":  0
+    },
+    {
+        "id":  "diff-check",
+        "command":  "git diff --check",
+        "exitCode":  0,
+        "seconds":  0
+    }
+]

@@ -1,0 +1,6 @@
+{
+  "migration": "20261010050000_archive_manual_assets",
+  "applied": true,
+  "existingManualAndCashUnchanged": true,
+  "existingRecordsActive": true
+}

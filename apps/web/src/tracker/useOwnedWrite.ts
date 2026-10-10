@@ -2,13 +2,14 @@ import { useEffect,useRef,useState } from 'react'
 import { trackerRequest,TrackerRequestError } from './client'
 type Pending={path:string;body:unknown;key:string;method:string}
 /** Unknown outcomes retain exactly the validated payload/key and keep parent navigation locked. */
-export function useOwnedWrite(lock:(value:boolean)=>void,expired:()=>void,refresh:()=>Promise<void>,completed?:(value:unknown,path:string)=>void){
+/** `timeoutMs` lets writes with slow server-side work (e.g. verifying a provider key) outlast it. */
+export function useOwnedWrite(lock:(value:boolean)=>void,expired:()=>void,refresh:()=>Promise<void>,completed?:(value:unknown,path:string)=>void,timeoutMs?:number){
  const [busy,setBusy]=useState(false),[pending,setPending]=useState<Pending|null>(null),[message,setMessage]=useState(''),writing=useRef(false)
  useEffect(()=>{lock(busy||!!pending);return()=>lock(false)},[busy,pending,lock])
  async function send(request:Pending){
   if(writing.current)return
   writing.current=true;lock(true);setBusy(true);setMessage('')
-  try{const value=await trackerRequest(request.path,request.method,request.body,request.key);setPending(null);completed?.(value,request.path);setMessage('บันทึกสำเร็จ');await refresh()}
+  try{const value=await trackerRequest(request.path,request.method,request.body,request.key,timeoutMs);setPending(null);completed?.(value,request.path);setMessage('บันทึกสำเร็จ');await refresh()}
   catch(error){setMessage(error instanceof Error?error.message:'บันทึกไม่สำเร็จ');if(error instanceof TrackerRequestError&&error.unknownOutcome)setPending(request);else{setPending(null);if(error instanceof TrackerRequestError&&error.expired)expired();else await refresh()}}
   finally{writing.current=false;setBusy(false)}
  }

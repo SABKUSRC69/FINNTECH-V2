@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-09T14:01:58.329Z",
+  "signup": [
+    200,
+    200
+  ],
+  "accountA_125_writes_status_counts": {
+    "200": 120,
+    "429": 5
+  },
+  "accountB_first_write": {
+    "status": 429,
+    "code": "WRITE_RATE_LIMITED"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "commit": "b665285f9b6782dd1ee21fa682c3ee74cef45867",
+  "previousCommit": "edc96845b1d44696c1ec12595da0e8a896a32e46",
+  "branch": "codex/student-real-use",
+  "pushExit": 0,
+  "files": [
+    "apps/api/prisma/migrations/20261010000000_daily_close_prices/migration.sql",
+    "apps/api/prisma/schema.prisma",
+    "apps/api/src/app.ts",
+    "apps/api/src/server.ts",
+    "apps/api/src/tracker/daily-close.ts",
+    "apps/api/src/tracker/market-keys.ts",
+    "apps/api/src/tracker/routes.ts",
+    "apps/web/src/tracker/Account.tsx",
+    "apps/web/src/tracker/Assets.tsx",
+    "apps/web/src/tracker/MarketKey.tsx",
+    "apps/web/src/tracker/StockHoldings.tsx",
+    "apps/web/src/tracker/client.ts",
+    "apps/web/src/tracker/valuationPolicy.ts",
+    "packages/contracts/src/index.ts",
+    "packages/finance/src/analytics.ts",
+    "packages/finance/src/index.ts",
+    "packages/finance/src/market-calendar.ts"
+  ],
+  "assets": [
+    {
+      "file": "index-BfUg9J6P.css",
+      "sha256": "98556bc91f487e661305046be3aaeaa56606c902237f77239ba5f64a1796d960"
+    },
+    {
+      "file": "index-nllpNtKm.js",
+      "sha256": "20095b2e6971200ff8549dcc7836d5b54f63264be59245218fae9bf4647f10b3"
+    }
+  ],
+  "secretScan": {
+    "status": "PASS",
+    "scanned": 19,
+    "knownSecretValuesChecked": 6,
+    "found": 0
+  },
+  "ownerWorkingRepositoryCommitted": false
+}

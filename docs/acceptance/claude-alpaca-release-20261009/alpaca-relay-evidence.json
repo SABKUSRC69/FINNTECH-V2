@@ -1,0 +1,15 @@
+{
+  "ownerOnly": {
+    "subscribed": [
+      "AAPL",
+      "SPY",
+      "QQQ"
+    ],
+    "pushMs": 776,
+    "ownerRest": 200,
+    "secondOwnerRest": 403,
+    "secondOwnerWs": 401,
+    "anonymousWs": 401,
+    "tradesAfterRetry": 1
+  }
+}

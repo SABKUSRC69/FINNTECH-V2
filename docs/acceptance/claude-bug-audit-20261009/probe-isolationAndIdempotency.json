@@ -1,0 +1,40 @@
+{
+  "at": "2026-10-09T13:58:04.122Z",
+  "signup": [
+    200,
+    200
+  ],
+  "a_stage_receipt": {
+    "status": 200,
+    "byteSize": 335
+  },
+  "idempotency": {
+    "first": 200,
+    "retrySameReceipt": true,
+    "changedPayload": [
+      409,
+      "IDEMPOTENCY_CONFLICT"
+    ]
+  },
+  "a_month": {
+    "expense": "120.5",
+    "transactions": 1
+  },
+  "cross_owner": {
+    "object": 404,
+    "attachment": 404,
+    "correction": [
+      404,
+      "ENTRY_NOT_FOUND"
+    ],
+    "bTransactions": 0
+  },
+  "anonymous_and_csrf": {
+    "anonymousMedia": 401,
+    "foreignOriginWrite": 403
+  },
+  "expired_session": {
+    "status": 401,
+    "code": "AUTH_REQUIRED"
+  }
+}

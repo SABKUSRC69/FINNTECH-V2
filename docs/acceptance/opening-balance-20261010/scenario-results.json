@@ -1,0 +1,273 @@
+{
+ "database": "throwaway postgres:16 (tmpfs, removed)",
+ "code": "release-source a05b7f0 build",
+ "passed": 53,
+ "failed": 0,
+ "results": [
+  {
+   "id": "A1",
+   "name": "income adds cash",
+   "pass": true
+  },
+  {
+   "id": "A2",
+   "name": "expense subtracts cash",
+   "pass": true
+  },
+  {
+   "id": "A3",
+   "name": "expense above balance refused",
+   "pass": true
+  },
+  {
+   "id": "A3b",
+   "name": "refused expense leaves balance and no row",
+   "pass": true
+  },
+  {
+   "id": "A4",
+   "name": "new entry without cash account refused",
+   "pass": true
+  },
+  {
+   "id": "A5",
+   "name": "other owner cash account refused",
+   "pass": true
+  },
+  {
+   "id": "A5b",
+   "name": "other owner balance untouched",
+   "pass": true
+  },
+  {
+   "id": "A6",
+   "name": "correction moves expense: A refunded, A2 charged",
+   "pass": true
+  },
+  {
+   "id": "A7",
+   "name": "income corrected to expense swings 400",
+   "pass": true
+  },
+  {
+   "id": "A8",
+   "name": "same idempotency key applies once",
+   "pass": true
+  },
+  {
+   "id": "A8b",
+   "name": "same key different body conflicts",
+   "pass": true
+  },
+  {
+   "id": "A9",
+   "name": "concurrent expenses: exactly one succeeds, no negative",
+   "pass": true
+  },
+  {
+   "id": "A10",
+   "name": "manual edit with stale version refused",
+   "pass": true
+  },
+  {
+   "id": "A10b",
+   "name": "balance not overwritten",
+   "pass": true
+  },
+  {
+   "id": "A11",
+   "name": "legacy correction and void do not change cash",
+   "pass": true
+  },
+  {
+   "id": "A11b",
+   "name": "legacy correction attaching cash refused",
+   "pass": true
+  },
+  {
+   "id": "A12",
+   "name": "backdated entry without choice refused",
+   "pass": true
+  },
+  {
+   "id": "A12b",
+   "name": "backdated entry applied on request; asOf stays the opening date",
+   "pass": true
+  },
+  {
+   "id": "C1",
+   "name": "crypto buy subtracts THB paid",
+   "pass": true
+  },
+  {
+   "id": "C2",
+   "name": "crypto buy above cash refused",
+   "pass": true
+  },
+  {
+   "id": "C3",
+   "name": "oversell refused, cash unchanged",
+   "pass": true
+  },
+  {
+   "id": "C4",
+   "name": "trade without settlement refused",
+   "pass": true
+  },
+  {
+   "id": "C5",
+   "name": "crypto sell adds THB received",
+   "pass": true
+  },
+  {
+   "id": "C6",
+   "name": "holding quantity after buy 2 sell 1",
+   "pass": true
+  },
+  {
+   "id": "C7",
+   "name": "buy corrected to other account and amount",
+   "pass": true
+  },
+  {
+   "id": "C8",
+   "name": "void of buy that later sell depends on is refused and rolled back",
+   "pass": true
+  },
+  {
+   "id": "C9",
+   "name": "backdated sell before first buy refused",
+   "pass": true
+  },
+  {
+   "id": "C10",
+   "name": "void sell after spending proceeds",
+   "pass": true
+  },
+  {
+   "id": "S1",
+   "name": "stock buy larger than cash refused",
+   "pass": true
+  },
+  {
+   "id": "S2",
+   "name": "stock buy subtracts THB paid incl fee",
+   "pass": true
+  },
+  {
+   "id": "S3",
+   "name": "stock sell adds THB after fee; zero holding",
+   "pass": true
+  },
+  {
+   "id": "S4",
+   "name": "stock oversell refused and rolled back",
+   "pass": true
+  },
+  {
+   "id": "B1",
+   "name": "restore succeeds",
+   "pass": true
+  },
+  {
+   "id": "B2",
+   "name": "restored balances equal source (no double settle)",
+   "pass": true
+  },
+  {
+   "id": "B3",
+   "name": "restored links counts equal",
+   "pass": true
+  },
+  {
+   "id": "B4",
+   "name": "restored links point to restored owner accounts",
+   "pass": true
+  },
+  {
+   "id": "B5",
+   "name": "pre-link backup (no cash fields) still previews and restores",
+   "pass": true
+  },
+  {
+   "id": "B6",
+   "name": "backup has no market key / ciphertext fields",
+   "pass": true
+  },
+  {
+   "id": "O1",
+   "name": "expense dated before opening date needs a choice",
+   "pass": true
+  },
+  {
+   "id": "O2",
+   "name": "included in opening balance: history kept, cash unchanged, unlinked",
+   "pass": true
+  },
+  {
+   "id": "O3",
+   "name": "not included: applied to cash",
+   "pass": true
+  },
+  {
+   "id": "O4",
+   "name": "opening flag on a record after the opening date refused",
+   "pass": true
+  },
+  {
+   "id": "O5",
+   "name": "same-day record applies without asking; asOf stays opening date",
+   "pass": true
+  },
+  {
+   "id": "O6",
+   "name": "correcting an opening-balance record keeps the flag and moves no cash",
+   "pass": true
+  },
+  {
+   "id": "O7",
+   "name": "crypto buy in opening balance: no THB amount needed, holding added, cash unchanged",
+   "pass": true
+  },
+  {
+   "id": "O8",
+   "name": "applied trade without THB amount refused",
+   "pass": true
+  },
+  {
+   "id": "O9",
+   "name": "stock buy in opening balance: holding added, cash unchanged, flagged",
+   "pass": true
+  },
+  {
+   "id": "O10",
+   "name": "backup marks opening-balance records",
+   "pass": true
+  },
+  {
+   "id": "O11",
+   "name": "restore keeps flags and balances without applying money",
+   "pass": true
+  },
+  {
+   "id": "O12",
+   "name": "backup with an opening-balance record that is also linked is rejected",
+   "pass": true
+  },
+  {
+   "id": "L1",
+   "name": "other owner writes during a 6 s exclusive mutation",
+   "pass": true
+  },
+  {
+   "id": "T1",
+   "name": "two concurrent reads: one provider call per symbol, both get prices",
+   "pass": true
+  },
+  {
+   "id": "T2",
+   "name": "nothing is retained after the read settles (next read calls again)",
+   "pass": true
+  }
+ ]
+}

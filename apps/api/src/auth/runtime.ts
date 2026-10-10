@@ -64,7 +64,10 @@ export function createAuthRuntime(database: PrismaClient, config: AuthConfigurat
       cookiePrefix: 'finntech', useSecureCookies: config.secureCookies,
       defaultCookieAttributes: { httpOnly: true, sameSite: 'lax', secure: config.secureCookies, path: '/' },
     },
-    rateLimit: { enabled: true, storage: 'memory', window: 60, max: 100 },
+    // Real mode has no trustworthy client IP (Render appends to client-supplied X-Forwarded-For), so
+    // Better Auth's limiter would key every visitor to one shared "no-trusted-ip" bucket (3 sign-ins
+    // per 10 s site-wide). createRealAuthGuard enforces per-email and global budgets instead.
+    rateLimit: config.real ? { enabled: false } : { enabled: true, storage: 'memory', window: 60, max: 100 },
     // Driver exceptions can contain credentials/PII. Log the event class only.
     logger: { level: 'warn', log: (level) => { console.error(`Auth ${level}: details withheld`) } },
     onAPIError: { onError: () => { /* The HTTP wrapper returns a generic failure; no raw driver/request logs. */ } },

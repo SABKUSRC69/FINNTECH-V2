@@ -30,6 +30,29 @@ export function valuePosition(quantity:string,cost:string,price:string|null){
  return {averageCost,value:serializeCrypto(value),unrealized:serializeCrypto(pnl),returnPercent:c.isZero()?null:serializeThb(pnl.div(c).times('100'))}
 }
 
+/**
+ * USD stock/ETF totals across every portfolio. Same-symbol rows in different portfolios share one
+ * price. A missing price never becomes a zero or the purchase cost: totals become null and the
+ * known (priced) part plus the missing symbols are reported instead.
+ */
+export function summarizeStockHoldings(holdings:readonly {symbol:string;quantity:string;totalCost:string}[],prices:ReadonlyMap<string,string>){
+ const zero=()=>parseCryptoDecimal('0')
+ let value=zero(),cost=zero(),pricedCost=zero();const missing=new Set<string>()
+ for(const row of holdings){
+  const q=parseCryptoDecimal(row.quantity),c=parseCryptoDecimal(row.totalCost)
+  if(q.lt('0')||c.lt('0'))throw new RangeError('Negative holding/cost')
+  cost=cost.plus(c)
+  if(q.isZero()){pricedCost=pricedCost.plus(c);continue}
+  const p=prices.get(row.symbol)
+  if(p===undefined){missing.add(row.symbol);continue}
+  const price=parseCryptoDecimal(p);if(!price.gt('0'))throw new RangeError('Invalid stock price')
+  value=value.plus(q.times(price));pricedCost=pricedCost.plus(c)
+ }
+ const complete=missing.size===0
+ return {complete,missing:[...missing].sort(),costUsd:serializeCrypto(cost),
+  valueUsd:complete?serializeCrypto(value):null,unrealizedUsd:complete?serializeCrypto(value.minus(cost)):null,
+  knownValueUsd:serializeCrypto(value),knownCostUsd:serializeCrypto(pricedCost),knownUnrealizedUsd:serializeCrypto(value.minus(pricedCost))}
+}
 /** Manual amounts are dated total valuations, not a second market-priced quantity or cash debit. */
 export function valueMixedAssets(base:ReturnType<typeof valueAssets>,stocks:readonly {quantity:string;symbol:string}[],stockPrices:ReadonlyMap<string,string>,
  manual:readonly {currency:'THB'|'USD'|'USDT';value:string}[],usdtThb:string|null,usdThb:string|null){

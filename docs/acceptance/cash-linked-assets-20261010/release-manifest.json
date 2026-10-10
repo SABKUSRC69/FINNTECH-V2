@@ -1,0 +1,69 @@
+{
+  "previousCommit": "ebc5a148f12209b7372a32c322904c5166f56e09",
+  "files": [
+    {
+      "path": "packages/contracts/src/index.ts",
+      "sha256": "f1694700d447b4e46e13284cd18645a842c295d2b6d28db4b01527df66be3b96"
+    },
+    {
+      "path": "apps/api/prisma/schema.prisma",
+      "sha256": "e20c2b289a887db96ab6139072789afda18d32a55424fcb7ff1e5b57d72a7421"
+    },
+    {
+      "path": "apps/api/prisma/migrations/20261010040000_link_cash_settlements/migration.sql",
+      "sha256": "10c8eb9bc81f58b9a47c19795bdd129cf56658c525b637675851f6f91c17e154"
+    },
+    {
+      "path": "apps/api/src/tracker/cash-links.ts",
+      "sha256": "5a67feaf98dcb273e65ce574397d649b935e8fc43d1c4a1794aef2039843e70b"
+    },
+    {
+      "path": "apps/api/src/tracker/service.ts",
+      "sha256": "c08dcd9b5301bf9c4a2002e38e3c8198970bca61dd9ddae329a3dd0d14020142"
+    },
+    {
+      "path": "apps/api/src/tracker/stock-ledger.ts",
+      "sha256": "d87413af37e1d12814f7b37748dbe968c00e7f3040811e299f7c9373488d0d13"
+    },
+    {
+      "path": "apps/api/src/tracker/backup.ts",
+      "sha256": "0ce4d7731dde84bece23f75919defb10e0e0091cabcdffa5bcd4c3c4a684bb47"
+    },
+    {
+      "path": "apps/web/src/tracker/CashSettlementFields.tsx",
+      "sha256": "6c9dd4ff60ec53efceb66779945e2e41b5077ff270c49bc4a85a4b4603cbe9e7"
+    },
+    {
+      "path": "apps/web/src/tracker/HeldAssets.tsx",
+      "sha256": "1c58e8a4a9ffbb90ff49cc69933f2b8bcc751634fcb59a192c8d4470353cba0f"
+    },
+    {
+      "path": "apps/web/src/tracker/Dashboard.tsx",
+      "sha256": "1d7c616cb42e86d88028c63bdf7f19bfea0948da1282748e86d01eef859261ff"
+    },
+    {
+      "path": "apps/web/src/tracker/FinanceHistory.tsx",
+      "sha256": "28bc7ceb3d26ae40d8653dfbec72ec7e4c5b0e37792303ef81d774950d2e4f72"
+    },
+    {
+      "path": "apps/web/src/tracker/StockHoldings.tsx",
+      "sha256": "8a4bb90bd0bfab43df37fc5b92db4acacea2aa9c16d984f0037acaa3e4b56af0"
+    },
+    {
+      "path": "apps/web/src/tracker/Assets.tsx",
+      "sha256": "1d98040bec9503d441d5187c147fd90009f634099d5da5e0c2601ef2a2994f0b"
+    },
+    {
+      "path": "apps/web/src/tracker/ValuationReferences.tsx",
+      "sha256": "876e9a64205a6b08601a0be171e40784aa2f2c44f60d6ed17885c8e8ec5634e8"
+    },
+    {
+      "path": "apps/web/src/tracker/client.ts",
+      "sha256": "5624d5ddebe89cb9a384b87b67363397342024da4d3ff2e2483fccd45e7c2ddd"
+    },
+    {
+      "path": "apps/web/src/journal.css",
+      "sha256": "e276913ac584529adcd9b7d80fac442d94f5fb407b8a65e0592b83b2bc0568a3"
+    }
+  ]
+}

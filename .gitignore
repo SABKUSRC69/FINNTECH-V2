@@ -40,3 +40,14 @@ apps/*/coverage
 packages/*/coverage
 coverage
 apps/api/src/generated
+
+# Local scratch files and merge intermediates
+/tmp/
+docs/acceptance/**/*.tmp
+docs/acceptance/**/merge-*-conflict.txt
+
+# Private live-account and hosting screenshots
+docs/acceptance/profile-existing-20261010/
+docs/acceptance/stock-valuation-20261009/live-*.jpg
+docs/acceptance/stock-valuation-20261009/render-*.jpg
+docs/acceptance/transient-tiingo-20261010/connected-transient-key.png

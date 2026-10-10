@@ -1,0 +1,827 @@
+diff --git a/apps/api/src/server.ts b/apps/api/src/server.ts
+index 289c9eb..97c5c62 100644
+--- a/apps/api/src/server.ts
++++ b/apps/api/src/server.ts
+@@ -5,7 +5,7 @@ import { createAuthRuntime } from './auth/runtime.js'
+ import { createTrackerDatabase } from './persistence/database.js'
+ import { MarketRelay } from './tracker/market.js'
+ import { attachMarketStream } from './tracker/stream.js'
+-import { readStockConfiguration, StockMarketRelay } from './tracker/stocks.js'
++import { readStockConfiguration, StockMarketRelay, type StockConfiguration } from './tracker/stocks.js'
+ import { RecoveryService } from './auth/recovery.js'
+ import { LocalSyntheticSink, drainDelivery, drainRealDelivery } from './auth/delivery.js'
+ import { BrevoDeliverySink } from './auth/mail.js'
+@@ -34,11 +34,24 @@ const recovery = database && authConfig?.recovery ? new RecoveryService(database
+ const auth = recovery?.auth ?? (database && authConfig ? createAuthRuntime(database, authConfig) : undefined)
+ const market = authConfig?.recovery?.mode === 'synthetic-3a' || authConfig?.real?.boundary === 'real-rehearsal'
+   ? new MarketRelay(async () => { throw new Error('synthetic_provider_disabled') }) : new MarketRelay()
+-const stocks = new StockMarketRelay(readStockConfiguration(process.env))
++// A partial or invalid Alpaca setup disables only the stock feed (sanitized log), never the whole site.
++let stockConfiguration: StockConfiguration | null = null
++try { stockConfiguration = readStockConfiguration(process.env) }
++catch {
++  const present = ['ALPACA_API_KEY_ID', 'ALPACA_API_SECRET_KEY', 'ALPACA_OWNER_ID', 'ALPACA_PERSONAL_USE'].filter(name => process.env[name])
++  console.error(`Alpaca IEX disabled: incomplete or invalid configuration (present: ${present.join(', ') || 'none'}); values withheld`)
++}
++const stockOwnerId = stockConfiguration?.ownerId
++const stocks = new StockMarketRelay(stockConfiguration, fetch, Date.now, undefined,
++  database && stockOwnerId ? async () => (await database.stockHolding.findMany({ where: { ownerId: stockOwnerId, quantity: { gt: 0 } }, select: { symbol: true } })).map(row => row.symbol) : null)
++if (stockConfiguration) console.info(`Alpaca IEX configured for one owner; ${stockConfiguration.symbols.length} watchlist symbols (feed=iex)`)
+ market.start()
+ const app = createApp({ market, stocks, ...(recovery ? { recovery } : {}), ...(webDistDir ? { webDistDir } : {}), ...(database && auth ? { database, auth } : {}) })
+ const server = app.listen(port, host, () => {
+   console.log(`FINNTECH tracker API listening at http://${host}:${port}`)
++  // One authentication probe per process start so operators can confirm entitlement in the logs; the
++  // relay disconnects again after 60 s without an owner request (no keepalive traffic).
++  if (stockConfiguration) void stocks.snapshot()
+ })
+ const stopMarket = auth && database ? attachMarketStream(server, auth, market, stocks, async authUserId => {
+   const identity = await database.authIdentity.findUnique({ where: { authUserId }, include: { owner: true } })
+diff --git a/apps/api/src/tracker/routes.ts b/apps/api/src/tracker/routes.ts
+index 62c2463..16dc513 100644
+--- a/apps/api/src/tracker/routes.ts
++++ b/apps/api/src/tracker/routes.ts
+@@ -55,7 +55,7 @@ export function trackerRouter(auth: AuthRuntime, database: PrismaClient, market
+   router.post('/valuation/references',async(req,res)=>{res.json(await saveValuationReference(database,(res.locals.owner as OwnerContext).ownerId,req.headers['idempotency-key'],req.body))})
+   router.post('/assets/manual',async(req,res)=>{res.json(await createManualAsset(database,(res.locals.owner as OwnerContext).ownerId,req.headers['idempotency-key'],req.body))})
+   router.patch('/assets/manual/:id',async(req,res)=>{res.json(await updateManualAsset(database,(res.locals.owner as OwnerContext).ownerId,req.params.id,req.headers['idempotency-key'],req.body))})
+-  router.post('/stocks/trades/:id/corrections',async(req,res)=>{res.json(await correctStockTrade(database,(res.locals.owner as OwnerContext).ownerId,req.params.id,req.headers['idempotency-key'],req.body))})
++  router.post('/stocks/trades/:id/corrections',async(req,res)=>{const owner=(res.locals.owner as OwnerContext).ownerId;res.json(await correctStockTrade(database,owner,req.params.id,req.headers['idempotency-key'],req.body));stocks?.holdingsChanged(owner)})
+   router.post('/cash', async (req, res) => { res.json(await createCash(database, (res.locals.owner as OwnerContext).ownerId, req.headers['idempotency-key'], req.body)) })
+   router.patch('/cash/:id', async (req, res) => { res.json(await updateCash(database, (res.locals.owner as OwnerContext).ownerId, req.params.id, req.headers['idempotency-key'], req.body)) })
+   router.get('/reference-rate', (_req, res) => { res.json(fx.snapshot()) })
+@@ -71,7 +71,12 @@ export function trackerRouter(auth: AuthRuntime, database: PrismaClient, market
+     ['/crypto/portfolios', createPortfolio], ['/crypto/trades', createTrade],
+     ['/stocks/portfolios',createStockPortfolio],['/stocks/trades',createStockTrade],
+   ] as const) {
+-    router.post(path, async (req, res) => { res.json(await operation(database, (res.locals.owner as OwnerContext).ownerId, req.headers['idempotency-key'], req.body)) })
++    router.post(path, async (req, res) => {
++      const owner = (res.locals.owner as OwnerContext).ownerId
++      res.json(await operation(database, owner, req.headers['idempotency-key'], req.body))
++      // A newly held symbol is subscribed on the next relay request instead of after the 60 s refresh.
++      if (path === '/stocks/trades') stocks?.holdingsChanged(owner)
++    })
+   }
+   router.patch('/finance/categories/:id', async (req, res) => { res.json(await renameCategory(database, (res.locals.owner as OwnerContext).ownerId, req.params.id, req.headers['idempotency-key'], req.body)) })
+   router.post('/finance/transactions/:id/corrections', async (req, res) => { res.json(await correctEntry(database, (res.locals.owner as OwnerContext).ownerId, req.params.id, req.headers['idempotency-key'], req.body)) })
+diff --git a/apps/api/src/tracker/stocks.ts b/apps/api/src/tracker/stocks.ts
+index b6cdf08..2ff6b9b 100644
+--- a/apps/api/src/tracker/stocks.ts
++++ b/apps/api/src/tracker/stocks.ts
+@@ -3,8 +3,13 @@ import { resourceIdSchema, stockSymbolSchema, type StockMarketSnapshot } from '@
+ import { parseCryptoDecimal, serializeCrypto } from '@finntech/finance'
+ import { parseProviderJson } from './provider-json.js'
+ 
++// Explicit IEX endpoints: the free Basic plan is IEX-only, so SIP is never requested by accident.
+ const streamUrl = 'wss://stream.data.alpaca.markets/v2/iex'
+ const latestUrl = 'https://data.alpaca.markets/v2/stocks/trades/latest'
++/** Alpaca Basic: up to 30 subscribed stock symbols on the real-time IEX stream. */
++export const ALPACA_BASIC_SYMBOL_LIMIT = 30
++const LIVE_MAX_AGE_MS = 30_000
++const CLOCK_SKEW_MS = 2_000
+ const defaultSymbols = [
+   'AAPL', 'MSFT', 'NVDA', 'AMZN', 'GOOGL', 'META', 'TSLA', 'AVGO', 'AMD', 'INTC',
+   'QCOM', 'ORCL', 'CRM', 'ADBE', 'NFLX', 'JPM', 'BAC', 'V', 'MA', 'WMT',
+@@ -20,22 +25,50 @@ export function readStockConfiguration(env: NodeJS.ProcessEnv): StockConfigurati
+   }
+   const ownerId = resourceIdSchema.parse(env.ALPACA_OWNER_ID)
+   const symbols = [...new Set((env.ALPACA_SYMBOLS?.split(',') ?? defaultSymbols).map(value => stockSymbolSchema.parse(value)))]
+-  if (symbols.length < 1 || symbols.length > 30) throw new Error('Alpaca IEX watchlist requires 1 to 30 symbols')
++  if (symbols.length < 1 || symbols.length > ALPACA_BASIC_SYMBOL_LIMIT) throw new Error('Alpaca IEX watchlist requires 1 to 30 symbols')
+   return { keyId: values[0]!, secret: values[1]!, ownerId, symbols }
+ }
+ 
+-type Quote = { price: string; observedAt: string; received: number; observed: number }
++/**
++ * US regular session (09:30–16:00 America/New_York, Monday–Friday). Exchange holidays are not known
++ * without a trading-API calendar, so on a holiday quotes are reported STALE rather than CLOSED.
++ */
++export function usRegularSession(now: number): boolean {
++  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(now))
++  const part = (type: string) => parts.find(p => p.type === type)?.value ?? ''
++  if (part('weekday') === 'Sat' || part('weekday') === 'Sun') return false
++  const minutes = Number(part('hour')) * 60 + Number(part('minute'))
++  return minutes >= 9 * 60 + 30 && minutes < 16 * 60
++}
++
++type Connection = StockMarketSnapshot['connection']
++type Quote = { price: string; observedAt: string; received: number; observed: number; subMs: number; tradeId: string | null }
+ type SocketFactory = () => WebSocket
++export type HeldSymbols = () => Promise<readonly string[]>
+ function record(value: unknown): value is Record<string, unknown> {
+   return value !== null && typeof value === 'object' && !Array.isArray(value)
+ }
++const timestampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.(\d{1,9}))?Z$/
++/** Provider errors mapped to a sanitized state and a bounded retry delay (never a tight loop). */
++const providerErrors: Record<string, { connection: Connection; retryMs: number; reason: string }> = {
++  '402': { connection: 'AUTH_FAILED', retryMs: 10 * 60_000, reason: 'authentication failed' },
++  '406': { connection: 'CONNECTION_LIMIT', retryMs: 30_000, reason: 'connection limit exceeded (another session uses this account)' },
++  '409': { connection: 'NOT_ENTITLED', retryMs: 30 * 60_000, reason: 'insufficient market data subscription' },
++  '410': { connection: 'NOT_ENTITLED', retryMs: 30 * 60_000, reason: 'invalid subscribe action for this feed' },
++  '405': { connection: 'UNAVAILABLE', retryMs: 5 * 60_000, reason: 'symbol limit exceeded' },
++}
+ 
+-/** One IEX connection for one configured owner. No trading API, orders, or browser credentials. */
++/** One IEX connection per configured account and owner. No trading API, orders, or browser credentials. */
+ export class StockMarketRelay {
+   private socket: WebSocket | null = null
+   private quotes = new Map<string, Quote>()
+-  private connection: StockMarketSnapshot['connection'] = 'NOT_CONFIGURED'
++  private connection: Connection = 'NOT_CONFIGURED'
++  private problem: Connection | null = null
+   private authenticated = false
++  private subscribed = new Set<string>()
++  private held: readonly string[] = []
++  private heldPending: Promise<void> | null = null
++  private nextHeld = 0
+   private nextAttempt = 0
+   private failures = 0
+   private lastAccess = 0
+@@ -44,6 +77,9 @@ export class StockMarketRelay {
+   private deadline: ReturnType<typeof setTimeout> | undefined
+   private idle: ReturnType<typeof setInterval>
+   private stopped = false
++  private listeners = new Set<() => void>()
++  private lastDiagnostic = new Map<string, number>()
++  private observedSymbols = new Set<string>()
+   readonly ownerId: string | null
+ 
+   constructor(private readonly config: StockConfiguration | null,
+@@ -51,58 +87,132 @@ export class StockMarketRelay {
+     private readonly now: () => number = Date.now,
+     private readonly socketFactory: SocketFactory = () => new WebSocket(streamUrl, {
+       handshakeTimeout: 5000, maxPayload: 1_048_576, perMessageDeflate: false, followRedirects: false,
+-    })) {
++    }),
++    private readonly heldSymbols: HeldSymbols | null = null,
++    private readonly log: (line: string) => void = line => console.info(line)) {
+     this.ownerId = config?.ownerId ?? null
+     if (config) this.connection = 'UNAVAILABLE'
+     this.idle = setInterval(() => {
+-      if (this.socket && this.now() - this.lastAccess > 60_000) this.disconnect(false)
++      if (this.socket && this.now() - this.lastAccess > 60_000) { this.diagnose('idle; disconnecting until next owner request'); this.disconnect(false) }
+     }, 10_000)
+     this.idle.unref()
+   }
+ 
+   allowsOwner(ownerId: string): boolean { return this.ownerId === null || this.ownerId === ownerId }
++  /** Called after the owner's stock ledger changes so newly held symbols are subscribed promptly. */
++  holdingsChanged(ownerId: string): void { if (ownerId === this.ownerId) this.nextHeld = 0 }
++  onUpdate(listener: () => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener) } }
++  private changed(): void { for (const listener of this.listeners) { try { listener() } catch { /* listener faults stay local */ } } }
++
++  /** Sanitized, de-duplicated operator diagnostics: states, codes and counts only — never keys or payloads. */
++  private diagnose(message: string): void {
++    const at = this.now(), previous = this.lastDiagnostic.get(message)
++    if (previous !== undefined && at - previous < 60_000) return
++    this.lastDiagnostic.set(message, at)
++    this.log(`Alpaca IEX: ${message}`)
++  }
+ 
+-  private accept(symbol: string, price: unknown, timestamp: unknown): void {
+-    if (!this.config?.symbols.includes(symbol) || typeof price !== 'string' || typeof timestamp !== 'string') return
++  /** Held symbols first (deterministic), then the configured watchlist, within the Basic symbol limit. */
++  private plan(): { desired: string[]; excluded: string[] } {
++    const ordered = [...new Set([...this.held, ...(this.config?.symbols ?? defaultSymbols)])]
++    return { desired: ordered.slice(0, ALPACA_BASIC_SYMBOL_LIMIT), excluded: ordered.slice(ALPACA_BASIC_SYMBOL_LIMIT) }
++  }
++
++  private accept(symbol: string, price: unknown, timestamp: unknown, tradeId: unknown): boolean {
++    if (!this.plan().desired.includes(symbol) || typeof price !== 'string' || typeof timestamp !== 'string') return false
+     // Provider time, not receipt time, determines freshness (including weekends/closed markets).
+-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(timestamp)) return
++    const match = timestampPattern.exec(timestamp)
++    if (!match) return false
+     const observed = Date.parse(timestamp)
+-    if (!Number.isFinite(observed) || observed > this.now()) return
+-    const amount = parseCryptoDecimal(price)
+-    if (!amount.greaterThan('0')) throw new Error('invalid_provider_price')
++    if (!Number.isFinite(observed) || observed > this.now() + CLOCK_SKEW_MS) return false
++    let amount
++    try { amount = parseCryptoDecimal(price) } catch { return false }
++    if (!amount.greaterThan('0')) return false
++    const subMs = Number((match[1] ?? '').padEnd(9, '0').slice(3))
+     const previous = this.quotes.get(symbol)
+-    if (previous && previous.observedAt > timestamp && previous.observed >= observed) return
+-    this.quotes.set(symbol, { price: serializeCrypto(amount), observedAt: timestamp, observed, received: this.now() })
++    if (previous && (observed < previous.observed || (observed === previous.observed && subMs < previous.subMs))) return false
++    this.quotes.set(symbol, { price: serializeCrypto(amount), observedAt: timestamp, observed, subMs, received: this.now(),
++      tradeId: typeof tradeId === 'string' ? tradeId : null })
++    if (!this.observedSymbols.has(symbol)) {
++      this.observedSymbols.add(symbol)
++      this.diagnose(`first trade observed for ${symbol} (provider-to-receipt ${Math.max(0, this.now() - observed)} ms)`)
++    }
++    return true
++  }
++
++  /** A correction replaces the held trade's price; a cancel/error removes it and forces a REST reseed. */
++  private reconcile(event: Record<string, unknown>): boolean {
++    if (typeof event.S !== 'string') return false
++    const quote = this.quotes.get(event.S)
++    if (!quote) return false
++    const target = event.T === 'c' ? event.oi : event.i
++    if (quote.tradeId !== null && typeof target === 'string' && target !== quote.tradeId) return false
++    if (event.T === 'c' && quote.tradeId !== null && typeof event.cp === 'string') {
++      try {
++        const corrected = parseCryptoDecimal(event.cp)
++        if (corrected.greaterThan('0')) {
++          this.quotes.set(event.S, { ...quote, price: serializeCrypto(corrected), tradeId: typeof event.ci === 'string' ? event.ci : null })
++          return true
++        }
++      } catch { /* fall through to removal */ }
++    }
++    this.quotes.delete(event.S); this.nextSeed = 0
++    return true
+   }
+ 
+   private async seed(): Promise<void> {
+     if (!this.config) return
++    const { desired } = this.plan()
+     try {
+-      const response = await this.request(`${latestUrl}?feed=iex&symbols=${encodeURIComponent(this.config.symbols.join(','))}`, {
++      const response = await this.request(`${latestUrl}?feed=iex&symbols=${encodeURIComponent(desired.join(','))}`, {
+         headers: { 'APCA-API-KEY-ID': this.config.keyId, 'APCA-API-SECRET-KEY': this.config.secret },
+         signal: AbortSignal.timeout(5000), redirect: 'error',
+       })
+-      if (!response.ok) return
++      if (!response.ok) { this.diagnose(`REST latest-trade seed HTTP ${response.status}`); return }
+       const body = parseProviderJson(await response.text())
+       if (!record(body) || !record(body.trades)) return
++      let accepted = 0
+       for (const [symbol, trade] of Object.entries(body.trades)) {
+-        if (record(trade)) { try { this.accept(symbol, trade.p, trade.t) } catch { /* Reject just the invalid observation. */ } }
++        if (record(trade) && this.accept(symbol, trade.p, trade.t, trade.i)) accepted++
+       }
+-    } catch { /* Never expose upstream responses, headers, or credentials. */ }
++      if (accepted) this.changed()
++    } catch { this.diagnose('REST latest-trade seed unavailable') }
+     finally { this.nextSeed = this.now() + 60_000 }
+   }
+ 
+-  private disconnect(failed: boolean): void {
++  private refreshHeld(): void {
++    if (!this.heldSymbols || this.heldPending || this.now() < this.nextHeld) return
++    this.heldPending = this.heldSymbols().then(list => {
++      const valid = [...new Set(list.flatMap(symbol => { const parsed = stockSymbolSchema.safeParse(symbol); return parsed.success ? [parsed.data] : [] }))].sort()
++      if (valid.join(',') !== this.held.join(',')) { this.held = valid; this.resubscribe(); this.changed() }
++    }).catch(() => { this.diagnose('held-symbol lookup unavailable; watchlist kept') })
++      .finally(() => { this.heldPending = null; this.nextHeld = this.now() + 60_000 })
++  }
++
++  /** Sends only the subscription difference on the existing authenticated socket. */
++  private resubscribe(): void {
++    if (!this.socket || !this.authenticated) return
++    const { desired } = this.plan()
++    const add = desired.filter(symbol => !this.subscribed.has(symbol)), remove = [...this.subscribed].filter(symbol => !desired.includes(symbol))
++    if (remove.length) this.socket.send(JSON.stringify({ action: 'unsubscribe', trades: remove }))
++    if (add.length) this.socket.send(JSON.stringify({ action: 'subscribe', trades: add }))
++  }
++
++  private disconnect(failed: boolean, retryMs?: number): void {
+     if (this.deadline) clearTimeout(this.deadline)
+     const socket = this.socket
+     this.socket = null
+     this.authenticated = false
++    this.subscribed.clear()
+     this.connection = this.config ? 'UNAVAILABLE' : 'NOT_CONFIGURED'
+     if (failed) {
+       this.failures = Math.min(this.failures + 1, 6)
+-      this.nextAttempt = this.now() + Math.min(1000 * 2 ** this.failures, 60_000)
++      const delay = retryMs ?? Math.min(1000 * 2 ** this.failures, 60_000)
++      this.nextAttempt = this.now() + delay
++      this.diagnose(`${this.problem ?? 'stream unavailable'}; retry in ${Math.round(delay / 1000)} s`)
+     }
+     socket?.terminate()
++    this.changed()
+   }
+ 
+   private connect(): void {
+@@ -111,6 +221,7 @@ export class StockMarketRelay {
+     let socket: WebSocket
+     try { socket = this.socketFactory() } catch { this.disconnect(true); return }
+     this.socket = socket
++    this.diagnose('connecting to v2/iex')
+     this.deadline = setTimeout(() => { if (this.socket === socket && this.connection !== 'STREAMING') this.disconnect(true) }, 10_000)
+     this.deadline.unref()
+     socket.on('open', () => {
+@@ -118,44 +229,57 @@ export class StockMarketRelay {
+     })
+     socket.on('message', data => {
+       if (this.socket !== socket) return
+-      try {
+-        const events = parseProviderJson(data.toString())
+-        if (!Array.isArray(events)) throw new Error('invalid_provider_message')
+-        for (const event of events) {
+-          if (!record(event)) continue
+-          if (event.T === 'error') { this.disconnect(true); return }
+-          if (event.T === 'success' && event.msg === 'authenticated') {
+-            this.authenticated = true
+-            socket.send(JSON.stringify({ action: 'subscribe', trades: this.config!.symbols }))
+-          } else if (this.authenticated && event.T === 'subscription' && Array.isArray(event.trades)
+-            && this.config!.symbols.every(symbol => (event.trades as unknown[]).includes(symbol))) {
+-            this.connection = 'STREAMING'; this.failures = 0
+-            if (this.deadline) clearTimeout(this.deadline)
+-          } else if (this.connection === 'STREAMING' && event.T === 't' && typeof event.S === 'string') {
+-            this.accept(event.S, event.p, event.t)
+-          } else if ((event.T === 'c' || event.T === 'x') && typeof event.S === 'string') {
+-            // A correction/cancel invalidates the last observation; the REST seed can reconcile it.
+-            this.quotes.delete(event.S); this.nextSeed = 0
+-          }
++      let events: unknown
++      try { events = parseProviderJson(data.toString()) } catch { this.disconnect(true); return }
++      if (!Array.isArray(events)) { this.disconnect(true); return }
++      let updated = false
++      for (const event of events) {
++        if (!record(event)) continue
++        if (event.T === 'error') {
++          const known = providerErrors[String(event.code)]
++          this.problem = known?.connection ?? 'UNAVAILABLE'
++          this.diagnose(`provider error ${String(event.code).replace(/[^0-9]/g, '').slice(0, 3)} (${known?.reason ?? 'stream error'})`)
++          this.disconnect(true, known?.retryMs); return
+         }
+-      } catch { this.disconnect(true) }
++        if (event.T === 'success' && event.msg === 'authenticated') {
++          this.authenticated = true; this.problem = null
++          this.diagnose('authenticated')
++          socket.send(JSON.stringify({ action: 'subscribe', trades: this.plan().desired }))
++        } else if (this.authenticated && event.T === 'subscription' && Array.isArray(event.trades)) {
++          this.subscribed = new Set(event.trades.filter((s): s is string => typeof s === 'string'))
++          this.connection = 'STREAMING'; this.failures = 0
++          if (this.deadline) clearTimeout(this.deadline)
++          this.diagnose(`subscribed ${this.subscribed.size} symbols (${this.held.length} held)`)
++          this.nextSeed = 0; updated = true
++        } else if (this.connection === 'STREAMING' && event.T === 't' && typeof event.S === 'string') {
++          updated = this.accept(event.S, event.p, event.t, event.i) || updated
++        } else if (event.T === 'c' || event.T === 'x') {
++          updated = this.reconcile(event) || updated
++        }
++      }
++      if (updated) this.changed()
+     })
+     socket.on('error', () => { if (this.socket === socket) this.disconnect(true) })
+     socket.on('close', () => { if (this.socket === socket) this.disconnect(true) })
+   }
+ 
+   async snapshot(): Promise<StockMarketSnapshot> {
+-    this.lastAccess = this.now()
+-    if (!this.socket && this.now() >= this.nextAttempt) this.connect()
+-    if (!this.stopped && this.authenticated && !this.seedPending && this.now() >= this.nextSeed) {
++    const now = this.now()
++    this.lastAccess = now
++    this.refreshHeld()
++    if (!this.socket && now >= this.nextAttempt) this.connect()
++    if (!this.stopped && this.authenticated && !this.seedPending && now >= this.nextSeed) {
+       this.seedPending = this.seed().finally(() => { this.seedPending = null })
+     }
+-    return { source: 'Alpaca IEX', currency: 'USD', connection: this.connection,
+-      quotes: (this.config?.symbols ?? defaultSymbols).map(symbol => {
++    const regular = usRegularSession(now), { desired, excluded } = this.plan()
++    const connection = this.connection === 'STREAMING' || !this.problem ? this.connection : this.problem
++    return { source: 'Alpaca IEX', currency: 'USD', connection, session: regular ? 'REGULAR' : 'CLOSED', excluded,
++      quotes: desired.map(symbol => {
+         const quote = this.quotes.get(symbol)
++        const fresh = !!quote && this.connection === 'STREAMING' && now - quote.observed <= LIVE_MAX_AGE_MS && now - quote.received <= LIVE_MAX_AGE_MS
+         return { symbol, price: quote?.price ?? null, observedAt: quote?.observedAt ?? null,
+           receivedAt: quote ? new Date(quote.received).toISOString() : null,
+-          status: !quote ? 'UNAVAILABLE' : this.connection !== 'STREAMING' || this.now() - quote.observed > 30_000 ? 'STALE' : 'LIVE' }
++          status: !quote ? 'UNAVAILABLE' : fresh ? 'LIVE' : regular ? 'STALE' : 'CLOSED' }
+       }) }
+   }
+ 
+diff --git a/apps/api/src/tracker/stream.ts b/apps/api/src/tracker/stream.ts
+index 77f5fae..04a42d7 100644
+--- a/apps/api/src/tracker/stream.ts
++++ b/apps/api/src/tracker/stream.ts
+@@ -74,5 +74,25 @@ export function attachMarketStream(server: Server, auth: AuthRuntime, market: Ma
+     })().finally(() => { broadcasting = false })
+   }, 5000)
+   timer.unref()
+-  return () => { clearInterval(timer); for (const client of origins.keys()) client.terminate(); sockets.close() }
++  // Provider events reach already-validated owner sockets within ~1 s; the 5 s loop above still
++  // re-validates sessions (revoking expired ones) and reconciles. Coalescing keeps only the latest state.
++  let pushTimer: ReturnType<typeof setTimeout> | undefined, lastPush = 0
++  const pushStocks = () => {
++    pushTimer = undefined; lastPush = Date.now()
++    const clients = [...origins].filter(([client, request]) => request.url === '/ws/stocks' && client.readyState === WebSocket.OPEN)
++    if (!clients.length || !stocks) return
++    void stocks.snapshot().then(snapshot => {
++      const text = JSON.stringify(snapshot)
++      for (const [client] of clients) {
++        if (client.readyState !== WebSocket.OPEN) continue
++        if (client.bufferedAmount > 65536) client.terminate(); else client.send(text)
++      }
++    }).catch(() => { /* the 5 s loop retries */ })
++  }
++  const stopUpdates = stocks?.onUpdate(() => {
++    if (pushTimer) return
++    pushTimer = setTimeout(pushStocks, Math.max(0, 1000 - (Date.now() - lastPush)))
++    pushTimer.unref()
++  })
++  return () => { clearInterval(timer); if (pushTimer) clearTimeout(pushTimer); stopUpdates?.(); for (const client of origins.keys()) client.terminate(); sockets.close() }
+ }
+diff --git a/apps/web/src/tracker/Assets.tsx b/apps/web/src/tracker/Assets.tsx
+index 48b1750..410e46b 100644
+--- a/apps/web/src/tracker/Assets.tsx
++++ b/apps/web/src/tracker/Assets.tsx
+@@ -1,5 +1,5 @@
+ import { useEffect, useRef, useState, type FormEvent } from 'react'
+-import { cashOverviewSchema, cashInputSchema, referenceRateSchema, stockOverviewSchema,manualAssetOverviewSchema,stockMarketSnapshotSchema,type StockOverview,type ManualAssetOverview,type StockMarketSnapshot,type CashOverview, type CryptoOverview, type MarketSnapshot, type ReferenceRate } from '@finntech/contracts'
++import { cashOverviewSchema, cashInputSchema, referenceRateSchema, stockOverviewSchema,manualAssetOverviewSchema,valuationReferenceInputSchema,type StockOverview,type ManualAssetOverview,type StockMarketSnapshot,type CashOverview, type CryptoOverview, type MarketSnapshot, type ReferenceRate } from '@finntech/contracts'
+ import { valueAssets,valueMixedAssets,valuePosition,parseCryptoDecimal } from '@finntech/finance'
+ import { valuationOverviewSchema,type ValuationOverview } from '@finntech/contracts'
+ import {selectReference} from './valuationPolicy'
+@@ -9,31 +9,38 @@ import { isFreshCryptoQuote } from './marketFreshness'
+ import { usePresentation } from '../presentation'
+ import ManualAssets from './ManualAssets'
+ import StockPortfolioValue from './StockPortfolioValue'
++import { useStockMarket } from './stockMarket'
++import { useOwnedWrite } from './useOwnedWrite'
+ 
+ type Pending = { path: string; method: string; body: unknown; key: string }
+ const today = () => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10)
++export const stockConnectionLabel=(connection:StockMarketSnapshot['connection'])=>({NOT_CONFIGURED:'ยังไม่ได้ตั้งค่า Alpaca key ฝั่ง server',CONNECTING:'กำลังเชื่อมต่อ',STREAMING:'เชื่อมต่อแล้ว',UNAVAILABLE:'ยังเชื่อมต่อไม่ได้ กำลังลองใหม่',AUTH_FAILED:'key ไม่ผ่านการยืนยันตัวตน',NOT_ENTITLED:'บัญชีไม่มีสิทธิ์ข้อมูล feed นี้',CONNECTION_LIMIT:'มีการเชื่อมต่ออื่นใช้บัญชีนี้อยู่ กำลังรอเชื่อมใหม่'})[connection]
+ const stockPosition=(quantity:string,cost:string,price:string|null)=>{try{return valuePosition(quantity,cost,price)}catch{return {value:null,unrealized:null}}}
+ export default function Assets({ crypto, market, now, expired, lock }: { crypto: CryptoOverview | null; market: MarketSnapshot; now: number; expired: () => void; lock: (value: boolean) => void }): JSX.Element {
+   const { money } = usePresentation()
+   const [cash, setCash] = useState<CashOverview | null>(null), [rate, setRate] = useState<ReferenceRate | null>(null)
+-  const [stocks,setStocks]=useState<StockOverview|null>(null),[manual,setManual]=useState<ManualAssetOverview|null>(null),[stockPrices,setStockPrices]=useState<StockMarketSnapshot|null>(null),[manualLocked,setManualLocked]=useState(false)
++  const [stocks,setStocks]=useState<StockOverview|null>(null),[manual,setManual]=useState<ManualAssetOverview|null>(null),[manualLocked,setManualLocked]=useState(false)
++  const stockMarket=useStockMarket(expired),stockPrices:StockMarketSnapshot|null=stockMarket.snapshot
++  const [autoLocked,setAutoLocked]=useState(false)
++  const automatic=useOwnedWrite(setAutoLocked,expired,async()=>{await load()})
+   const [references,setReferences]=useState<ValuationOverview|null>(null),[referenceLocked,setReferenceLocked]=useState(false),[referenceTarget,setReferenceTarget]=useState<{symbol:string;request:number}|null>(null)
+   const [name, setName] = useState(''), [balance, setBalance] = useState(''), [asOf, setAsOf] = useState(today())
+   const [editing, setEditing] = useState<CashOverview['accounts'][number] | null>(null)
+   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [pending, setPending] = useState<Pending | null>(null), [message, setMessage] = useState('')
+   const [loadFailed, setLoadFailed] = useState(false)
+   const writing = useRef(false), mounted = useRef(true)
+-  useEffect(() => { lock(busy || !!pending||manualLocked||referenceLocked); return () => lock(false) }, [busy, pending,manualLocked,referenceLocked,lock])
++  useEffect(() => { lock(busy || !!pending||manualLocked||referenceLocked||autoLocked); return () => lock(false) }, [busy, pending,manualLocked,referenceLocked,autoLocked,lock])
+   async function load(): Promise<void> {
+     setLoading(true)
+     try {
+       const [accounts, fx] = await Promise.all([trackerRequest('cash'), trackerRequest('reference-rate')])
+       if (mounted.current) { setCash(cashOverviewSchema.parse(accounts)); setRate(referenceRateSchema.parse(fx)); setLoadFailed(false) }
+       // Independent reads: failed pricing never prevents viewing recorded USD costs/manual assets.
+-      const extra=await Promise.allSettled([trackerRequest('stocks'),trackerRequest('assets/manual'),trackerRequest('stocks/market'),trackerRequest('valuation/references')])
++      // Stock prices arrive from the shared live store (useStockMarket), not from this 15 s reconciliation.
++      const extra=await Promise.allSettled([trackerRequest('stocks'),trackerRequest('assets/manual'),trackerRequest('valuation/references')])
+       if(extra.some(result=>result.status==='rejected'&&result.reason instanceof TrackerRequestError&&result.reason.expired))expired()
+-      if(mounted.current){setStocks(extra[0].status==='fulfilled'?stockOverviewSchema.parse(extra[0].value):null);setManual(extra[1].status==='fulfilled'?manualAssetOverviewSchema.parse(extra[1].value):null);setStockPrices(extra[2].status==='fulfilled'?stockMarketSnapshotSchema.parse(extra[2].value):null)}
+-      if(mounted.current){const parsed=extra[3].status==='fulfilled'?valuationOverviewSchema.safeParse(extra[3].value):null;setReferences(parsed?.success?parsed.data:null)}
++      if(mounted.current){setStocks(extra[0].status==='fulfilled'?stockOverviewSchema.parse(extra[0].value):null);setManual(extra[1].status==='fulfilled'?manualAssetOverviewSchema.parse(extra[1].value):null)}
++      if(mounted.current){const parsed=extra[2].status==='fulfilled'?valuationOverviewSchema.safeParse(extra[2].value):null;setReferences(parsed?.success?parsed.data:null)}
+     } catch (error) {
+       if (mounted.current) { setCash(null); setRate(null); setLoadFailed(true) }
+       if (error instanceof TrackerRequestError && error.expired) expired()
+@@ -69,12 +76,14 @@ export default function Assets({ crypto, market, now, expired, lock }: { crypto:
+   const prices = new Map(market.quotes.filter(quote => isFreshCryptoQuote(quote, now)).map(quote => [quote.asset, quote.price!]))
+   let valued: ReturnType<typeof valueAssets> | null = null
+   try { if (cash && crypto) valued = valueAssets(cash.accounts.map(row => row.balance), crypto.holdings, prices, freshRate ? rate!.rate : null) } catch { /* Invalid/overflow totals must remain unavailable. */ }
+-  const selectedStocks=new Map((stocks?.holdings??[]).map(r=>[r.symbol,selectReference(r.symbol,references,stockPrices,now)]))
++  // A live event re-renders immediately; evaluate it at its receipt time rather than the last 1 s tick.
++  const stockNow=Math.max(now,stockMarket.receivedAt)
++  const selectedStocks=new Map((stocks?.holdings??[]).map(r=>[r.symbol,selectReference(r.symbol,references,stockPrices,stockNow)]))
+   const eligibleStocks=new Map([...selectedStocks].flatMap(([symbol,r])=>r.value===null?[]:[[symbol,r.value] as [string,string]]))
+-  const usdFx=selectReference('USDTHB',references,stockPrices,now)
++  const usdFx=selectReference('USDTHB',references,stockPrices,stockNow)
+   let mixed:ReturnType<typeof valueMixedAssets>|null=null
+   try{if(valued&&stocks&&manual)mixed=valueMixedAssets(valued,stocks.holdings,eligibleStocks,manual.assets,freshRate?rate!.rate:null,usdFx.value)}catch{/* Incomplete or unrepresentable aggregate remains N/A. */}
+-  const disabled = busy || !!pending ||manualLocked||referenceLocked||loading || !cash
++  const disabled = busy || !!pending ||manualLocked||referenceLocked||autoLocked||loading || !cash
+   const requestReference=(symbol:string)=>setReferenceTarget({symbol,request:Date.now()})
+   const display = (value: string | null | undefined) => value == null ? 'N/A' : money(displayDecimal(value))
+   return <section className="journal-assets" aria-label="สินทรัพย์รวม">
+@@ -82,8 +91,16 @@ export default function Assets({ crypto, market, now, expired, lock }: { crypto:
+     <div className="journal-assets-summary"><div className="tracker-card tracker-balance-card rounded-2xl p-5"><p className="text-sm">สินทรัพย์รวมเทียบบาท · มูลค่าอ้างอิง</p><p className="mt-3 break-all text-3xl font-semibold tabular-nums" data-testid="assets-total">{!mixed && loading ? 'กำลังโหลด…' : <>{display(mixed?.totalThb)} <span className="text-sm">THB</span></>}</p><p className="mt-2 text-xs">{!mixed && loading ? 'กำลังโหลดยอดและราคาอ้างอิง' : mixed?.complete ? 'ครบตามสินทรัพย์ที่บันทึก · ประมาณการตามแหล่งและวันอ้างอิงด้านล่าง ไม่ใช่มูลค่าที่รับประกันซื้อขายได้' : 'ข้อมูลยังไม่ครบ · ราคา/อัตราไม่พร้อม หรือยอดเกินขอบเขต'}</p></div>
+       <div className="tracker-card rounded-2xl p-5"><p className="text-sm">เงินสดที่บันทึก</p><p className="mt-3 break-all text-2xl font-semibold">{display(valued?.cashThb)} THB</p>{!mixed?.complete && <p className="mt-2 break-all text-sm">ยอดที่ประเมินได้บางส่วน: {display(mixed?.knownThb)} THB · ไม่ใช่ยอดรวมทั้งหมด</p>}</div></div>
+     <section className="tracker-card rounded-2xl p-5 space-y-3"><h3 className="font-semibold">ยอดตามสกุล · ไม่ใช่ยอดที่บวกข้ามสกุลได้</h3><p className="break-all">เงินสดและสินทรัพย์ประเมินเอง THB: {display(mixed?.native.THB)} THB</p><p className="break-all">คริปโตและสินทรัพย์ประเมินเอง USDT: {display(mixed?.native.USDT)} USDT</p><p className="break-all">หุ้นและสินทรัพย์ประเมินเอง USD: {display(mixed?.native.USD)} USD</p><p className="break-all text-sm">USD ที่ประเมินได้บางส่วน: {display(mixed?.knownNative.USD)} USD · มูลค่าหุ้นคูณอัตรา USD/THB แยกจาก USDT/THB</p>
+-     {stocks?.holdings.map(row=>{const reference=selectedStocks.get(row.symbol)!,position=stockPosition(row.quantity,row.totalCost,reference.value);return <article className="border-t pt-3 space-y-2 break-all" key={row.portfolioId+row.symbol}><p>{row.symbol} · {money(row.quantity)} หุ้น · ต้นทุน {display(row.totalCost)} USD</p><p>มูลค่าอ้างอิง {display(position.value)} USD · กำไร/ขาดทุนยังไม่รับรู้ {display(position.unrealized)} USD</p><p className="text-xs">ราคา {display(reference.value)} USD ต่อหุ้น · {reference.source} · {reference.state} · {reference.asOf?new Date(reference.asOf).toLocaleString('th-TH'):'ไม่มีวันอ้างอิง'}</p>{reference.value===null&&!parseCryptoDecimal(row.quantity).isZero()&&<p role="status">ขาดราคาอ้างอิง {row.symbol} จึงยังรวมมูลค่าหุ้นนี้ไม่ได้</p>}<button className="auth-secondary" disabled={disabled} onClick={()=>requestReference(row.symbol)}>ตั้งราคาอ้างอิง {row.symbol}</button></article>})}
++     {stocks?.holdings.map(row=>{const reference=selectedStocks.get(row.symbol)!,position=stockPosition(row.quantity,row.totalCost,reference.value),manualRecord=references?.references.find(r=>r.symbol===row.symbol&&r.enabled);return <article className="border-t pt-3 space-y-2 break-all" key={row.portfolioId+row.symbol} data-testid={`stock-row-${row.symbol}`}><p>{row.symbol} · {money(row.quantity)} หุ้น · ต้นทุน {display(row.totalCost)} USD</p><p>มูลค่าอ้างอิง {display(position.value)} USD · กำไร/ขาดทุนยังไม่รับรู้ {display(position.unrealized)} USD</p><p className="text-xs">ราคา {display(reference.value)} USD ต่อหุ้น · {reference.source} · {reference.state} · {reference.asOf?`เวลารายการ ${new Date(reference.asOf).toLocaleString('th-TH')}`:'ไม่มีวันอ้างอิง'}</p>
++      {reference.state==='LIVE'&&<p className="text-xs" role="status">ราคาสดอัตโนมัติจาก Alpaca IEX (ตลาดเดียว ไม่ใช่ราคารวมทุกตลาด) · อัปเดตเองโดยไม่ต้องกรอก</p>}
++      {reference.lastKnown&&<p className="text-xs" role="status">ราคาล่าสุดที่ทราบ {display(reference.lastKnown.price)} USD · เวลารายการ {reference.lastKnown.observedAt?new Date(reference.lastKnown.observedAt).toLocaleString('th-TH'):'N/A'} · {reference.state==='CLOSED'?'ตลาดปิด':'ไม่สด'} · ไม่นับในยอดรวม</p>}
++      {reference.overriddenLive&&manualRecord&&<div role="status" className="text-xs space-y-2"><p>มีราคาสดจาก Alpaca {display(reference.overriddenLive.price)} USD แต่ระบบใช้ราคาที่คุณกรอกเองอยู่ จึงไม่นำราคาสดมาคิด</p><button type="button" className="auth-secondary" disabled={disabled} onClick={()=>automatic.submit('valuation/references',valuationReferenceInputSchema,{symbol:manualRecord.symbol,currency:manualRecord.currency,value:manualRecord.value,asOf:manualRecord.asOf,enabled:false,expectedVersion:manualRecord.version})}>กลับไปใช้ราคา Alpaca อัตโนมัติ {row.symbol}</button><p>ราคาที่กรอกไว้ยังเก็บอยู่ เปิดใช้อีกครั้งได้ภายหลัง</p></div>}
++      {reference.value===null&&!parseCryptoDecimal(row.quantity).isZero()&&<p role="status">ขาดราคาอ้างอิง {row.symbol} จึงยังรวมมูลค่าหุ้นนี้ไม่ได้</p>}<button className="auth-secondary" disabled={disabled} onClick={()=>requestReference(row.symbol)}>{reference.state==='LIVE'?`กรอกราคาเองแทน ${row.symbol} (ไม่จำเป็น)`:`ตั้งราคาอ้างอิง ${row.symbol}`}</button></article>})}
++     {automatic.message&&<p role="alert" className="text-sm">{automatic.message}</p>}{automatic.pending&&<button className="auth-primary" disabled={automatic.busy} onClick={automatic.retry}>ตรวจผลการกลับไปใช้ราคาอัตโนมัติด้วยคำขอเดิม</button>}
++     {stockMarket.access==='owner'&&stockPrices&&stockPrices.connection!=='STREAMING'&&stockPrices.connection!=='NOT_CONFIGURED'&&<p className="text-xs" role="status">สถานะ Alpaca IEX: {stockConnectionLabel(stockPrices.connection)}</p>}
++     {stockPrices?.excluded&&stockPrices.excluded.length>0&&<p className="text-xs" role="status">เกินเพดาน 30 หลักทรัพย์ของ Alpaca Basic จึงไม่ได้ติดตาม: {stockPrices.excluded.join(', ')} · ตั้งราคาอ้างอิงเองได้</p>}
+      {!usdFx.value&&mixed&&parseCryptoDecimal(mixed.knownNative.USD).gt('0')&&<p role="status">ขาดอัตรา USD/THB · แสดงมูลค่า USD ได้ แต่ยังแปลงเป็นบาทไม่ได้</p>}
++     {usdFx.value&&(stocks?.holdings.length??0)>0&&<p className="text-xs" data-testid="usd-thb-label">มูลค่าหุ้นเป็นบาทคือการแปลงอ้างอิงด้วย {usdFx.source} ณ {usdFx.asOf?new Date(usdFx.asOf).toLocaleDateString('th-TH'):'N/A'} · อัตรานี้ไม่ใช่เรียลไทม์ แม้ราคาหุ้นจะสด</p>}
+      {valued?.holdings.filter(r=>r.thb===null).map(r=><p key={r.portfolioId+r.asset} role="status">คริปโต {r.asset}: ขาดราคาสดหรือ USDT/THB สด</p>)}
+     </section>
+     <section className="tracker-card rounded-2xl p-5 space-y-3"><h3 className="font-semibold">อัตราอ้างอิง USD → THB</h3><p>1 USD ≈ {display(usdFx.value)} THB · {usdFx.state}</p><p className="text-sm break-all">{usdFx.source} · ณ {usdFx.asOf?new Date(usdFx.asOf).toLocaleString('th-TH'):'N/A'}</p><p className="text-xs">ECB เป็นอัตราอ้างอิงรายวัน แปลงจากอัตราต่อ EUR ไม่ใช่ราคาแลกเงินสด ไม่ใช่ USDT และไม่รวมค่าธรรมเนียม · <a className="underline" href="https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html" target="_blank" rel="noreferrer">ข้อมูลต้นทาง ECB</a></p><button className="auth-secondary" disabled={disabled} onClick={()=>requestReference('USDTHB')}>ตั้งอัตรา USD/THB ของคุณ</button></section>
+diff --git a/apps/web/src/tracker/StockHoldings.tsx b/apps/web/src/tracker/StockHoldings.tsx
+index b76e97b..640ad70 100644
+--- a/apps/web/src/tracker/StockHoldings.tsx
++++ b/apps/web/src/tracker/StockHoldings.tsx
+@@ -9,6 +9,7 @@ import { useOwnedWrite } from './useOwnedWrite'
+ import ModalDialog from './ModalDialog'
+ import StockPortfolioValue from './StockPortfolioValue'
+ import StockQuote, {stockSymbols} from './StockQuote'
++import { liveStockQuote } from './valuationPolicy'
+ const today=()=>new Date(Date.now()+7*3600000).toISOString().slice(0,10)
+ export default function StockHoldings({snapshot,now,lock,expired,blocked=false,refreshRevision=0,mediaEnabled=true}:{snapshot:StockMarketSnapshot|null;now:number;lock:(v:boolean)=>void;expired:()=>void;blocked?:boolean;refreshRevision?:number;mediaEnabled?:boolean}){
+  const {money}=usePresentation(),[data,setData]=useState<StockOverview|null>(null),[loading,setLoading]=useState(true),[loadError,setLoadError]=useState('')
+@@ -21,7 +22,7 @@ export default function StockHoldings({snapshot,now,lock,expired,blocked=false,r
+  const disabled=blocked||loading||!data||write.busy||!!write.pending
+  const display=(v:string|null)=>v===null?'N/A':money(displayDecimal(v))
+  const rows=(data?.holdings??[]).filter(row=>row.portfolioId===portfolio).map(row=>{
+-  const q=snapshot?.quotes.find(q=>q.symbol===row.symbol),fresh=q?.status==='LIVE'&&q.observedAt&&q.receivedAt&&now-Date.parse(q.observedAt)>=0&&now-Date.parse(q.observedAt)<=30000&&now-Date.parse(q.receivedAt)>=0&&now-Date.parse(q.receivedAt)<=30000
++  const q=snapshot?.quotes.find(q=>q.symbol===row.symbol),fresh=!!liveStockQuote(row.symbol,snapshot,now)
+   try{return {...row,...valuePosition(row.quantity,row.totalCost,fresh?q!.price:null),reference:q??null,fresh:!!fresh}}catch{return {...row,averageCost:null,value:null,unrealized:null,returnPercent:null,reference:q??null,fresh:false}}
+  })
+  let total:string|null=null;try{if(portfolio&&rows.every(row=>row.value!==null))total=serializeCrypto(rows.reduce((sum,row)=>sum.plus(row.value!),parseCryptoDecimal('0')))}catch{/* Overflow stays unavailable. */}
+diff --git a/apps/web/src/tracker/StockPrices.tsx b/apps/web/src/tracker/StockPrices.tsx
+index ae0bebb..3c86a0c 100644
+--- a/apps/web/src/tracker/StockPrices.tsx
++++ b/apps/web/src/tracker/StockPrices.tsx
+@@ -1,83 +1,51 @@
+ import { useEffect, useState } from 'react'
+ import { usePresentation } from '../presentation'
+-import { stockMarketSnapshotSchema, type StockMarketSnapshot } from '@finntech/contracts'
+-import { displayDecimal, trackerRequest, TrackerRequestError } from './client'
++import { type StockMarketSnapshot } from '@finntech/contracts'
++import { displayDecimal } from './client'
+ import StockHoldings from './StockHoldings'
+ import FreeStockPrices from './FreeStockPrices'
++import { useStockMarket } from './stockMarket'
++import { liveStockQuote } from './valuationPolicy'
+ 
+ const connectionLabels: Record<StockMarketSnapshot['connection'], string> = {
+   NOT_CONFIGURED: 'ยังไม่ได้ตั้งค่า Alpaca key ฝั่ง server', CONNECTING: 'กำลังเชื่อมต่อข้อมูล IEX',
+-  STREAMING: 'เชื่อมต่อ feed IEX แล้ว', UNAVAILABLE: 'ยังเชื่อมต่อ Alpaca ไม่ได้',
++  STREAMING: 'เชื่อมต่อ feed IEX แล้ว', UNAVAILABLE: 'ยังเชื่อมต่อ Alpaca ไม่ได้ กำลังลองใหม่',
++  AUTH_FAILED: 'Alpaca ปฏิเสธ key (ยืนยันตัวตนไม่ผ่าน) ตรวจ key ใน Render', NOT_ENTITLED: 'บัญชี Alpaca ไม่มีสิทธิ์ข้อมูล feed นี้',
++  CONNECTION_LIMIT: 'มีการเชื่อมต่ออื่นใช้บัญชี Alpaca นี้อยู่ ระบบจะลองใหม่เอง',
+ }
+ const clock = (value: string) => new Date(value).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+ 
+ export default function StockPrices({ expired,lock=()=>{},blocked=false,refreshRevision=0,mediaEnabled=true }: { expired: () => void;lock?:(value:boolean)=>void;blocked?:boolean;refreshRevision?:number;mediaEnabled?:boolean }): JSX.Element {
+   const { money } = usePresentation()
+-  const [snapshot, setSnapshot] = useState<StockMarketSnapshot | null>(null)
+-  const [message, setMessage] = useState('')
+-  const [viewTime, setViewTime] = useState(Date.now())
+-  useEffect(() => {
+-    let mounted = true
+-    let socket: WebSocket | null = null
+-    let reconnect: ReturnType<typeof setTimeout> | undefined
+-    let failures = 0, fetching = false
+-    const accept = (value: unknown) => {
+-      const parsed = stockMarketSnapshotSchema.parse(value)
+-      if (mounted) { setSnapshot(parsed); setMessage(''); setViewTime(Date.now()) }
+-    }
+-    const refresh = async () => {
+-      if (fetching) return
+-      fetching = true
+-      try { accept(await trackerRequest('stocks/market')) }
+-      catch (error) {
+-        if (mounted) {
+-          setSnapshot(null)
+-          setMessage('ข้อมูลราคายังไม่พร้อม หรือบัญชีนี้ไม่มีสิทธิ์ใช้ key ที่ตั้งไว้ ราคาจะแสดงเป็น N/A')
+-          if (error instanceof TrackerRequestError && error.expired) expired()
+-        }
+-      } finally { fetching = false }
+-    }
+-    const connect = () => {
+-      if (!mounted || typeof WebSocket === 'undefined') return
+-      socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/stocks`)
+-      socket.onmessage = event => {
+-        try { accept(JSON.parse(String(event.data))); failures = 0 }
+-        catch { if (mounted) { setSnapshot(null); setMessage('รูปแบบข้อมูลราคายังไม่พร้อม') } }
+-      }
+-      socket.onerror = () => socket?.close()
+-      socket.onclose = () => {
+-        if (mounted) { failures = Math.min(failures + 1, 5); reconnect = setTimeout(connect, 1000 * 2 ** failures) }
+-      }
+-    }
+-    void refresh(); connect()
+-    const poll = setInterval(() => { void refresh() }, 15_000)
+-    // Expire prices locally even if both our API and stream become unreachable.
+-    const age = setInterval(() => setViewTime(Date.now()), 1000)
+-    return () => { mounted = false; clearInterval(poll); clearInterval(age); if (reconnect) clearTimeout(reconnect); socket?.close() }
+-  }, [refreshRevision])
++  const market = useStockMarket(expired, refreshRevision), snapshot = market.snapshot
++  const [tick, setTick] = useState(Date.now())
++  // Expire prices locally even if both our API and stream become unreachable.
++  useEffect(() => { const age = setInterval(() => setTick(Date.now()), 1000); return () => clearInterval(age) }, [])
++  const viewTime = Math.max(tick, market.receivedAt)
++  const message = market.access === 'denied' ? 'บัญชีนี้ไม่ใช่เจ้าของ Alpaca key ที่ตั้งไว้ ราคาอัตโนมัติจึงเป็น N/A ใช้กราฟฟรีหรือตั้งราคาอ้างอิงเองได้'
++    : market.access === 'unavailable' ? 'ข้อมูลราคายังไม่พร้อม ราคาจะแสดงเป็น N/A' : ''
+ 
+   return <section className="space-y-5" aria-label="ราคาหุ้นสหรัฐ">
+     <FreeStockPrices refreshRevision={refreshRevision}/>
+     <StockHoldings mediaEnabled={mediaEnabled} snapshot={snapshot} now={viewTime} expired={expired} lock={lock} blocked={blocked} refreshRevision={refreshRevision}/>
+     {snapshot?.connection !== 'NOT_CONFIGURED' && snapshot !== null && <div className="journal-stock-intro tracker-card rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+       <h2 className="text-xl font-semibold">ติดตามหุ้นและ ETF สหรัฐ · USD</h2>
+-      <p className="mt-2 text-sm leading-7 text-slate-600">Alpaca Basic · ราคา last trade จาก IEX เท่านั้น ไม่ใช่ราคาครบทุกตลาดสหรัฐ · สูงสุด 30 หลักทรัพย์</p>
+-      <p className="mt-2 text-sm leading-7 text-slate-600">Watchlist ไม่ใช่รายการที่คุณถือจริง แยกจากการถือครอง ไม่รวมยอดตามรายชื่อที่ติดตาม ราคา IEX ใช้ได้เฉพาะเจ้าของ key ตามสิทธิ์เดิม ผู้ใช้ทั่วไปบันทึกต้นทุนและประวัติได้แม้ราคา N/A</p>
+-      <p role="status" className="mt-4 text-sm font-medium text-teal-800">{message || (snapshot ? connectionLabels[snapshot.connection] : 'กำลังตรวจการเชื่อมต่อ…')}</p>
++      <p className="mt-2 text-sm leading-7 text-slate-600">Alpaca Basic · ราคา last trade จาก IEX เท่านั้น ไม่ใช่ราคาครบทุกตลาดสหรัฐ · สูงสุด 30 หลักทรัพย์ (หุ้นที่ถืออยู่มาก่อน แล้วจึง watchlist)</p>
++      <p className="mt-2 text-sm leading-7 text-slate-600">ราคา IEX ใช้ได้เฉพาะเจ้าของ key ตามเงื่อนไขใช้งานส่วนตัวของ Alpaca ผู้ใช้อื่นบันทึกต้นทุนและประวัติได้ และตั้งราคาอ้างอิงเองได้</p>
++      <p role="status" className="mt-4 text-sm font-medium text-teal-800">{connectionLabels[snapshot.connection]}{snapshot.session === 'CLOSED' ? ' · ตลาดสหรัฐปิด (นอกเวลา 09:30–16:00 นิวยอร์ก) ราคาล่าสุดไม่นับเป็นราคาสด' : ''}</p>
++      {snapshot.excluded && snapshot.excluded.length > 0 && <p className="mt-2 text-xs">เกินเพดาน 30 จึงไม่ได้ติดตาม: {snapshot.excluded.join(', ')}</p>}
+     </div>}
+     {snapshot?.connection !== 'NOT_CONFIGURED' && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+       {snapshot?.quotes.map(quote => {
+-        const fresh = quote.status === 'LIVE' && quote.observedAt !== null && quote.receivedAt!==null
+-          && viewTime - Date.parse(quote.observedAt) >=0 && viewTime - Date.parse(quote.observedAt) <= 30_000
+-          && viewTime - Date.parse(quote.receivedAt)>=0 && viewTime - Date.parse(quote.receivedAt)<=30_000
++        const fresh = !!liveStockQuote(quote.symbol, snapshot, viewTime)
+         return <article key={quote.symbol} aria-label={`ราคา ${quote.symbol}`} className="tracker-card rounded-2xl border border-slate-200 bg-white p-5">
+-          <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{quote.symbol}</h3><span className="text-xs text-slate-500">{fresh ? 'ราคาสด IEX' : quote.price ? 'ราคาเก่า / ตลาดอาจปิด' : 'ราคาไม่พร้อม'}</span></div>
++          <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{quote.symbol}</h3><span className="text-xs text-slate-500">{fresh ? 'ราคาสด IEX' : !quote.price ? 'ราคาไม่พร้อม' : quote.status === 'CLOSED' ? 'ตลาดปิด · ราคาล่าสุด' : 'ราคาไม่สด'}</span></div>
+           <p className="mt-3 break-all text-xl font-semibold tabular-nums">{quote.price ? money(displayDecimal(quote.price)) : 'N/A'} <span className="text-xs text-slate-400">USD</span></p>
+           <p className="mt-3 text-xs leading-6 text-slate-500">เวลารายการล่าสุด: {quote.observedAt ? clock(quote.observedAt) : 'N/A'}</p>
+         </article>
+       })}
+     </div>}
+     {message && <p role="status" className="text-xs text-slate-500">การประเมินอัตโนมัติผ่าน API: {message}</p>}
+-    {snapshot?.connection !== 'NOT_CONFIGURED' && snapshot !== null && <p className="text-xs leading-6 text-slate-500">ราคาผ่าน backend และส่งเข้าเว็บทุก 5 วินาที · อายุรายการเกิน 30 วินาทีถือว่าเก่า · การเชื่อมต่อสำเร็จไม่ได้หมายความว่ามีการซื้อขายใหม่ตลอดเวลา · ใช้ส่วนตัวเฉพาะเจ้าของ key</p>}
++    {snapshot?.connection !== 'NOT_CONFIGURED' && snapshot !== null && <p className="text-xs leading-6 text-slate-500">ราคาส่งจาก backend ทันทีที่มีรายการใหม่ (รวบไม่เกินวินาทีละครั้ง) และตรวจซ้ำทุก 30 วินาที · อายุรายการเกิน 30 วินาทีถือว่าเก่า · การเชื่อมต่อสำเร็จไม่ได้หมายความว่ามีการซื้อขายใหม่ตลอดเวลา · ใช้ส่วนตัวเฉพาะเจ้าของ key</p>}
+   </section>
+ }
+diff --git a/apps/web/src/tracker/client.ts b/apps/web/src/tracker/client.ts
+index 2e9d6ac..ae68902 100644
+--- a/apps/web/src/tracker/client.ts
++++ b/apps/web/src/tracker/client.ts
+@@ -1,6 +1,6 @@
+ import { BACKUP_MAX_BYTES, BACKUP_MAX_ROWS } from '@finntech/contracts'
+ export class TrackerRequestError extends Error {
+-  constructor(message: string, readonly unknownOutcome: boolean, readonly expired = false) { super(message) }
++  constructor(message: string, readonly unknownOutcome: boolean, readonly expired = false, readonly status?: number, readonly code?: string) { super(message) }
+ }
+ const messages: Record<string, string> = {
+   MEDIA_QUOTA: 'พื้นที่รูปเต็ม (3 MiB / รูปแนบ 10 รูปต่อบัญชี หรือพื้นที่รวมของระบบ) ไม่มีการลบรูปเก่าอัตโนมัติ',
+@@ -41,7 +41,7 @@ export async function trackerRequest(path: string, method = 'GET', body?: unknow
+     const value = await response.json() as { error?: { code?: string } }
+     if (!response.ok) throw new TrackerRequestError(
+       response.status === 401 ? 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง' : messages[value.error?.code ?? ''] ?? 'ระบบยังตอบกลับไม่ได้ กรุณาลองอีกครั้งด้วยคำขอเดิม',
+-      method !== 'GET' && response.status >= 500, response.status === 401,
++      method !== 'GET' && response.status >= 500, response.status === 401, response.status, value.error?.code,
+     )
+     return value
+   } catch (error) {
+diff --git a/apps/web/src/tracker/stockMarket.ts b/apps/web/src/tracker/stockMarket.ts
+new file mode 100644
+index 0000000..5ea33c3
+--- /dev/null
++++ b/apps/web/src/tracker/stockMarket.ts
+@@ -0,0 +1,79 @@
++import { useEffect, useState } from 'react'
++import { stockMarketSnapshotSchema, type StockMarketSnapshot } from '@finntech/contracts'
++import { trackerRequest, TrackerRequestError } from './client'
++
++/**
++ * One shared subscription per browser tab to FINNTECH's authenticated stock relay. The browser never
++ * holds provider keys. Non-owners (403) and unconfigured servers never open the WebSocket.
++ */
++export type StockAccess = 'checking' | 'owner' | 'denied' | 'unavailable'
++export interface StockMarketState { snapshot: StockMarketSnapshot | null; access: StockAccess; receivedAt: number }
++type Listener = (state: StockMarketState) => void
++
++const RECONCILE_MS = 30_000
++let state: StockMarketState = { snapshot: null, access: 'checking', receivedAt: 0 }
++const listeners = new Set<Listener>()
++let socket: WebSocket | null = null, reconnect: ReturnType<typeof setTimeout> | undefined, poll: ReturnType<typeof setInterval> | undefined
++let failures = 0, fetching = false, expiredHandlers = new Set<() => void>()
++
++function publish(next: Partial<StockMarketState>): void {
++  state = { ...state, ...next }
++  for (const listener of listeners) listener(state)
++}
++/** Invalid REST snapshots clear prices (N/A); an invalid stream frame is ignored, keeping the last valid one. */
++function accept(value: unknown, fromRest: boolean): void {
++  const parsed = stockMarketSnapshotSchema.safeParse(value)
++  if (parsed.success) publish({ snapshot: parsed.data, access: 'owner', receivedAt: Date.now() })
++  else if (fromRest) publish({ snapshot: null, access: 'unavailable' })
++}
++async function reconcile(): Promise<void> {
++  if (fetching) return
++  fetching = true
++  try {
++    accept(await trackerRequest('stocks/market'), true)
++    // No socket when the server has no Alpaca keys: periodic reconciliation will notice activation.
++    if (!socket && listeners.size && state.snapshot?.connection !== 'NOT_CONFIGURED') connect()
++  } catch (error) {
++    if (error instanceof TrackerRequestError && error.expired) { publish({ snapshot: null, access: 'denied' }); stop(); for (const handler of [...expiredHandlers]) handler(); return }
++    // 403: this account is not the key owner. Other failures: feed or network unavailable. No socket.
++    const forbidden = error instanceof TrackerRequestError && error.status === 403
++    publish({ snapshot: null, access: forbidden ? 'denied' : 'unavailable' })
++    if (forbidden) stop(); else socket?.close()
++  } finally { fetching = false }
++}
++function connect(): void {
++  if (socket || typeof WebSocket === 'undefined' || !listeners.size || state.access !== 'owner') return
++  const opened = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/stocks`)
++  socket = opened
++  opened.onmessage = event => { try { accept(JSON.parse(String(event.data)), false); failures = 0 } catch { /* keep last valid snapshot */ } }
++  opened.onerror = () => opened.close()
++  opened.onclose = () => {
++    if (socket !== opened) return
++    socket = null
++    if (listeners.size && state.access === 'owner') { failures = Math.min(failures + 1, 5); reconnect = setTimeout(connect, 1000 * 2 ** failures) }
++  }
++}
++function start(): void {
++  void reconcile()
++  poll = setInterval(() => { void reconcile() }, RECONCILE_MS)
++}
++function stop(): void {
++  if (poll) clearInterval(poll); if (reconnect) clearTimeout(reconnect)
++  poll = undefined; reconnect = undefined
++  const closing = socket; socket = null; closing?.close()
++}
++
++/** Subscribe a component; the first subscriber starts the shared store and the last one stops it. */
++export function useStockMarket(expired: () => void, refreshRevision = 0): StockMarketState {
++  const [current, setCurrent] = useState(state)
++  useEffect(() => {
++    const listener: Listener = next => setCurrent(next)
++    listeners.add(listener); expiredHandlers.add(expired)
++    if (listeners.size === 1) start(); else { setCurrent(state); void reconcile() }
++    return () => { listeners.delete(listener); expiredHandlers.delete(expired); if (!listeners.size) { stop(); state = { snapshot: null, access: 'checking', receivedAt: 0 } } }
++  }, [refreshRevision])
++  return current
++}
++
++/** Test seam: reset module state between isolated renders. */
++export function resetStockMarketForTests(): void { stop(); listeners.clear(); expiredHandlers = new Set(); state = { snapshot: null, access: 'checking', receivedAt: 0 }; failures = 0; fetching = false }
+diff --git a/apps/web/src/tracker/valuationPolicy.ts b/apps/web/src/tracker/valuationPolicy.ts
+index cd1f15f..b42dc38 100644
+--- a/apps/web/src/tracker/valuationPolicy.ts
++++ b/apps/web/src/tracker/valuationPolicy.ts
+@@ -1,11 +1,32 @@
+ import type { ValuationOverview, StockMarketSnapshot } from '@finntech/contracts'
+ export const REFERENCE_MAX_AGE=7*86400000
+-export type SelectedReference={value:string|null;source:string;asOf:string|null;state:'LIVE'|'DAILY'|'MANUAL'|'STALE'|'MISSING'|'ERROR'}
++export const LIVE_MAX_AGE=30000
++const CLOCK_SKEW=2000
++export type SelectedReference={value:string|null;source:string;asOf:string|null;state:'LIVE'|'DAILY'|'MANUAL'|'STALE'|'CLOSED'|'MISSING'|'ERROR'
++ /** A last observed provider trade shown for context only; never counted in totals. */
++ lastKnown?:{price:string;observedAt:string|null}
++ /** A fresh live price that an enabled manual override is currently hiding. */
++ overriddenLive?:{price:string;observedAt:string}}
+ const valid=(date:string|null,now:number,limit:number)=>date!==null&&now-Date.parse(date)>=0&&now-Date.parse(date)<=limit
++const providerProblem:Partial<Record<StockMarketSnapshot['connection'],string>>={
++ AUTH_FAILED:'Alpaca ปฏิเสธ key (ยืนยันตัวตนไม่ผ่าน) · ตั้งราคาอ้างอิงเองได้',
++ NOT_ENTITLED:'บัญชี Alpaca ไม่มีสิทธิ์ข้อมูล feed นี้ · ตั้งราคาอ้างอิงเองได้',
++ CONNECTION_LIMIT:'Alpaca จำกัดจำนวนการเชื่อมต่อ กำลังรอเชื่อมใหม่ · ตั้งราคาอ้างอิงเองได้',
++}
++/** Live = provider trade time and receipt both within 30 s while streaming (last trade, not bid/ask). */
++export function liveStockQuote(symbol:string,market:StockMarketSnapshot|null,now:number){
++ const q=market?.quotes.find(q=>q.symbol===symbol)
++ // A small tolerance absorbs provider/server/browser clock skew; it never extends the 30 s age limit.
++ const fresh=(date:string|null|undefined)=>!!date&&now-Date.parse(date)>=-CLOCK_SKEW&&now-Date.parse(date)<=LIVE_MAX_AGE
++ return market?.connection==='STREAMING'&&q?.status==='LIVE'&&q.price&&fresh(q.observedAt)&&fresh(q.receivedAt)?{price:q.price,observedAt:q.observedAt!}:null
++}
+ /** An enabled manual override wins, including when stale. Disable it explicitly to resume automatic. */
+ export function selectReference(symbol:string, overview:ValuationOverview|null,market:StockMarketSnapshot|null,now:number):SelectedReference {
+  const manual=overview?.references.find(r=>r.symbol===symbol&&r.enabled)
+- if(manual)return {value:valid(manual.asOf,now,REFERENCE_MAX_AGE)?manual.value:null,source:'กรอกเอง (แทนอัตโนมัติ)',asOf:manual.asOf,state:valid(manual.asOf,now,REFERENCE_MAX_AGE)?'MANUAL':'STALE'}
++ if(manual){
++  const live=symbol==='USDTHB'?null:liveStockQuote(symbol,market,now)
++  return {value:valid(manual.asOf,now,REFERENCE_MAX_AGE)?manual.value:null,source:'กรอกเอง (แทนอัตโนมัติ)',asOf:manual.asOf,state:valid(manual.asOf,now,REFERENCE_MAX_AGE)?'MANUAL':'STALE',...(live?{overriddenLive:live}:{})}
++ }
+  if(symbol==='USDTHB'){
+   const fx=overview?.usdThb
+   if(fx?.status==='DAILY'&&valid(fx.asOf,now,REFERENCE_MAX_AGE)&&fx.rate)return {value:fx.rate,source:'ECB · อ้างอิงรายวัน (THB/EUR ÷ USD/EUR)',asOf:fx.asOf,state:'DAILY'}
+@@ -13,7 +34,14 @@ export function selectReference(symbol:string, overview:ValuationOverview|null,m
+  }
+  // An unconfigured feed is not a provider failure: guide the owner to a manual reference instead.
+  if(market?.connection==='NOT_CONFIGURED')return {value:null,source:'ยังไม่มี feed ราคาอัตโนมัติ · ตั้งราคาอ้างอิงเองได้',asOf:null,state:'MISSING'}
++ const live=liveStockQuote(symbol,market,now)
++ if(live)return {value:live.price,source:'Alpaca IEX · ราคาซื้อขายล่าสุด (last trade)',asOf:live.observedAt,state:'LIVE'}
+  const q=market?.quotes.find(q=>q.symbol===symbol)
+- if(q?.status==='LIVE'&&q.price&&valid(q.observedAt??null,now,30000)&&valid(q.receivedAt,now,30000))return {value:q.price,source:market!.source,asOf:q.observedAt!,state:'LIVE'}
+- return {value:null,source:market?.source??'ยังไม่มี feed ที่อนุญาต',asOf:q?.observedAt??null,state:q?.price?'STALE':q?.status==='UNAVAILABLE'?'ERROR':'MISSING'}
++ const lastKnown=q?.price?{lastKnown:{price:q.price,observedAt:q.observedAt}}:{}
++ const problem=market?providerProblem[market.connection]:undefined
++ if(problem)return {value:null,source:problem,asOf:q?.observedAt??null,state:'ERROR',...lastKnown}
++ if(!market)return {value:null,source:'ยังไม่มี feed ที่อนุญาต',asOf:null,state:'MISSING'}
++ if(!q)return {value:null,source:'Alpaca IEX · ไม่อยู่ในรายการที่ subscribe (เกินเพดาน 30) · ตั้งราคาอ้างอิงเองได้',asOf:null,state:'MISSING'}
++ if(q.price)return {value:null,source:q.status==='CLOSED'?'Alpaca IEX · ตลาดปิด ราคาล่าสุดไม่นับในยอดรวม':'Alpaca IEX · ราคาไม่สด (เกิน 30 วินาที) ไม่นับในยอดรวม',asOf:q.observedAt,state:q.status==='CLOSED'?'CLOSED':'STALE',...lastKnown}
++ return {value:null,source:market.connection==='CONNECTING'?'กำลังเชื่อมต่อ Alpaca IEX':'Alpaca IEX · ยังไม่มีรายการซื้อขาย',asOf:null,state:market.connection==='UNAVAILABLE'?'ERROR':'MISSING'}
+ }
+diff --git a/packages/contracts/src/index.ts b/packages/contracts/src/index.ts
+index 4476f11..ae78cf2 100644
+--- a/packages/contracts/src/index.ts
++++ b/packages/contracts/src/index.ts
+@@ -155,12 +155,16 @@ export type MarketSnapshot = z.infer<typeof marketSnapshotSchema>
+ // USD price observations are separate from the USDT ledger; this is a watchlist, not ownership.
+ export const stockSymbolSchema = z.string().regex(/^[A-Za-z][A-Za-z0-9.-]{0,14}$/)
+   .transform(symbol => symbol.toUpperCase())
++// Last-trade valuation only (never bid/ask/midpoint). AUTH_FAILED / NOT_ENTITLED / CONNECTION_LIMIT are
++// provider answers, distinct from NOT_CONFIGURED (no server keys) and from a closed market session.
+ export const stockMarketSnapshotSchema = z.object({
+   source: z.literal('Alpaca IEX'), currency: z.literal('USD'),
+-  connection: z.enum(['NOT_CONFIGURED', 'CONNECTING', 'STREAMING', 'UNAVAILABLE']),
++  connection: z.enum(['NOT_CONFIGURED', 'CONNECTING', 'STREAMING', 'UNAVAILABLE', 'AUTH_FAILED', 'NOT_ENTITLED', 'CONNECTION_LIMIT']),
++  session: z.enum(['REGULAR', 'CLOSED']).optional(),
++  excluded: z.array(stockSymbolSchema).max(200).optional(),
+   quotes: z.array(z.object({
+     symbol: stockSymbolSchema, price: positiveCryptoAmount.nullable(),
+-    status: z.enum(['LIVE', 'STALE', 'UNAVAILABLE']),
++    status: z.enum(['LIVE', 'STALE', 'CLOSED', 'UNAVAILABLE']),
+     observedAt: z.string().nullable(), receivedAt: z.string().datetime().nullable(),
+   })).max(30),
+ })

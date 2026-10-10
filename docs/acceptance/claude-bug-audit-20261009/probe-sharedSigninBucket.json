@@ -1,0 +1,29 @@
+{
+  "at": "2026-10-09T14:00:35.708Z",
+  "signup_shared-0": 200,
+  "signup_shared-1": 200,
+  "signup_shared-2": 200,
+  "signup_shared-3": 200,
+  "four_distinct_correct_signins_within_10s": [
+    {
+      "person": "shared-0",
+      "status": 200,
+      "code": null
+    },
+    {
+      "person": "shared-1",
+      "status": 200,
+      "code": null
+    },
+    {
+      "person": "shared-2",
+      "status": 200,
+      "code": null
+    },
+    {
+      "person": "shared-3",
+      "status": 429,
+      "code": null
+    }
+  ]
+}

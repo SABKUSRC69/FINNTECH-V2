@@ -11,6 +11,8 @@ import type { MarketRelay } from './tracker/market.js'
 import type { StockMarketRelay } from './tracker/stocks.js'
 import type { ReferenceFxRelay } from './tracker/fx.js'
 import type { DailyUsdRelay } from './tracker/usd-fx.js'
+import type { DailyCloseRelay } from './tracker/daily-close.js'
+import type { PersonalDailyCloses } from './tracker/market-keys.js'
 import type { RecoveryService } from './auth/recovery.js'
 import { authSubjectAllowed } from './auth/authorization.js'
 import { betaFor, createBetaAuthGuard } from './auth/beta.js'
@@ -31,6 +33,8 @@ export interface ApiAppOptions {
   stocks?: StockMarketRelay
   fx?: ReferenceFxRelay
   usdFx?: DailyUsdRelay
+  dailyCloses?: DailyCloseRelay
+  personalCloses?: PersonalDailyCloses
   recovery?: RecoveryService
 }
 
@@ -89,6 +93,16 @@ export function createApp(options: ApiAppOptions = {}): Express {
         const denied = await demoGuard(request) ?? await betaGuard?.(request) ?? await realGuard?.(request)
         if (denied) return denied
         let result = await registerPassword?.(request) ?? await options.recovery?.handle(request) ?? await options.auth!.handler(request)
+        if (real && new URL(request.url).pathname === '/api/auth/sign-in/email' && result.ok) {
+          // Only after Better Auth verified the password: a wrong password stays an ordinary 401, so
+          // deletion state is never disclosed to someone who does not hold the credential.
+          const signedIn = await result.clone().json() as { user?: { id?: string } } | null
+          const userId = signedIn?.user?.id
+          if (userId && (await options.database!.authRecoveryEnrollment.findUnique({ where: { userId }, select: { blocked: true } }))?.blocked) {
+            await options.database!.authSession.deleteMany({ where: { userId } })
+            return globalThis.Response.json({ error: { code: 'ACCOUNT_DELETION_PENDING' } }, { status: 403, headers: { 'cache-control': 'no-store' } })
+          }
+        }
         if (new URL(request.url).pathname === '/api/auth/get-session' && result.ok) {
           const snapshot = await result.clone().json() as { user?: { id?: string } } | null
           if (snapshot?.user?.id && !await authSubjectAllowed(options.auth!, options.database!, snapshot.user.id)) result = globalThis.Response.json(null)
@@ -133,7 +147,7 @@ export function createApp(options: ApiAppOptions = {}): Express {
   if (options.auth && options.database) {
     app.use('/api/account/deletion', express.json({limit:'16kb'}), deletionRouter(options.auth,options.database))
     app.use('/api/media', mediaRouter(options.auth,options.database))
-    app.use('/api', trackerRouter(options.auth, options.database, options.market, options.stocks, options.fx, options.usdFx))
+    app.use('/api', trackerRouter(options.auth, options.database, options.market, options.stocks, options.fx, options.usdFx, options.dailyCloses, options.personalCloses))
   }
   app.use(express.json({ limit: '64kb' }))
 

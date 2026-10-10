@@ -1,11 +1,13 @@
+import CashSettlementFields, {CashAccountField, OpeningBalanceChoice, openingAccount, tradeCash, unlinkedLabel} from './CashSettlementFields'
+import { clearValuationCache } from './useValuationReferences'
 import ReceiptAssist from '../media/ReceiptAssist'
 import Attachment from '../media/Attachment'
 import {MediaLocks} from '../media/Locks'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
-  budgetInputSchema, categoryInputSchema, financeEntrySchema, financeOverviewSchema,
+  cashOverviewSchema, type CashOverview, stockOverviewSchema, budgetInputSchema, categoryInputSchema, financeEntrySchema, financeOverviewSchema,
   cryptoOverviewSchema, marketSnapshotSchema, portfolioInputSchema, tradeEntrySchema,
-  financeCorrectionSchema, tradeCorrectionSchema,
+  financeCorrectionSchema, tradeCorrectionSchema, starterCategoriesInputSchema, STARTER_CATEGORIES,
   type FinanceOverview, type CryptoOverview, type MarketSnapshot,
 } from '@finntech/contracts'
 import { parseCryptoDecimal, serializeCrypto, serializeThb } from '@finntech/finance'
@@ -38,6 +40,15 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery = 
   const [month, setMonth] = useState(today().slice(0, 7))
   const [finance, setFinance] = useState<FinanceOverview | null>(null)
   const [crypto, setCrypto] = useState<CryptoOverview | null>(null)
+  const [cash, setCash] = useState<CashOverview>({accounts:[]})
+  const [financeCashId,setFinanceCashId]=useState(''),[tradeCashId,setTradeCashId]=useState(''),[cashAmount,setCashAmount]=useState('')
+  // Records dated before an account's opening date default to "already in the opening balance".
+  const [financeIncluded,setFinanceIncluded]=useState(true),[tradeIncluded,setTradeIncluded]=useState(true)
+  const [legacyFinanceOpening,setLegacyFinanceOpening]=useState(false),[legacyTradeOpening,setLegacyTradeOpening]=useState(false)
+  // Settled stock sales, used only to ask before the same proceeds are entered again as income.
+  const [stockSells,setStockSells]=useState<{label:string;date:string;accountId:string;amountThb:string}[]>([])
+  const [incomeCheck,setIncomeCheck]=useState<{text:string;proceed:()=>void}|null>(null)
+  const [legacyFinance,setLegacyFinance]=useState(false),[legacyTrade,setLegacyTrade]=useState(false)
   const [market, setMarket] = useState<MarketSnapshot>({ quotes: [] })
   const [marketTime, setMarketTime] = useState(() => Date.now())
   const [loading, setLoading] = useState(true)
@@ -53,6 +64,9 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery = 
   const [date, setDate] = useState(today())
   const [note, setNote] = useState('')
   const [categoryName, setCategoryName] = useState('')
+  const [inlineCategory, setInlineCategory] = useState('')
+  const [inlineType, setInlineType] = useState<'income' | 'expense'>('expense')
+  const [inlineOpen, setInlineOpen] = useState(false)
   const [budgetCategory, setBudgetCategory] = useState('')
   const [budgetAmount, setBudgetAmount] = useState('')
   const [portfolioName, setPortfolioName] = useState('')
@@ -80,6 +94,7 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery = 
     if (next === section) return true
     setMessage('')
     setSection(next)
+    if(next==='finance'||next==='crypto')void load()
     return true
   }
 
@@ -90,22 +105,30 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery = 
   }, [editingFinance, editingTrade, voiding])
 
   function cancelCorrection(): void {
+    setLegacyFinance(false); setLegacyTrade(false); setCashAmount(''); setFinanceIncluded(true); setTradeIncluded(true)
     setEditingFinance(null); setEditingTrade(null); setVoiding(null); setCorrectionReason('')
     setAmount(''); setNote(''); setQuantity(''); setPrice(''); setFee('0')
   }
   function editFinance(row: FinanceOverview['transactions'][number]): void {
     cancelCorrection(); setEditingFinance(row.id); setType(row.type); setCategoryId(row.categoryId)
+    setLegacyFinance(!row.cashAccountId); setLegacyFinanceOpening(!!row.inOpeningBalance); setFinanceCashId(row.cashAccountId??'')
     setAmount(row.amount); setDate(row.date); setNote(row.note)
   }
   function editTrade(row: CryptoOverview['trades'][number]): void {
     cancelCorrection(); setEditingTrade(row.id); setPortfolioId(row.portfolioId); setAsset(row.asset)
+    setLegacyTrade(!row.cashSettlement); setLegacyTradeOpening(!!row.inOpeningBalance); setTradeCashId(row.cashSettlement?.accountId??''); setCashAmount(row.cashSettlement?.amountThb??'')
     setSide(row.side); setQuantity(row.quantity); setPrice(row.price); setFee(row.fee); setTradeDate(row.date)
   }
 
   async function load(selected = month): Promise<void> {
     setLoading(true)
     try {
-      const [f, c] = await Promise.all([trackerRequest(`finance?month=${selected}`), trackerRequest('crypto')])
+      const [f, c, a] = await Promise.all([trackerRequest(`finance?month=${selected}`), trackerRequest('crypto'),trackerRequest('cash')])
+      const accounts=cashOverviewSchema.parse(a);setCash(accounts)
+      void trackerRequest('stocks').then(value => {
+        const parsed = stockOverviewSchema.safeParse(value)
+        setStockSells(parsed.success ? parsed.data.trades.flatMap(t => t.side === 'sell' && !t.voidedAt && t.cashSettlement ? [{ label: `ขาย ${t.symbol}`, date: t.date, accountId: t.cashSettlement.accountId, amountThb: t.cashSettlement.amountThb }] : []) : [])
+      }).catch(() => { setStockSells([]) })
       setFinance(financeOverviewSchema.parse(f)); setCrypto(cryptoOverviewSchema.parse(c)); setAvailable(true)
     } catch (error) {
       setAvailable(false)
@@ -114,6 +137,16 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery = 
     } finally { setLoading(false) }
   }
   useEffect(() => { void load(month) }, [month])
+  // Personal closes are held for this signed-in view only; leaving the dashboard (logout, expiry) drops them.
+  useEffect(() => () => { clearValuationCache() }, [])
+  /** A settled sale into the same account with the same THB amount within 7 days of this income. */
+  function saleMatch(accountId: string, value: string, day: string): string | null {
+    const near = (other: string) => Math.abs(Date.parse(other) - Date.parse(day)) <= 7 * 86400000
+    const same = (other: string) => { try { return parseCryptoDecimal(other).eq(value) } catch { return false } }
+    const sales = [...(crypto?.trades ?? []).flatMap(t => t.side === 'sell' && !t.voidedAt && t.cashSettlement ? [{ label: `ขาย ${t.asset}`, date: t.date, accountId: t.cashSettlement.accountId, amountThb: t.cashSettlement.amountThb }] : []), ...stockSells]
+    const hit = sales.find(row => row.accountId === accountId && same(row.amountThb) && near(row.date))
+    return hit ? `${hit.label} วันที่ ${hit.date} เพิ่มเงิน ${displayDecimal(hit.amountThb)} THB เข้าบัญชีนี้แล้ว` : null
+  }
   useEffect(() => {
     const updateClock = () => setMarketTime(Date.now())
     // Expire locally even when API/WS stop replying, including after a background tab wakes.
@@ -169,11 +202,20 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery = 
     if (writing.current) return
     writing.current = true; setBusy(true); setMessage('')
     try {
-      await trackerRequest(request.path, request.method, request.body, request.key)
-      if(request.path.startsWith('finance/transactions')||request.path.startsWith('crypto/trades')){setFinanceImage(undefined);setCryptoImage(undefined);setReceiptReset(v=>v+1)}
-      setPending(null); setAmount(''); setNote(''); setQuantity(''); setPrice('')
-      cancelCorrection()
-      setCategoryName(''); setPortfolioName(''); setRename(''); setRenameId('')
+      const result = await trackerRequest(request.path, request.method, request.body, request.key) as { id?: unknown } | null
+      setPending(null)
+      // Reset only the form that was written, so a draft transaction survives category/portfolio setup.
+      if (request.path.startsWith('finance/transactions') || request.path.startsWith('crypto/trades')) {
+        setFinanceImage(undefined); setCryptoImage(undefined); setReceiptReset(v => v + 1)
+        setAmount(''); setNote(''); setQuantity(''); setPrice('')
+        cancelCorrection()
+      } else if (request.path === 'finance/categories') {
+        setCategoryName(''); setInlineCategory(''); setInlineOpen(false)
+        const created = request.body as { type?: string }
+        if (created.type === type && typeof result?.id === 'string') setCategoryId(result.id)
+      } else if (request.path === 'finance/categories/starter') setInlineOpen(false)
+      else if (request.path.startsWith('finance/categories/')) { setRename(''); setRenameId('') }
+      else if (request.path === 'crypto/portfolios') setPortfolioName('')
       setMessage('บันทึกสำเร็จ'); await load()
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'บันทึกไม่สำเร็จ')
@@ -183,12 +225,16 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery = 
   }
   function submit(event: FormEvent, path: string, schema: { safeParse: (value: unknown) => { success: boolean; data?: unknown } }, body: unknown, method = 'POST'): void {
     event.preventDefault()
+    write(path, schema, body, method)
+  }
+  function write(path: string, schema: { safeParse: (value: unknown) => { success: boolean; data?: unknown } }, body: unknown, method = 'POST'): void {
     if (disabled || writing.current) return
     const result = schema.safeParse(body)
     if (!result.success) { setMessage('ข้อมูลไม่ถูกต้อง เงิน THB รับทศนิยมไม่เกิน 2 ตำแหน่ง คริปโตไม่เกิน 18 ตำแหน่ง และต้องเป็นจำนวนบวก'); return }
     void send({ path, body: result.data, key: globalThis.crypto.randomUUID(), method })
   }
   const categories = finance?.categories ?? []
+  const typeCategories = categories.filter(c => c.type === type)
   const categoryLabel = (id: string) => categories.find(c => c.id === id)?.name ?? 'ไม่ระบุหมวดหมู่'
   const portfolios = crypto?.portfolios ?? []
   const holdings = (crypto?.holdings ?? []).filter(h => h.portfolioId === portfolioId)
@@ -219,6 +265,10 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery = 
     {!voiding && feedback}
     {!available && !loading && <button className="auth-secondary" onClick={() => { void load() }}>โหลดข้อมูลอีกครั้ง</button>}
     {loading && <p role="status">กำลังโหลดข้อมูล…</p>}
+    {incomeCheck && <ModalDialog title="รายรับนี้อาจซ้ำกับเงินจากการขาย" onDismiss={() => setIncomeCheck(null)} closeDisabled={busy || !!pending}>
+      <p className="mt-3 text-sm leading-7">{incomeCheck.text} ถ้าเป็นเงินก้อนเดียวกัน ไม่ต้องบันทึกเป็นรายรับอีก เพราะเงินสดจะถูกบวกสองครั้ง</p>
+      <div className="mt-4 flex flex-wrap gap-3"><button type="button" className="auth-primary" onClick={() => setIncomeCheck(null)}>ไม่บันทึก</button><button type="button" className="auth-secondary" disabled={busy || !!pending} onClick={() => { const next = incomeCheck; setIncomeCheck(null); next.proceed() }}>เป็นเงินคนละก้อน บันทึกรายรับนี้</button></div>
+    </ModalDialog>}
     {voiding && <ModalDialog title="ยืนยันยกเลิกรายการ" onDismiss={cancelCorrection} closeDisabled={busy || !!pending}>
       <p className="mt-4 font-semibold">ยกเลิกรายการ {money(voiding.label)}</p>
       <p className="mt-2 text-sm leading-7">รายการเดิมยังอยู่ในประวัติ แต่จะไม่รวมในยอด หากทำให้ประวัติคริปโตขายเกินจำนวน ระบบจะปฏิเสธและคงข้อมูลเดิม</p>
@@ -240,12 +290,30 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery = 
       <div className="journal-analysis">{finance && finance.month === month && !loading && <ExpenseBreakdown finance={finance} />}</div>
       <div className="journal-editor">
         <section className={card}><h2 className="text-lg font-semibold">{editingFinance ? 'แก้ไขรายรับรายจ่าย' : 'บันทึกรายการ'}</h2><form ref={financeForm} aria-label="บันทึกรายรับรายจ่าย" className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={e => {
-          const entry = { ...(financeImage?{attachmentId:financeImage}:{}),type, categoryId, amount, currency: 'THB', date, note }
-          if (editingFinance) submit(e, `finance/transactions/${editingFinance}/corrections`, financeCorrectionSchema, { action: 'replace', reason: correctionReason, entry })
-          else submit(e, 'finance/transactions', financeEntrySchema, entry)
+          const opening = !legacyFinance && !editingFinance && !!openingAccount(cash.accounts, financeCashId, date)
+          const entry = { ...(!legacyFinance?{cashAccountId:financeCashId}:{}), ...(opening?{inOpeningBalance:financeIncluded}:{}), ...(financeImage?{attachmentId:financeImage}:{}),type, categoryId, amount, currency: 'THB', date, note }
+          if (editingFinance) { submit(e, `finance/transactions/${editingFinance}/corrections`, financeCorrectionSchema, { action: 'replace', reason: correctionReason, entry }); return }
+          e.preventDefault()
+          const match = type === 'income' && !(opening && financeIncluded) ? saleMatch(financeCashId, amount, date) : null
+          if (match) setIncomeCheck({ text: match, proceed: () => write('finance/transactions', financeEntrySchema, entry) })
+          else write('finance/transactions', financeEntrySchema, entry)
         }}>
-          <label className="auth-label">ประเภทรายการ<select className={input} value={type} disabled={disabled} onChange={e => { setType(e.target.value as typeof type); setCategoryId('') }}><option value="expense">รายจ่าย</option><option value="income">รายรับ</option></select></label>
-          <label className="auth-label">หมวดหมู่<select className={input} required value={categoryId} disabled={disabled} onChange={e => setCategoryId(e.target.value)}><option value="">เลือกหมวดหมู่</option>{categories.filter(c => c.type === type).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+          <label className="auth-label">ประเภทรายการ<select className={input} value={type} disabled={disabled} onChange={e => { const next = e.target.value as typeof type; setType(next); setInlineType(next); setCategoryId('') }}><option value="expense">รายจ่าย</option><option value="income">รายรับ</option></select></label>
+          <label className="auth-label">หมวดหมู่<select className={input} required value={categoryId} disabled={disabled} onChange={e => setCategoryId(e.target.value)}><option value="">เลือกหมวดหมู่</option>{typeCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+          {!editingFinance && <div className="journal-category-helper sm:col-span-2 space-y-3" data-testid="category-helper">
+            {loading && !finance && <p role="status" className="text-sm">กำลังโหลดหมวดหมู่…</p>}
+            {!loading && !available && <div role="alert" className="text-sm">โหลดหมวดหมู่ไม่สำเร็จ ข้อมูลที่กรอกยังอยู่ <button type="button" className="auth-secondary ml-2" disabled={busy || !!pending} onClick={() => { void load() }}>ลองโหลดหมวดหมู่อีกครั้ง</button></div>}
+            {available && typeCategories.length === 0 && <p role="status" className="text-sm">ยังไม่มีหมวด{type === 'expense' ? 'รายจ่าย' : 'รายรับ'} เพิ่มหมวดหมู่เพื่อเริ่มบันทึก</p>}
+            {available && (typeCategories.length === 0 || inlineOpen) ? <div className="grid gap-3 sm:grid-cols-3 sm:items-end">
+              <label className="auth-label">ชื่อหมวดใหม่<input className={input} maxLength={100} value={inlineCategory} disabled={disabled} onChange={e => setInlineCategory(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); write('finance/categories', categoryInputSchema, { name: inlineCategory, type: inlineType }) } }} /></label>
+              <label className="auth-label">ประเภทหมวด<select className={input} value={inlineType} disabled={disabled} onChange={e => setInlineType(e.target.value as typeof inlineType)}><option value="expense">รายจ่าย</option><option value="income">รายรับ</option></select></label>
+              <button type="button" className="auth-secondary" disabled={disabled || !inlineCategory.trim()} onClick={() => write('finance/categories', categoryInputSchema, { name: inlineCategory, type: inlineType })}>เพิ่มหมวดนี้</button>
+              <div className="sm:col-span-3 flex flex-wrap items-center gap-3"><button type="button" className="auth-secondary" disabled={disabled} onClick={() => write('finance/categories/starter', starterCategoriesInputSchema, {})}>เพิ่มหมวดหมู่พื้นฐาน</button><p className="text-xs text-slate-500">เพิ่มเฉพาะชื่อหมวดที่ยังไม่มี เช่น {STARTER_CATEGORIES[type].slice(0, 3).join(', ')} · ไม่สร้างจำนวนเงินหรือรายการ เปลี่ยนชื่อหรือเพิ่มเองได้ภายหลัง</p></div>
+            </div> : available && <button type="button" className="auth-secondary" disabled={disabled} onClick={() => setInlineOpen(true)}>+ เพิ่มหมวดใหม่โดยไม่ล้างข้อมูลที่กรอก</button>}
+          </div>}
+          {type === 'income' && !editingFinance && <p className="sm:col-span-2 text-xs" role="note" data-testid="sale-income-hint">เงินจากการขายหุ้น/คริปโตที่บันทึกในหน้าพอร์ต เข้าบัญชีเงินสดให้อัตโนมัติแล้ว ไม่ต้องลงเป็นรายรับซ้ำ</p>}
+          {!legacyFinance && !editingFinance && (() => { const opening = openingAccount(cash.accounts, financeCashId, date); return opening ? <OpeningBalanceChoice asOf={opening.asOf} checked={financeIncluded} onChange={setFinanceIncluded} disabled={disabled} /> : null })()}
+          {legacyFinance?<p className="sm:col-span-2 text-xs" role="status">{unlinkedLabel(legacyFinanceOpening)} · แก้ประวัติเท่านั้น</p>:<CashAccountField accounts={cash.accounts} value={financeCashId} onChange={setFinanceCashId} disabled={disabled} label={type==='income'?'รับเข้าบัญชีเงินสด':'จ่ายจากบัญชีเงินสด'}/>}
           <label className="auth-label">จำนวนเงิน THB<input className={input} inputMode="decimal" required value={amount} disabled={disabled} onChange={e => setAmount(e.target.value)} placeholder="0.00" /></label>
           <label className="auth-label">วันที่<input className={input} type="date" required value={date} disabled={disabled} onChange={e => setDate(e.target.value)} /></label>
           <label className="auth-label sm:col-span-2">บันทึกช่วยจำ<input className={input} maxLength={500} value={note} disabled={disabled} onChange={e => setNote(e.target.value)} /></label>
@@ -260,10 +328,10 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery = 
           {renameId && <form aria-label="เปลี่ยนชื่อหมวดหมู่" className="mt-4 space-y-3" onSubmit={e => { e.preventDefault(); if (!disabled && rename.trim()) void send({ path: `finance/categories/${renameId}`, method: 'PATCH', body: { name: rename.trim() }, key: globalThis.crypto.randomUUID() }) }}><label className="auth-label">ชื่อใหม่<input className={input} maxLength={100} required value={rename} disabled={disabled} onChange={e => setRename(e.target.value)} /></label><button className="auth-secondary" disabled={disabled}>บันทึกชื่อ</button></form>}
         </section>
       </div>
-      <FinanceHistory mediaEnabled={!demo} mediaLock={setMediaLocked} expired={expired} finance={finance} categoryLabel={categoryLabel} money={money} disabled={disabled} edit={editFinance} cancel={row => { cancelCorrection(); setVoiding({ kind: 'finance', id: row.id, label: `${categoryLabel(row.categoryId)} ${money(displayDecimal(row.amount))} THB` }) }} />
+      <FinanceHistory mediaEnabled={!demo} mediaLock={setMediaLocked} expired={expired} finance={finance} categoryLabel={categoryLabel} cashLabel={id=>cash.accounts.find(row=>row.id===id)?.name??'บัญชีเงินสด'} money={money} disabled={disabled} edit={editFinance} cancel={row => { cancelCorrection(); setVoiding({ kind: 'finance', id: row.id, label: `${categoryLabel(row.categoryId)} ${money(displayDecimal(row.amount))} THB` }) }} />
     </div>}
     {section === 'budget' && <div className="journal-budget-layout"><section className={card}><h2 className="text-lg font-semibold">ตั้งงบประมาณรายเดือน</h2><form aria-label="ตั้งงบประมาณ" className="mt-5 space-y-4" onSubmit={e => submit(e, 'finance/budgets', budgetInputSchema, { categoryId: budgetCategory, month, amount: budgetAmount, currency: 'THB' })}>
-      <label className="auth-label">หมวดรายจ่าย<select className={input} required value={budgetCategory} disabled={disabled} onChange={e => setBudgetCategory(e.target.value)}><option value="">เลือกหมวดหมู่</option>{categories.filter(c => c.type === 'expense').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label className="auth-label">งบ THB<input className={input} inputMode="decimal" required value={budgetAmount} disabled={disabled} onChange={e => setBudgetAmount(e.target.value)} /></label><button disabled={disabled} className="auth-primary w-full">บันทึกงบประมาณ</button><p className="text-xs leading-6 text-slate-500">บันทึกซ้ำหมวดและเดือนเดิมเป็นการปรับงบ ไม่มีการสร้างรายการรายจ่าย</p>
+      <label className="auth-label">หมวดรายจ่าย<select className={input} required value={budgetCategory} disabled={disabled} onChange={e => setBudgetCategory(e.target.value)}><option value="">เลือกหมวดหมู่</option>{categories.filter(c => c.type === 'expense').map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>{available && !categories.some(c => c.type === 'expense') && <p role="status" className="text-sm">ยังไม่มีหมวดรายจ่าย เพิ่มหมวดหรือหมวดหมู่พื้นฐานได้ที่หน้ารายรับรายจ่าย</p>}<label className="auth-label">งบ THB<input className={input} inputMode="decimal" required value={budgetAmount} disabled={disabled} onChange={e => setBudgetAmount(e.target.value)} /></label><button disabled={disabled} className="auth-primary w-full">บันทึกงบประมาณ</button><p className="text-xs leading-6 text-slate-500">บันทึกซ้ำหมวดและเดือนเดิมเป็นการปรับงบ ไม่มีการสร้างรายการรายจ่าย</p>
     </form></section><section className={`${card} journal-budget-track`}><h2 className="text-lg font-semibold">ติดตามงบเดือนนี้</h2><div className="mt-5 space-y-4">{finance?.budgets.length === 0 && <p className="text-sm text-slate-500">ยังไม่ได้ตั้งงบประมาณ</p>}{finance?.budgets.map(b => <div key={b.id} className="rounded-xl border border-slate-200 p-4"><p className="font-medium">{categoryLabel(b.categoryId)}</p><p className="mt-2 break-all text-sm">ใช้ไป {money(displayDecimal(b.spent))} / {money(displayDecimal(b.amount))} THB</p><p className={`mt-1 break-all text-sm ${b.remaining.startsWith('-') ? 'text-rose-700' : 'text-teal-700'}`}>{b.remaining.startsWith('-') ? 'เกินงบ ' : 'เหลือ '}{money(displayDecimal(b.remaining.replace(/^-/, '')))} THB</p></div>)}</div></section></div>}
     {section === 'assets' && <Assets crypto={available ? crypto : null} market={market} now={marketTime} expired={expired} lock={setBackupLocked} />}
     {section === 'crypto' && <div className="journal-crypto-layout">
@@ -277,18 +345,19 @@ export default function Dashboard({ name, logout, expired, authBusy, recovery = 
         return <article key={h.asset} className="rounded-xl border border-slate-200 p-4"><div className="flex justify-between"><h4 className="font-semibold">{h.asset}</h4><span className="text-xs text-slate-500">{fresh ? 'ราคาอ้างอิงพร้อม' : quote?.price && quote.status !== 'UNAVAILABLE' ? 'ราคาล้าสมัย' : 'ราคาไม่พร้อม'}</span></div><dl className="mt-3 space-y-2 break-all text-sm"><div>ปริมาณ {money(displayDecimal(h.quantity, 0))}</div><div>ต้นทุน {h.totalCost === null ? 'N/A' : `${money(displayDecimal(h.totalCost))} USDT`}</div><div>ต้นทุนเฉลี่ย {money(average)}</div><div>{fresh ? 'ราคาอ้างอิง' : 'ราคาล่าสุดที่ได้รับ (ไม่ใช้คำนวณ)'} {quote?.price ? `${money(displayDecimal(quote.price))} USDT` : 'N/A'}</div><div>มูลค่าประเมิน {h.value===null?'N/A':money(displayDecimal(h.value))} USDT</div><div>กำไร/ขาดทุนรับรู้ {h.realizedPnl === null ? 'N/A' : `${money(displayDecimal(h.realizedPnl))} USDT`}</div><div>กำไร/ขาดทุนยังไม่รับรู้ {h.unrealized === null ? 'N/A' : `${money(displayDecimal(h.unrealized))} USDT`}</div><div>ผลตอบแทนต้นทุน {h.unrealized!==null&&h.totalCost&&parseCryptoDecimal(h.totalCost).gt('0')?money(displayDecimal(serializeThb(parseCryptoDecimal(h.unrealized).div(h.totalCost).times('100')))):'N/A'}% · ไม่ใช่การเปลี่ยนแปลงราคาตลาด</div><div>สัดส่วนพอร์ต {money(allocation)}</div><div className="text-xs">Binance public · USDT · {quote?.kind==='TRADE'?'รายการซื้อขายต้นทาง':'snapshot ที่ดึงล่าสุด (ไม่มีเวลาซื้อขาย)'}<br/>เวลาต้นทาง: {quote?.observedAt??'N/A'}<br/>เวลารับ: {quote?.receivedAt??'N/A'} · ไม่มี feed/ไม่รองรับแสดง N/A</div></dl></article>
       })}</div><p className="mt-4 text-xs text-slate-500">ราคาผ่าน backend · เกิน 30 วินาทีถือว่าล้าสมัย · ไม่รวมยอดกับ THB</p></section>
       <div className="journal-crypto-editor"><section className={card}><h3 className="font-semibold">{editingTrade ? 'แก้ไขประวัติคริปโต' : 'บันทึกซื้อ/ขายในประวัติ'}</h3><form ref={tradeForm} aria-label="บันทึกคริปโต" className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={e => {
-        const entry = { ...(cryptoImage?{attachmentId:cryptoImage}:{}),side, quantity, price, fee, quoteCurrency: 'USDT', date: tradeDate }
+        const entry = { ...(!legacyTrade?(editingTrade?{cashSettlement:{accountId:tradeCashId,amountThb:cashAmount}}:tradeCash(cash.accounts,tradeCashId,cashAmount,tradeDate,tradeIncluded)):{}), ...(cryptoImage?{attachmentId:cryptoImage}:{}),side, quantity, price, fee, quoteCurrency: 'USDT', date: tradeDate }
         if (editingTrade) submit(e, `crypto/trades/${editingTrade}/corrections`, tradeCorrectionSchema, { action: 'replace', reason: correctionReason, entry })
         else submit(e, 'crypto/trades', tradeEntrySchema, { ...entry, portfolioId, asset })
       }}>
         <label className="auth-label">สินทรัพย์<input className={input} required maxLength={32} list="crypto-asset-catalog" value={asset} disabled={disabled || !portfolioId || !!editingTrade} onChange={e => setAsset(e.target.value)} /></label><datalist id="crypto-asset-catalog">{market.catalog?.filter(row=>row.available).map(row=><option key={row.asset} value={row.asset}>{row.symbol} · USDT</option>)}</datalist><label className="auth-label">ชนิดประวัติ<select className={input} value={side} disabled={disabled || !portfolioId} onChange={e => setSide(e.target.value as typeof side)}><option value="buy">ซื้อ</option><option value="sell">ขาย</option></select></label>
         <label className="auth-label">ปริมาณ<input className={input} inputMode="decimal" required value={quantity} disabled={disabled || !portfolioId} onChange={e => setQuantity(e.target.value)} /></label><label className="auth-label">ราคาต่อหน่วย USDT<input className={input} inputMode="decimal" required value={price} disabled={disabled || !portfolioId} onChange={e => setPrice(e.target.value)} /></label><label className="auth-label">ค่าธรรมเนียม USDT<input className={input} inputMode="decimal" required value={fee} disabled={disabled || !portfolioId} onChange={e => setFee(e.target.value)} /></label><label className="auth-label">วันที่ในประวัติ<input className={input} type="date" required value={tradeDate} disabled={disabled || !portfolioId} onChange={e => setTradeDate(e.target.value)} /></label>
+        <CashSettlementFields accounts={cash.accounts} accountId={tradeCashId} setAccountId={setTradeCashId} amount={cashAmount} setAmount={setCashAmount} side={side} disabled={disabled||!portfolioId} legacy={legacyTrade} legacyLabel={unlinkedLabel(legacyTradeOpening)} date={editingTrade?'':tradeDate} included={tradeIncluded} setIncluded={setTradeIncluded}/>
         {!demo&&<ReceiptAssist key={'crypto-'+receiptReset} kind="crypto" disabled={disabled} lock={setMediaLocked} expired={expired} onAttachment={setCryptoImage} onApply={f=>{if(f.asset!==undefined&&!editingTrade)setAsset(f.asset);if(f.side==='buy'||f.side==='sell')setSide(f.side);if(f.quantity!==undefined)setQuantity(f.quantity);if(f.price!==undefined)setPrice(f.price);if(f.fee!==undefined)setFee(f.fee);if(f.date!==undefined)setTradeDate(f.date)}}/>}
         {editingTrade && <label className="auth-label sm:col-span-2">เหตุผลการแก้ไข<input className={input} required maxLength={500} value={correctionReason} disabled={disabled} onChange={e => setCorrectionReason(e.target.value)} /></label>}
         <button disabled={disabled || !portfolioId || !!voiding} className="auth-primary sm:col-span-2">{editingTrade ? 'บันทึกการแก้ไข' : 'บันทึกประวัติ'}</button>
         {editingTrade && <button type="button" className="auth-secondary sm:col-span-2" disabled={disabled} onClick={cancelCorrection}>เลิกแก้ไข</button>}
-      </form></section><section className={card}><h3 className="font-semibold">สร้างพอร์ตแยก</h3><form aria-label="สร้างพอร์ต" className="mt-5 space-y-4" onSubmit={e => submit(e, 'crypto/portfolios', portfolioInputSchema, { name: portfolioName, quoteCurrency: 'USDT' })}><label className="auth-label">ชื่อพอร์ต<input className={input} required maxLength={100} value={portfolioName} disabled={disabled} onChange={e => setPortfolioName(e.target.value)} /></label><button className="auth-secondary w-full" disabled={disabled}>สร้างพอร์ต</button></form><p className="mt-6 text-sm leading-7 text-slate-500">ต้นทุนแยกต่อพอร์ตและสินทรัพย์ ค้นหา BTC, ETH, SOL, XRP, BNB, DOGE และ ADA จากรายชื่อที่ backend ยืนยันคู่ spot USDT แล้ว สินทรัพย์ไม่รองรับ/ถูกถอดยังเก็บประวัติไว้ แต่การประเมินเป็น N/A เริ่มถือครองเดิมด้วยประวัติซื้อและต้นทุนที่ทราบ ไม่หักเงินสดอัตโนมัติ</p></section></div>
-      <section className={`${card} journal-trade-history`}><h3 className="font-semibold">ประวัติของพอร์ต</h3><p className="mt-2 text-xs text-slate-500">การแก้ไขรักษาพอร์ตและสินทรัพย์เดิม เก็บต้นฉบับและคำนวณต้นทุนใหม่ทั้งประวัติ</p><div className="mt-4 space-y-3">{crypto?.trades.filter(t => t.portfolioId === portfolioId).map(t => <div key={t.id} className="flex flex-wrap justify-between gap-2 border-t border-slate-100 py-3 text-sm"><div><p className={`font-medium ${t.voidedAt ? 'text-slate-400 line-through' : ''}`}>{t.side === 'buy' ? 'ซื้อ' : 'ขาย'} {t.asset} · {t.date}</p><p className="mt-1 break-all text-slate-500">{money(t.quantity)} @ {money(displayDecimal(t.price))} USDT · fee {money(t.fee)}</p>{t.voidedAt && <p className="mt-1 break-all text-xs text-rose-700">ยกเลิกแล้ว · ไม่รวมยอด · {t.voidReason}</p>}</div>{!demo&&<Attachment kind="crypto" id={t.id} disabled={disabled} lock={setMediaLocked} expired={expired}/>} {!t.voidedAt && <><div className="flex gap-3"><button type="button" className="text-teal-700" disabled={disabled} onClick={() => editTrade(t)}>แก้ไขประวัติ</button><button type="button" className="text-rose-700" disabled={disabled} onClick={() => { cancelCorrection(); setVoiding({ kind: 'crypto', id: t.id, label: `${t.side === 'buy' ? 'ซื้อ' : 'ขาย'} ${t.asset} ${money(t.quantity)}` }) }}>ยกเลิกประวัติ</button></div>{t.side === 'sell' && <p className="break-all">P&amp;L {money(t.realizedPnl ?? 'N/A')} USDT</p>}</>}</div>)}</div></section>
+      </form></section><section className={card}><h3 className="font-semibold">สร้างพอร์ตแยก</h3><form aria-label="สร้างพอร์ต" className="mt-5 space-y-4" onSubmit={e => submit(e, 'crypto/portfolios', portfolioInputSchema, { name: portfolioName, quoteCurrency: 'USDT' })}><label className="auth-label">ชื่อพอร์ต<input className={input} required maxLength={100} value={portfolioName} disabled={disabled} onChange={e => setPortfolioName(e.target.value)} /></label><button className="auth-secondary w-full" disabled={disabled}>สร้างพอร์ต</button></form><p className="mt-6 text-sm leading-7 text-slate-500">ต้นทุนแยกต่อพอร์ตและสินทรัพย์ ค้นหา BTC, ETH, SOL, XRP, BNB, DOGE และ ADA จากรายชื่อที่ backend ยืนยันคู่ spot USDT แล้ว สินทรัพย์ไม่รองรับ/ถูกถอดยังเก็บประวัติไว้ แต่การประเมินเป็น N/A รายการซื้อขายใหม่ปรับเงินสดตามเงินบาทจริงที่กรอก</p></section></div>
+      <section className={`${card} journal-trade-history`}><h3 className="font-semibold">ประวัติของพอร์ต</h3><p className="mt-2 text-xs text-slate-500">การแก้ไขรักษาพอร์ตและสินทรัพย์เดิม เก็บต้นฉบับและคำนวณต้นทุนใหม่ทั้งประวัติ</p><div className="mt-4 space-y-3">{crypto?.trades.filter(t => t.portfolioId === portfolioId).map(t => <div key={t.id} className="flex flex-wrap justify-between gap-2 border-t border-slate-100 py-3 text-sm"><div><p className={`font-medium ${t.voidedAt ? 'text-slate-400 line-through' : ''}`}>{t.side === 'buy' ? 'ซื้อ' : 'ขาย'} {t.asset} · {t.date}</p><p className="mt-1 break-all text-slate-500">{money(t.quantity)} @ {money(displayDecimal(t.price))} USDT · fee {money(t.fee)}</p><p className="mt-1 text-xs">{t.cashSettlement?`${cash.accounts.find(a=>a.id===t.cashSettlement!.accountId)?.name??'เงินสด'} · ${money(displayDecimal(t.cashSettlement.amountThb))} THB`:unlinkedLabel(t.inOpeningBalance)}</p>{t.voidedAt && <p className="mt-1 break-all text-xs text-rose-700">ยกเลิกแล้ว · ไม่รวมยอด · {t.voidReason}</p>}</div>{!demo&&<Attachment kind="crypto" id={t.id} disabled={disabled} lock={setMediaLocked} expired={expired}/>} {!t.voidedAt && <><div className="flex gap-3"><button type="button" className="text-teal-700" disabled={disabled} onClick={() => editTrade(t)}>แก้ไขประวัติ</button><button type="button" className="text-rose-700" disabled={disabled} onClick={() => { cancelCorrection(); setVoiding({ kind: 'crypto', id: t.id, label: `${t.side === 'buy' ? 'ซื้อ' : 'ขาย'} ${t.asset} ${money(t.quantity)}` }) }}>ยกเลิกประวัติ</button></div>{t.side === 'sell' && <p className="break-all">P&amp;L {money(t.realizedPnl ?? 'N/A')} USDT</p>}</>}</div>)}</div></section>
     </div>}
     {section === 'stocks' && <StockPrices mediaEnabled={!demo} expired={expired} lock={setBackupLocked} blocked={authBusy} refreshRevision={refreshRevision}/>}
     {section === 'backup' && <Backup lock={setBackupLocked} expired={expired} restored={async () => { await load() }} />}

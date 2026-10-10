@@ -1,0 +1,30 @@
+{
+  "at": "2026-10-09T14:22:21.740Z",
+  "signup": 200,
+  "write_before": 200,
+  "request": {
+    "wrongPassword": 401,
+    "accepted": 200,
+    "status": "REQUESTED"
+  },
+  "after_old_session": {
+    "finance": 401
+  },
+  "sign_in_after_request": {
+    "signIn": 200,
+    "sessionBody": null,
+    "write": [
+      403,
+      "ACCOUNT_NOT_READY"
+    ]
+  },
+  "re_register_same_email": {
+    "status": 422,
+    "code": "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL"
+  },
+  "status_lookup": {
+    "status": "REQUESTED",
+    "caseId": "f6056418-6499-42a5-981b-d510e54fbde6",
+    "requestedAt": "2026-10-09T14:21:59.552Z"
+  }
+}

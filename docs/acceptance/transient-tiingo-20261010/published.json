@@ -1,0 +1,25 @@
+{
+  "commit": "afbc953e0ad5a2424e7aa29df8e4be2f539b3bd4",
+  "previousCommit": "b665285f9b6782dd1ee21fa682c3ee74cef45867",
+  "branch": "codex/student-real-use",
+  "files": [
+    "apps/api/prisma/migrations/20261010010000_transient_personal_prices/migration.sql",
+    "apps/api/src/server.ts",
+    "apps/api/src/tracker/market-keys.ts",
+    "apps/api/src/tracker/routes.ts",
+    "apps/api/src/tracker/service.ts",
+    "apps/api/src/tracker/transient-closes.ts",
+    "apps/web/src/tracker/Assets.tsx",
+    "apps/web/src/tracker/MarketKey.tsx",
+    "apps/web/src/tracker/StockHoldings.tsx",
+    "apps/web/src/tracker/useOwnedWrite.ts",
+    "apps/web/src/tracker/useValuationReferences.ts",
+    "packages/contracts/src/index.ts"
+  ],
+  "secretScan": {
+    "status": "PASS",
+    "scanned": 14,
+    "found": 0
+  },
+  "rootRepositoryCommitted": false
+}

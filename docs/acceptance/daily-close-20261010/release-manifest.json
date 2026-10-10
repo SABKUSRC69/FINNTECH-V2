@@ -1,0 +1,90 @@
+{
+  "previousCommit": "edc96845b1d44696c1ec12595da0e8a896a32e46",
+  "files": [
+    {
+      "path": "packages/contracts/src/index.ts",
+      "sha256": "09a092dd8b4e61ea6c5826cc8b09a7dcd2dfc8c8b02fa6f208fa88fc83db2a31",
+      "previousSha256": "81fd76b73503a3fbd6f2de2c65593e4ddc31b3ae3a1fb76901fae04c58ec8572"
+    },
+    {
+      "path": "packages/finance/src/index.ts",
+      "sha256": "33f4c26e760a5bda1e38a11c2a53628c3b38cd2e99f7a24a4e69f9c6c2c878ed",
+      "previousSha256": "74577648529d34038f189951ad05531c1dc8581442fcd7c68f4e4c90654f2755"
+    },
+    {
+      "path": "packages/finance/src/analytics.ts",
+      "sha256": "015b7735e6897b4fd4b4734c3539700632017b4809b693a58af3615876fc20c2",
+      "previousSha256": "ba65f27c06efa0bf470c0a0fa6d45a986c718526341547f14c0b44d7fe4d3e1e"
+    },
+    {
+      "path": "packages/finance/src/market-calendar.ts",
+      "sha256": "de53a564117d0b9b01dc8a518b23dab8d12997512634b2c3e701a306daefa7c8",
+      "previousSha256": null
+    },
+    {
+      "path": "apps/api/prisma/schema.prisma",
+      "sha256": "03360d4bf584c0a9f30bb3616114866b4439f916a6968e193a596673cfae8449",
+      "previousSha256": "75b23f6b89dd6165530d98d377f1d119b4ff2f394068ae2d82d11b1adfcd18d1"
+    },
+    {
+      "path": "apps/api/prisma/migrations/20261010000000_daily_close_prices/migration.sql",
+      "sha256": "87354a698387421c14a9ec556b41115879c295c9a4b6821b4dc579e962fb4400",
+      "previousSha256": null
+    },
+    {
+      "path": "apps/api/src/app.ts",
+      "sha256": "904af71b214258ce65cb51ba2541125a0b89d5109e71ab25935ab0e2bf3b5b62",
+      "previousSha256": "4165f724e1569adb7807949982128db39451ed9a4b052956a6a9ff289645c6d0"
+    },
+    {
+      "path": "apps/api/src/server.ts",
+      "sha256": "9347b3e4459a083387bc7eb0d6ce84313778afd6a3eb23cd9da39e92c6de2692",
+      "previousSha256": "be964bc203d0508bedcd33f57ea1d394afc4a901c8b78a2e912d0e090347438e"
+    },
+    {
+      "path": "apps/api/src/tracker/routes.ts",
+      "sha256": "f6b0cb7f39e062b54f20c83743c7d53b16bdad94d1ea7b6fbf21c9113130ef81",
+      "previousSha256": "1543259a1bea8ceb09013d22c3a7908df63ceb1535c99787e9748b7aec47bda6"
+    },
+    {
+      "path": "apps/api/src/tracker/daily-close.ts",
+      "sha256": "cd8bffa67244fdadc95c832887492d2903733502864f1a70a311be2fb3763ec1",
+      "previousSha256": null
+    },
+    {
+      "path": "apps/api/src/tracker/market-keys.ts",
+      "sha256": "5980c1fd3e3b70d8672698dabd1ce6fc62f01ecc201462fa1d419fb82a37559a",
+      "previousSha256": null
+    },
+    {
+      "path": "apps/web/src/tracker/Assets.tsx",
+      "sha256": "4b1243da82259ca0dfa923ca283aebdfe7b3daf748476b4110529dea58a6c952",
+      "previousSha256": "52ef85993f98eef454984912ab76707653db25d87abe7da0f6a3a13b1c30b2d3"
+    },
+    {
+      "path": "apps/web/src/tracker/StockHoldings.tsx",
+      "sha256": "3b44f0c0ba552ba074c36eaa4f3ae486864e017eb5cbb4490f691bc3fe643015",
+      "previousSha256": "6e1f577f783910aff19a1f4111f901706415f1bba7898cef1e7376e4cff80d66"
+    },
+    {
+      "path": "apps/web/src/tracker/valuationPolicy.ts",
+      "sha256": "f7aff452c734d07e0e10340ee7b8e0a7a434b97bf86ded59773b3460050e4273",
+      "previousSha256": "7ab884ab74ebe9768b7638f1c5c2436e5796d78738ddb04945054bcf993f8301"
+    },
+    {
+      "path": "apps/web/src/tracker/client.ts",
+      "sha256": "f1fd5ea4b5bd36b8cb39c3ac02a99a4e3e65e5e7388fcf122f67e28e43d7299b",
+      "previousSha256": "97301bbb697daec2a0cd33708aeec390ab6283b90322dc005f93b83a89b993e5"
+    },
+    {
+      "path": "apps/web/src/tracker/MarketKey.tsx",
+      "sha256": "a966226ecce676e510efd9165187cd91a34a21d48bde0d3ecd50828ca8c48b36",
+      "previousSha256": null
+    },
+    {
+      "path": "apps/web/src/tracker/Account.tsx",
+      "sha256": "b88a9e67f30dded5c19825d95024806276cf7d8ca726a67318ee96b9d1f6c52a",
+      "previousSha256": "45391fd33233b0ac95eac2fcf7456ae1fecd5ba4894322736774ed9161041f55"
+    }
+  ]
+}

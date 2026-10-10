@@ -87,6 +87,10 @@ export async function submitAuth(action: AuthAction, input: { email?: string; pa
   }
   if (response.status === 429) throw new AuthRequestError('ทำรายการถี่เกินไป กรุณารอสักครู่แล้วลองอีกครั้ง')
   if (response.status >= 500) throw new AuthRequestError('ระบบยังไม่พร้อม กรุณาตรวจสอบสถานะก่อนลองอีกครั้ง', true)
+  const code = response.body && typeof response.body === 'object' && 'error' in response.body && response.body.error && typeof response.body.error === 'object' && 'code' in response.body.error ? response.body.error.code : undefined
+  if (response.status === 403 && action === 'sign-in' && code === 'ACCOUNT_DELETION_PENDING') {
+    throw new AuthRequestError('บัญชีนี้มีคำขอลบบัญชีอยู่ระหว่างดำเนินการ จึงเข้าสู่ระบบไม่ได้ ดูสถานะได้ด้วยรหัสคำขอที่บันทึกไว้ตอนขอลบ')
+  }
   if (response.status === 403) throw new AuthRequestError('คำขอถูกปฏิเสธ กรุณาเปิดหน้าเว็บใหม่แล้วลองอีกครั้ง')
   if (action === 'sign-in') throw new AuthRequestError('อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาลองอีกครั้ง')
   if (action === 'sign-up') throw new AuthRequestError('สมัครบัญชีไม่สำเร็จ หากเคยสมัครแล้ว กรุณาเข้าสู่ระบบ')

@@ -1,0 +1,42 @@
+{
+  "commit": "41d2985ea872e244d369073120ac51461f06b608",
+  "previousCommit": "8058bb7b1d480600035c44f2021f69270cf11a0a",
+  "branch": "codex/student-real-use",
+  "pushExit": 0,
+  "files": [
+    "apps/api/src/app.ts",
+    "apps/api/src/auth/real.ts",
+    "apps/api/src/auth/runtime.ts",
+    "apps/api/src/server.ts",
+    "apps/api/src/tracker/backup.ts",
+    "apps/api/src/tracker/crypto-stream.ts",
+    "apps/api/src/tracker/replay-persist.ts",
+    "apps/api/src/tracker/routes.ts",
+    "apps/api/src/tracker/service.ts",
+    "apps/api/src/tracker/stock-ledger.ts",
+    "apps/web/src/auth/client.ts",
+    "apps/web/src/tracker/Assets.tsx",
+    "apps/web/src/tracker/Backup.tsx",
+    "apps/web/src/tracker/Dashboard.tsx",
+    "apps/web/src/tracker/client.ts",
+    "apps/web/src/tracker/valuationPolicy.ts",
+    "packages/contracts/src/index.ts"
+  ],
+  "assets": [
+    {
+      "file": "index-BDYv7HwH.js",
+      "sha256": "6bf3a3c6413807405007bd26d9d1a7704462ab6643a675d4ad23debc25298d68"
+    },
+    {
+      "file": "index-C6G3rOc3.css",
+      "sha256": "df60f3f754a0df18f526467d192755a851ae1e73ca97b751ba2d524fa4b0bc4d"
+    }
+  ],
+  "secretScan": {
+    "status": "PASS",
+    "scanned": 19,
+    "knownSecretValuesChecked": 6,
+    "found": 0
+  },
+  "ownerWorkingRepositoryCommitted": false
+}

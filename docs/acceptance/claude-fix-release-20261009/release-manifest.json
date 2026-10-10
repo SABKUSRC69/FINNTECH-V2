@@ -1,0 +1,107 @@
+{
+  "previousCommit": "8058bb7b1d480600035c44f2021f69270cf11a0a",
+  "files": [
+    {
+      "path": "apps/api/src/app.ts",
+      "sha256": "e93ff5b2d11fe7ac598562c6387c9aa312b763013bcf27e0b4d3c735e56d9556",
+      "baselineSha256": "b1710bb1a10d1b1c536227ea09f0e048ab54dd70e90867d3d5ea3e389f876264",
+      "bytes": 12226
+    },
+    {
+      "path": "apps/api/src/server.ts",
+      "sha256": "65ec253b5986ed3bf1d0c500bac38c4b5056f69b70e017420409a4bc902df633",
+      "baselineSha256": "15180eebac759d4b510adfcbe5ff3f1105950685e9bf23558f424d2d63172bf1",
+      "bytes": 4909
+    },
+    {
+      "path": "apps/api/src/auth/runtime.ts",
+      "sha256": "1411fc65c5ddb7a9afdba58efb6cb78acd39ddb7f2ce3c49d5c0048e4615d186",
+      "baselineSha256": "74e016f2448ff2a929a6960b2ff415ca068afd8f31bbf540663444823917a933",
+      "bytes": 5464
+    },
+    {
+      "path": "apps/api/src/auth/real.ts",
+      "sha256": "8c3701f1ab29de698fed0f30660724a9907a5a1280054be9ac8de8ef0f7cdeba",
+      "baselineSha256": "344b7253c72b46d1cd48c598fc01746cf7cc35c9394b6974a8dc37253156f82f",
+      "bytes": 6380
+    },
+    {
+      "path": "apps/api/src/tracker/service.ts",
+      "sha256": "f3cce83e8b387df6615c581783e67e67b1be7eca863632b886b14aa4bce0b71c",
+      "baselineSha256": "5aa245ece41b4cd37d0827782eb6ae9b3199448d000a0b5bc846136848d5ec1b",
+      "bytes": 19291
+    },
+    {
+      "path": "apps/api/src/tracker/stock-ledger.ts",
+      "sha256": "33738a3118102c3e2307cb58f2841170e65fb712ad08e349199cc8c67f6923ce",
+      "baselineSha256": "734b68c607287206348334888722708a038ddb85e9053fa7aa9521048ef588cb",
+      "bytes": 5750
+    },
+    {
+      "path": "apps/api/src/tracker/replay-persist.ts",
+      "sha256": "17deccc6752762f4004f8909e230a807930a37e66602aa5dd6643f6ff772bbe6",
+      "baselineSha256": null,
+      "bytes": 1864
+    },
+    {
+      "path": "apps/api/src/tracker/backup.ts",
+      "sha256": "7fc6948ad24e5019d75dfa981f429d80c54c562f681a3aa5241cc8900529314c",
+      "baselineSha256": "51a3f583dc798dd4872fb12fc181925451d3f1102dcebd43d46f08ab78bd31e1",
+      "bytes": 19800
+    },
+    {
+      "path": "apps/api/src/tracker/crypto-stream.ts",
+      "sha256": "979889991b84bae105c62eb904784da2c37e2dd971f7b07e9103a02e2a11a0b6",
+      "baselineSha256": "b3dce0637c391b4f12f05db232cbbcbc903d9acc76e2e233ad6d155854daec80",
+      "bytes": 6710
+    },
+    {
+      "path": "apps/api/src/tracker/routes.ts",
+      "sha256": "6c52f7005db1b0082af6677012fb54235f616f8493243a7e4d867f271e99c378",
+      "baselineSha256": "6c212a95b0f45aad0b8d037a42768ed70e947bf514c4b13901dbdc604fc267cb",
+      "bytes": 8837
+    },
+    {
+      "path": "apps/web/src/tracker/Dashboard.tsx",
+      "sha256": "19dd6c134c944300cdfaa6fb0b1c8c6677f9e094e992bbed0b367d76afb90e53",
+      "baselineSha256": "640f10842ba0a52a3ccf5cfe3b3ad5eb3b63b074f566573b17c73e9b13e5d925",
+      "bytes": 41229
+    },
+    {
+      "path": "apps/web/src/tracker/Assets.tsx",
+      "sha256": "62818a4a4729fcdc746fe20dde857272afdbf424044a7a8e0edd1f8cd485caa3",
+      "baselineSha256": "4f979492b1046bb0bd7b5992ed2a20fc5e5fbdc7bd86556b04e460c3ddf25304",
+      "bytes": 19991
+    },
+    {
+      "path": "apps/web/src/tracker/valuationPolicy.ts",
+      "sha256": "664ca6f2228ba9bc20df67d2c68d33acaa49f11fe3a4fdb287e1f4afbae1ffaa",
+      "baselineSha256": "085254cccf694b61dea8bd363c1b460eb41d030b950039bf3fbe4e561ef8c54a",
+      "bytes": 2114
+    },
+    {
+      "path": "apps/web/src/tracker/client.ts",
+      "sha256": "b9fea20064ec2429f58d8c7f6017921816e2ca38bec0881c22ac807efc0ebc16",
+      "baselineSha256": "f974f43e02e531c7b6fbbbf762fa33ab11f455d9662e4890aae8938d86fdb760",
+      "bytes": 6409
+    },
+    {
+      "path": "apps/web/src/tracker/Backup.tsx",
+      "sha256": "7eab10625aa6c50d6a73f4e86350592d15c93eaaf48c5a5a3d000871399debff",
+      "baselineSha256": "01cad8f609c3947b7dafbd99057b03b9d71a0d08577d27a8c6ed44b91bb2a2af",
+      "bytes": 13402
+    },
+    {
+      "path": "apps/web/src/auth/client.ts",
+      "sha256": "4c90910ad420ad8d3e85ed686a15c8301a83a126c03b8b0d31018468a03a1399",
+      "baselineSha256": "d054fbeeb1630b0ce1fcfd0311a4e2260d3b82be7378ed309f375337a060a04f",
+      "bytes": 9825
+    },
+    {
+      "path": "packages/contracts/src/index.ts",
+      "sha256": "0e4767695e96ffb77c072c9a4f9f7de99b736a50c998f21915f9a013b43829f6",
+      "baselineSha256": "6ff89b26abbc81d75edf5fda87b0c679d56edce8123bd265378ba8157a1c2375",
+      "bytes": 23768
+    }
+  ]
+}

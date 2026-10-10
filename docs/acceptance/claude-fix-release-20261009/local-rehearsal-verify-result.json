@@ -1,0 +1,78 @@
+{
+  "at": "2026-10-09T15:14:27.720Z",
+  "origin": "http://127.0.0.1:4199",
+  "checks": {
+    "release-assets": {
+      "pass": true,
+      "js": "index-BDYv7HwH.js",
+      "css": "index-C6G3rOc3.css"
+    },
+    "ready": {
+      "pass": true
+    },
+    "F1-simultaneous-sign-in": {
+      "pass": true,
+      "statuses": [
+        200,
+        200,
+        200,
+        200,
+        200
+      ]
+    },
+    "F3-new-account-has-no-categories": {
+      "pass": true,
+      "categories": 0
+    },
+    "F3-starter-categories": {
+      "pass": true,
+      "created": 13,
+      "categories": 13
+    },
+    "save-and-reload": {
+      "pass": true,
+      "expense": "250.75"
+    },
+    "stock-reference-valuation": {
+      "pass": true,
+      "totalThb": "3500",
+      "withoutPrice": null
+    },
+    "owner-isolation": {
+      "pass": true
+    },
+    "F2-per-owner-write-budget": {
+      "pass": true,
+      "ownerB": {
+        "200": 120,
+        "429": 1
+      },
+      "otherOwner": 200
+    },
+    "cleanup-p0": {
+      "pass": true,
+      "status": 200
+    },
+    "cleanup-p1": {
+      "pass": true,
+      "status": 200
+    },
+    "cleanup-p2": {
+      "pass": true,
+      "status": 200
+    },
+    "cleanup-p3": {
+      "pass": false,
+      "status": 401
+    },
+    "cleanup-p4": {
+      "pass": false,
+      "status": 401
+    },
+    "F10-deletion-pending-after-password-only": {
+      "pass": true,
+      "wrong": 401,
+      "right": 403
+    }
+  }
+}

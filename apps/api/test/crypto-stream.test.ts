@@ -12,6 +12,17 @@ class Socket extends EventEmitter{
 }
 afterEach(()=>{vi.useRealTimers();vi.restoreAllMocks()})
 describe('one bounded crypto upstream and truthful observation cache',()=>{
+ it('keeps REST snapshots for other symbols when one ticker fails, and still backs off',async()=>{
+  vi.useFakeTimers();vi.setSystemTime(start)
+  const request=vi.fn(async(url:unknown)=>{const text=String(url);if(text.includes('exchangeInfo'))return Response.json(metadata());if(text.includes('symbol=BTCUSDT'))return new Response('{}',{status:500});return Response.json({symbol:new URL(text).searchParams.get('symbol'),price:'1.5'})})
+  const relay=new MarketRelay(request as typeof fetch,Date.now,()=>new Socket() as unknown as WebSocket)
+  await relay.snapshot();await settle()
+  const snapshot=await relay.snapshot()
+  expect(snapshot.quotes.filter(q=>q.price!==null).map(q=>q.asset)).toEqual(CRYPTO_CATALOG.filter(a=>a!=='BTC'))
+  expect(snapshot.quotes.find(q=>q.asset==='BTC')!.price).toBeNull()
+  const calls=request.mock.calls.length;await relay.snapshot();await settle()
+  expect(request.mock.calls.length).toBe(calls)
+ })
  it('validates seven quote/base/status pairs, coalesces REST and subscribes only approved USDT markets',async()=>{
   vi.useFakeTimers();vi.setSystemTime(start)
   const data=metadata();data.symbols[3]!.quoteAsset='USD';data.symbols[4]!.status='BREAK';data.symbols[6]!.baseAsset='BTC'

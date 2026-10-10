@@ -1,0 +1,86 @@
+{
+  "container": {
+    "cpus": 0.1,
+    "memory": "512m",
+    "image": "finntech-audit-fix:local (Dockerfile.real)"
+  },
+  "database": "local PostgreSQL 18 (no Neon network latency)",
+  "results": [
+    {
+      "size": 2000,
+      "rows": {
+        "transactions": 1200,
+        "crypto": 602,
+        "stock": 189
+      },
+      "firstReplayAfterSeed": {
+        "crypto": [
+          200,
+          4478
+        ],
+        "stock": [
+          200,
+          1099
+        ]
+      },
+      "appendTradeMs": [
+        200,
+        2202
+      ],
+      "export": [
+        200,
+        11596,
+        598157
+      ],
+      "preview": [
+        200,
+        8895
+      ],
+      "restore": [
+        200,
+        26495,
+        "ok"
+      ],
+      "worstHealthDuringRestoreMs": 7685,
+      "peakContainerMiB": 227
+    },
+    {
+      "size": 5000,
+      "rows": {
+        "transactions": 3000,
+        "crypto": 1502,
+        "stock": 489
+      },
+      "firstReplayAfterSeed": {
+        "crypto": [
+          200,
+          2155
+        ],
+        "stock": [
+          200,
+          1300
+        ]
+      },
+      "appendTradeMs": [
+        200,
+        2502
+      ],
+      "export": [
+        200,
+        18899,
+        1499800
+      ],
+      "preview": [
+        200,
+        15884
+      ],
+      "restore": [
+        200,
+        46797,
+        "ok"
+      ],
+      "worstHealthDuringRestoreMs": 17303,
+      "peakContainerMiB": 285
+    }
+  ]
+}

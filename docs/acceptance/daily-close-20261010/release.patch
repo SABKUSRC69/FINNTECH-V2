@@ -1,0 +1,1046 @@
+diff --git a/apps/api/prisma/migrations/20261010000000_daily_close_prices/migration.sql b/apps/api/prisma/migrations/20261010000000_daily_close_prices/migration.sql
+new file mode 100644
+index 0000000..7878696
+--- /dev/null
++++ b/apps/api/prisma/migrations/20261010000000_daily_close_prices/migration.sql
+@@ -0,0 +1,35 @@
++BEGIN;
++-- End-of-day closes. scope='shared' rows come from a server key whose licence allows display to every
++-- account; scope=<owner uuid> rows were fetched with that owner's own personal key and are only ever
++-- read back for that owner. Owner rows cascade with the owner on an approved privacy purge.
++CREATE TABLE daily_close_prices (
++ id UUID PRIMARY KEY,
++ source VARCHAR(32) NOT NULL CHECK(length(source)>0),
++ scope VARCHAR(36) NOT NULL DEFAULT 'shared',
++ owner_id UUID REFERENCES tracker_users(id) ON DELETE CASCADE,
++ symbol VARCHAR(16) NOT NULL CHECK(symbol ~ '^[A-Z][A-Z0-9.-]{0,14}$'),
++ trading_date DATE NOT NULL CHECK(EXTRACT(ISODOW FROM trading_date) BETWEEN 1 AND 5),
++ close NUMERIC(38,18) NOT NULL CHECK(close>0 AND close<'1000000000'::numeric),
++ currency VARCHAR(3) NOT NULL CHECK(currency='USD'),
++ price_type VARCHAR(16) NOT NULL DEFAULT 'CLOSE' CHECK(price_type='CLOSE'),
++ fetched_at TIMESTAMPTZ(3) NOT NULL,
++ CHECK((scope='shared' AND owner_id IS NULL) OR (owner_id IS NOT NULL AND scope=owner_id::text)),
++ UNIQUE(source,scope,symbol,trading_date)
++);
++CREATE INDEX daily_close_prices_owner ON daily_close_prices(owner_id) WHERE owner_id IS NOT NULL;
++
++-- One personal market-data key per owner, AES-256-GCM encrypted by the server (AAD = owner id).
++-- Never exported in owner backups; removal clears the ciphertext instead of deleting the row.
++CREATE TABLE owner_market_keys (
++ owner_id UUID PRIMARY KEY REFERENCES tracker_users(id) ON DELETE CASCADE,
++ provider VARCHAR(16) NOT NULL CHECK(provider='TIINGO'),
++ ciphertext BYTEA CHECK(ciphertext IS NULL OR octet_length(ciphertext) BETWEEN 30 AND 512),
++ key_hint VARCHAR(4) CHECK(key_hint IS NULL OR key_hint ~ '^[A-Za-z0-9]{4}$'),
++ status VARCHAR(16) NOT NULL CHECK(status IN ('ACTIVE','REMOVED')),
++ personal_use_confirmed_at TIMESTAMPTZ(3) NOT NULL,
++ updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
++ version INTEGER NOT NULL DEFAULT 1 CHECK(version>0),
++ CHECK((status='ACTIVE' AND ciphertext IS NOT NULL AND key_hint IS NOT NULL) OR (status='REMOVED' AND ciphertext IS NULL AND key_hint IS NULL))
++);
++CREATE TRIGGER preserve_owner BEFORE UPDATE ON owner_market_keys FOR EACH ROW EXECUTE FUNCTION tracker_preserve_owner();
++COMMIT;
+diff --git a/apps/api/prisma/schema.prisma b/apps/api/prisma/schema.prisma
+index 72423f2..6f95ce9 100644
+--- a/apps/api/prisma/schema.prisma
++++ b/apps/api/prisma/schema.prisma
+@@ -79,6 +79,8 @@ model TrackerUser {
+   stockHoldings StockHolding[]
+   manualAssets ManualAsset[]
+   valuationReferences ValuationReference[]
++  dailyClosePrices DailyClosePrice[]
++  marketKey OwnerMarketKey?
+   mediaObjects MediaObject[]
+   mediaAttachments MediaAttachment[]
+   profile OwnerProfile?
+@@ -102,6 +104,39 @@ model ValuationReference {
+   @@map("valuation_references")
+ }
+ 
++// Shared market data (not owner data): one unadjusted official close per provider/symbol/session.
++// Excluded from owner backups and purges; every owner's valuation reads the same row.
++model DailyClosePrice {
++  id String @id @default(uuid()) @db.Uuid
++  source String @db.VarChar(32)
++  scope String @default("shared") @db.VarChar(36)
++  ownerId String? @map("owner_id") @db.Uuid
++  owner TrackerUser? @relation(fields: [ownerId], references: [id], onDelete: Cascade)
++  symbol String @db.VarChar(16)
++  tradingDate DateTime @map("trading_date") @db.Date
++  close Decimal @db.Decimal(38,18)
++  currency String @db.VarChar(3)
++  priceType String @default("CLOSE") @map("price_type") @db.VarChar(16)
++  fetchedAt DateTime @map("fetched_at") @db.Timestamptz(3)
++  @@unique([source, scope, symbol, tradingDate])
++  @@index([ownerId], map: "daily_close_prices_owner")
++  @@map("daily_close_prices")
++}
++
++// A personal market-data key, encrypted by the server; used only for its owner's own valuation.
++model OwnerMarketKey {
++  ownerId String @id @map("owner_id") @db.Uuid
++  owner TrackerUser @relation(fields: [ownerId], references: [id], onDelete: Cascade)
++  provider String @db.VarChar(16)
++  ciphertext Bytes?
++  keyHint String? @map("key_hint") @db.VarChar(4)
++  status String @db.VarChar(16)
++  personalUseConfirmedAt DateTime @map("personal_use_confirmed_at") @db.Timestamptz(3)
++  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(3)
++  version Int @default(1)
++  @@map("owner_market_keys")
++}
++
+ // Private immutable normalized bytes. Only unlinked staging objects expire.
+ model MediaObject {
+   id String @id @default(uuid()) @db.Uuid
+diff --git a/apps/api/src/app.ts b/apps/api/src/app.ts
+index 8215094..f0507c4 100644
+--- a/apps/api/src/app.ts
++++ b/apps/api/src/app.ts
+@@ -11,6 +11,8 @@ import type { MarketRelay } from './tracker/market.js'
+ import type { StockMarketRelay } from './tracker/stocks.js'
+ import type { ReferenceFxRelay } from './tracker/fx.js'
+ import type { DailyUsdRelay } from './tracker/usd-fx.js'
++import type { DailyCloseRelay } from './tracker/daily-close.js'
++import type { PersonalDailyCloses } from './tracker/market-keys.js'
+ import type { RecoveryService } from './auth/recovery.js'
+ import { authSubjectAllowed } from './auth/authorization.js'
+ import { betaFor, createBetaAuthGuard } from './auth/beta.js'
+@@ -31,6 +33,8 @@ export interface ApiAppOptions {
+   stocks?: StockMarketRelay
+   fx?: ReferenceFxRelay
+   usdFx?: DailyUsdRelay
++  dailyCloses?: DailyCloseRelay
++  personalCloses?: PersonalDailyCloses
+   recovery?: RecoveryService
+ }
+ 
+@@ -143,7 +147,7 @@ export function createApp(options: ApiAppOptions = {}): Express {
+   if (options.auth && options.database) {
+     app.use('/api/account/deletion', express.json({limit:'16kb'}), deletionRouter(options.auth,options.database))
+     app.use('/api/media', mediaRouter(options.auth,options.database))
+-    app.use('/api', trackerRouter(options.auth, options.database, options.market, options.stocks, options.fx, options.usdFx))
++    app.use('/api', trackerRouter(options.auth, options.database, options.market, options.stocks, options.fx, options.usdFx, options.dailyCloses, options.personalCloses))
+   }
+   app.use(express.json({ limit: '64kb' }))
+ 
+diff --git a/apps/api/src/server.ts b/apps/api/src/server.ts
+index 97c5c62..2ee9634 100644
+--- a/apps/api/src/server.ts
++++ b/apps/api/src/server.ts
+@@ -6,6 +6,8 @@ import { createTrackerDatabase } from './persistence/database.js'
+ import { MarketRelay } from './tracker/market.js'
+ import { attachMarketStream } from './tracker/stream.js'
+ import { readStockConfiguration, StockMarketRelay, type StockConfiguration } from './tracker/stocks.js'
++import { DAILY_CLOSE_ENV, DailyCloseRelay, MemoryDailyCloseStore, TiingoDailyProvider, prismaDailyCloseStore, readDailyCloseConfiguration, type DailyCloseConfiguration } from './tracker/daily-close.js'
++import { MarketKeyCipher, PersonalDailyCloses } from './tracker/market-keys.js'
+ import { RecoveryService } from './auth/recovery.js'
+ import { LocalSyntheticSink, drainDelivery, drainRealDelivery } from './auth/delivery.js'
+ import { BrevoDeliverySink } from './auth/mail.js'
+@@ -45,8 +47,21 @@ const stockOwnerId = stockConfiguration?.ownerId
+ const stocks = new StockMarketRelay(stockConfiguration, fetch, Date.now, undefined,
+   database && stockOwnerId ? async () => (await database.stockHolding.findMany({ where: { ownerId: stockOwnerId, quantity: { gt: 0 } }, select: { symbol: true } })).map(row => row.symbol) : null)
+ if (stockConfiguration) console.info(`Alpaca IEX configured for one owner; ${stockConfiguration.symbols.length} watchlist symbols (feed=iex)`)
++// Daily closes: same pattern — misconfiguration disables only this feed, and only variable names are logged.
++let dailyConfiguration: DailyCloseConfiguration | null = null
++try { dailyConfiguration = readDailyCloseConfiguration(process.env) }
++catch {
++  const present = DAILY_CLOSE_ENV.filter(name => process.env[name])
++  console.error(`Daily close feed disabled: incomplete or invalid configuration (present: ${present.join(', ') || 'none'}); values withheld`)
++}
++const dailyCloses = new DailyCloseRelay(dailyConfiguration, dailyConfiguration ? new TiingoDailyProvider(dailyConfiguration.token) : null,
++  database ? prismaDailyCloseStore(database) : new MemoryDailyCloseStore())
++if (dailyConfiguration) console.info(`Daily close feed configured (Tiingo EOD, ${dailyConfiguration.license === 'REDISTRIBUTION' ? 'all signed-in accounts' : 'one owner only'}; ${dailyConfiguration.symbols.length} symbols; budget ${dailyConfiguration.maxRequestsPerHour}/h ${dailyConfiguration.maxRequestsPerDay}/day)`)
+ market.start()
+-const app = createApp({ market, stocks, ...(recovery ? { recovery } : {}), ...(webDistDir ? { webDistDir } : {}), ...(database && auth ? { database, auth } : {}) })
++dailyCloses.start()
++// Personal keys are encrypted with a key derived from the existing auth secret (no extra secret).
++const personalCloses = database && authConfig ? new PersonalDailyCloses(database, new MarketKeyCipher(authConfig.secret)) : undefined
++const app = createApp({ market, stocks, dailyCloses, ...(personalCloses ? { personalCloses } : {}), ...(recovery ? { recovery } : {}), ...(webDistDir ? { webDistDir } : {}), ...(database && auth ? { database, auth } : {}) })
+ const server = app.listen(port, host, () => {
+   console.log(`FINNTECH tracker API listening at http://${host}:${port}`)
+   // One authentication probe per process start so operators can confirm entitlement in the logs; the
+@@ -93,6 +108,7 @@ function shutdown(signal: string): void {
+   stopMarket?.()
+   if (deliveryTimer) clearInterval(deliveryTimer)
+   stocks.stop()
++  dailyCloses.stop()
+   market.stop()
+   console.log(`Received ${signal}; stopping tracker API`)
+   server.close(() => { void (database?.$disconnect() ?? Promise.resolve()).finally(() => process.exit(0)) })
+diff --git a/apps/api/src/tracker/daily-close.ts b/apps/api/src/tracker/daily-close.ts
+new file mode 100644
+index 0000000..4a721da
+--- /dev/null
++++ b/apps/api/src/tracker/daily-close.ts
+@@ -0,0 +1,242 @@
++import { z } from 'zod'
++import { STOCK_INSTRUMENTS, resourceIdSchema, type DailyCloseQuote, type DailyCloseSnapshot } from '@finntech/contracts'
++import { assessDailyClose, latestSessionAt, newYorkClock, parseCryptoDecimal, serializeCrypto, CLOSE_CORRECTIONS_MINUTES, CLOSE_PUBLISHED_MINUTES } from '@finntech/finance'
++import type { PrismaClient } from '../generated/prisma/client.js'
++import { cryptoForApi } from '../persistence/decimal.js'
++import { parseProviderJson } from './provider-json.js'
++
++/**
++ * Shared end-of-day closes for US stocks/ETFs. One server-side cache serves every permitted account:
++ * provider requests depend on the symbol catalog and trading calendar, never on the number of users.
++ * The provider key stays in server memory (Authorization header only, never a URL, log or response).
++ */
++export type DailyCloseProblem = NonNullable<DailyCloseQuote['problem']>
++export class DailyCloseProviderError extends Error {
++  constructor(readonly problem: DailyCloseProblem, readonly retryAfterMs: number | null = null) { super(problem) }
++}
++export interface ProviderClose { tradingDate: string; close: string }
++export interface DailyCloseProvider {
++  readonly source: string
++  readonly attribution: { label: string; url: string }
++  /** Latest unadjusted close at or after `since` (YYYY-MM-DD). */
++  latestClose(symbol: string, since: string): Promise<ProviderClose>
++}
++export interface DailyCloseRecord { source: string; symbol: string; tradingDate: string; close: string; currency: 'USD'; fetchedAt: string }
++export interface DailyCloseStore {
++  latest(source: string, symbols: readonly string[]): Promise<DailyCloseRecord[]>
++  save(record: DailyCloseRecord): Promise<void>
++}
++
++export type DailyCloseLicense = 'REDISTRIBUTION' | 'PERSONAL'
++export interface DailyCloseConfiguration {
++  provider: 'tiingo'; token: string; license: DailyCloseLicense; ownerId: string | null
++  symbols: readonly string[]; maxRequestsPerHour: number; maxRequestsPerDay: number
++}
++const LICENSES: Record<string, DailyCloseLicense> = { 'redistribution-confirmed': 'REDISTRIBUTION', 'personal-owner-only': 'PERSONAL' }
++export const DAILY_CLOSE_ENV = ['DAILY_CLOSE_PROVIDER', 'TIINGO_API_TOKEN', 'DAILY_CLOSE_LICENSE', 'DAILY_CLOSE_OWNER_ID', 'DAILY_CLOSE_MAX_REQUESTS_PER_HOUR', 'DAILY_CLOSE_MAX_REQUESTS_PER_DAY'] as const
++/**
++ * The operator states which licence the key carries. A free/personal ("internal use") plan may only
++ * serve its own holder (PERSONAL + owner id); every account needs a plan with display/redistribution
++ * rights (REDISTRIBUTION). Absent variables disable the feed; partial or invalid ones throw.
++ */
++export function readDailyCloseConfiguration(env: NodeJS.ProcessEnv): DailyCloseConfiguration | null {
++  if (DAILY_CLOSE_ENV.every(name => !env[name])) return null
++  const fail = () => { throw new Error('Daily close requires DAILY_CLOSE_PROVIDER=tiingo, a server-only TIINGO_API_TOKEN and a declared DAILY_CLOSE_LICENSE; values withheld') }
++  const token = env.TIINGO_API_TOKEN ?? ''
++  const license = LICENSES[env.DAILY_CLOSE_LICENSE ?? '']
++  if (env.DAILY_CLOSE_PROVIDER !== 'tiingo' || !/^[A-Za-z0-9]{20,128}$/.test(token) || !license) fail()
++  const ownerId = license === 'PERSONAL' ? resourceIdSchema.safeParse(env.DAILY_CLOSE_OWNER_ID) : null
++  if (ownerId && !ownerId.success) fail()
++  if (license === 'REDISTRIBUTION' && env.DAILY_CLOSE_OWNER_ID) fail()
++  const bound = (value: string | undefined, fallback: number) => {
++    if (value === undefined || value === '') return fallback
++    const n = Number(value); if (!Number.isInteger(n) || n < 1 || n > 100000) fail(); return n
++  }
++  // Defaults stay under Tiingo's published free limits (50/hour, 1,000/day); paid plans may raise them.
++  return { provider: 'tiingo', token, license: license!, ownerId: ownerId?.success ? ownerId.data : null,
++    symbols: STOCK_INSTRUMENTS.map(row => row.symbol), maxRequestsPerHour: bound(env.DAILY_CLOSE_MAX_REQUESTS_PER_HOUR, 40), maxRequestsPerDay: bound(env.DAILY_CLOSE_MAX_REQUESTS_PER_DAY, 500) }
++}
++
++async function boundedText(response: Response, limit: number): Promise<string> {
++  if (Number(response.headers.get('content-length') ?? 0) > limit || !response.body) throw new DailyCloseProviderError('INVALID_DATA')
++  const reader = response.body.getReader(), decoder = new TextDecoder(); let size = 0, text = ''
++  try {
++    for (;;) { const part = await reader.read(); if (part.done) break; size += part.value.length; if (size > limit) throw new DailyCloseProviderError('INVALID_DATA'); text += decoder.decode(part.value, { stream: true }) }
++    return text + decoder.decode()
++  } finally { await reader.cancel().catch(() => {}) }
++}
++const tiingoRows = z.array(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}(T00:00:00(\.000)?(Z|\+00:00))?$/), close: z.string() }).passthrough()).max(64)
++/** Tiingo end-of-day: `close` is the raw (unadjusted) close; adjClose is deliberately ignored. */
++export class TiingoDailyProvider implements DailyCloseProvider {
++  readonly source = 'Tiingo EOD'
++  readonly attribution = { label: 'Tiingo', url: 'https://www.tiingo.com' }
++  constructor(private readonly token: string, private readonly fetcher: typeof fetch = fetch) {}
++  async latestClose(symbol: string, since: string): Promise<ProviderClose> {
++    const url = `https://api.tiingo.com/tiingo/daily/${encodeURIComponent(symbol.toLowerCase())}/prices?startDate=${since}`
++    let response: Response
++    try { response = await this.fetcher(url, { redirect: 'error', signal: AbortSignal.timeout(8000), headers: { Accept: 'application/json', Authorization: `Token ${this.token}` } }) }
++    catch { throw new DailyCloseProviderError('UNAVAILABLE') }
++    if (response.status === 401 || response.status === 403) throw new DailyCloseProviderError('AUTH_FAILED')
++    if (response.status === 429) { const s = Number(response.headers.get('retry-after')); throw new DailyCloseProviderError('RATE_LIMITED', Number.isFinite(s) && s > 0 ? Math.min(s, 86400) * 1000 : null) }
++    if (response.status === 404) throw new DailyCloseProviderError('NOT_FOUND')
++    if (!response.ok) throw new DailyCloseProviderError('UNAVAILABLE')
++    let body: unknown
++    try { body = parseProviderJson(await boundedText(response, 65536)) } catch (error) { throw error instanceof DailyCloseProviderError ? error : new DailyCloseProviderError('INVALID_DATA') }
++    // Tiingo reports some errors as 200 + {"detail": "..."}.
++    if (!Array.isArray(body)) {
++      const detail = typeof body === 'object' && body && 'detail' in body ? String((body as { detail: unknown }).detail) : ''
++      throw new DailyCloseProviderError(/not found/i.test(detail) ? 'NOT_FOUND' : /token|auth|permission/i.test(detail) ? 'AUTH_FAILED' : 'INVALID_DATA')
++    }
++    const rows = tiingoRows.safeParse(body)
++    if (!rows.success) throw new DailyCloseProviderError('INVALID_DATA')
++    if (!rows.data.length) throw new DailyCloseProviderError('NOT_YET_PUBLISHED')
++    const last = rows.data.reduce((a, b) => b.date > a.date ? b : a)
++    try {
++      const close = parseCryptoDecimal(last.close)
++      if (!close.gt('0') || !close.lt('1000000000')) throw Error()
++      return { tradingDate: last.date.slice(0, 10), close: serializeCrypto(close) }
++    } catch { throw new DailyCloseProviderError('INVALID_DATA') }
++  }
++}
++
++export class MemoryDailyCloseStore implements DailyCloseStore {
++  readonly rows: DailyCloseRecord[] = []
++  async latest(source: string, symbols: readonly string[]) {
++    return symbols.flatMap(symbol => this.rows.filter(r => r.source === source && r.symbol === symbol).sort((a, b) => b.tradingDate.localeCompare(a.tradingDate)).slice(0, 1))
++  }
++  async save(record: DailyCloseRecord) {
++    const i = this.rows.findIndex(r => r.source === record.source && r.symbol === record.symbol && r.tradingDate === record.tradingDate)
++    if (i >= 0) this.rows[i] = record; else this.rows.push(record)
++  }
++}
++/** owner=null: shared rows (server licence). owner id: rows fetched with that owner's own key, read back only for them. */
++export function prismaDailyCloseStore(db: PrismaClient, owner: string | null = null): DailyCloseStore {
++  const scope = owner ?? 'shared'
++  return {
++    async latest(source, symbols) {
++      const rows = await db.dailyClosePrice.findMany({ where: { source, scope, symbol: { in: [...symbols] } }, orderBy: [{ symbol: 'asc' }, { tradingDate: 'desc' }], distinct: ['symbol'] })
++      return rows.map(r => ({ source: r.source, symbol: r.symbol, tradingDate: r.tradingDate.toISOString().slice(0, 10), close: cryptoForApi(r.close), currency: 'USD' as const, fetchedAt: r.fetchedAt.toISOString() }))
++    },
++    async save(r) {
++      const tradingDate = new Date(r.tradingDate + 'T00:00:00.000Z'), fetchedAt = new Date(r.fetchedAt)
++      await db.dailyClosePrice.upsert({ where: { source_scope_symbol_tradingDate: { source: r.source, scope, symbol: r.symbol, tradingDate } },
++        update: { close: r.close, fetchedAt }, create: { source: r.source, scope, ownerId: owner, symbol: r.symbol, tradingDate, close: r.close, currency: r.currency, fetchedAt } })
++    },
++  }
++}
++
++const MINUTE = 60000, HOUR = 60 * MINUTE
++/** Not yet published at the expected time: try again in 30 minutes (until the provider catches up). */
++export const NOT_PUBLISHED_RETRY_MS = 30 * MINUTE
++const daysBefore = (date: string, days: number) => new Date(Date.parse(date + 'T00:00:00.000Z') - days * 86400000).toISOString().slice(0, 10)
++
++export class DailyCloseRelay {
++  private readonly records = new Map<string, DailyCloseRecord>()
++  private readonly problems = new Map<string, DailyCloseProblem | null>()
++  private readonly nextAttempt = new Map<string, number>()
++  private readonly failures = new Map<string, number>()
++  private readonly requests: number[] = []
++  private pausedUntil = 0
++  private loaded = false
++  private loading: Promise<void> | null = null
++  private flight: Promise<void> | null = null
++  private timer: ReturnType<typeof setInterval> | undefined
++  constructor(private readonly config: DailyCloseConfiguration | null, private readonly provider: DailyCloseProvider | null,
++    private readonly store: DailyCloseStore, private readonly clock: () => number = Date.now, private readonly log: (line: string) => void = line => console.info(line)) {}
++
++  get configured(): boolean { return !!this.config && !!this.provider }
++  allowsOwner(ownerId: string): boolean { return !!this.config && (this.config.license === 'REDISTRIBUTION' || this.config.ownerId === ownerId) }
++  /** Requests made in the last hour/day (for operators and tests; never includes symbols or keys). */
++  usage(): { lastHour: number; lastDay: number } { this.prune(); const now = this.clock(); return { lastHour: this.requests.filter(t => now - t < HOUR).length, lastDay: this.requests.length } }
++
++  async snapshotFor(ownerId: string): Promise<DailyCloseSnapshot> {
++    const now = this.clock(), expectedSession = latestSessionAt(now, CLOSE_PUBLISHED_MINUTES)
++    if (!this.config || !this.provider) return { provider: 'NOT_CONFIGURED', source: null, license: null, expectedSession, attribution: null, quotes: [] }
++    if (!this.allowsOwner(ownerId)) return { provider: 'NOT_LICENSED', source: this.provider.source, license: this.config.license, expectedSession, attribution: null, quotes: [] }
++    await this.load()
++    void this.refresh()
++    return { provider: 'READY', source: this.provider.source, license: this.config.license, expectedSession, attribution: this.provider.attribution,
++      quotes: this.config.symbols.map(symbol => this.quote(symbol, now)) }
++  }
++  private quote(symbol: string, now: number): DailyCloseQuote {
++    const record = this.records.get(symbol), problem = this.problems.get(symbol) ?? null
++    if (!record) return { symbol, currency: 'USD', priceType: 'CLOSE', close: null, tradingDate: null, fetchedAt: null, status: problem && problem !== 'NOT_YET_PUBLISHED' ? 'ERROR' : 'MISSING', problem }
++    const state = assessDailyClose(record.tradingDate, now).state
++    return { symbol, currency: 'USD', priceType: 'CLOSE', close: record.close, tradingDate: record.tradingDate, fetchedAt: record.fetchedAt, status: state === 'CURRENT' || state === 'DELAYED' ? state : 'STALE', problem }
++  }
++  private load(): Promise<void> {
++    if (this.loaded || !this.provider || !this.config) return Promise.resolve()
++    this.loading ??= this.store.latest(this.provider.source, this.config.symbols)
++      .then(rows => { for (const row of rows) if (!this.records.has(row.symbol) || this.records.get(row.symbol)!.tradingDate < row.tradingDate) this.records.set(row.symbol, row); this.loaded = true })
++      .catch(() => { this.log('Daily close store unavailable; using in-memory closes only (details withheld)') })
++      .finally(() => { this.loading = null })
++    return this.loading
++  }
++  /** One shared refresh at a time, however many accounts are reading. */
++  refresh(): Promise<void> {
++    if (!this.config || !this.provider) return Promise.resolve()
++    this.flight ??= this.run().finally(() => { this.flight = null })
++    return this.flight
++  }
++  start(intervalMs = 15 * MINUTE): void {
++    if (!this.configured || this.timer) return
++    void this.load().then(() => this.refresh())
++    this.timer = setInterval(() => { void this.refresh() }, intervalMs); this.timer.unref?.()
++  }
++  stop(): void { if (this.timer) clearInterval(this.timer); this.timer = undefined }
++
++  private due(symbol: string, now: number, expected: string): boolean {
++    if (now < (this.nextAttempt.get(symbol) ?? 0)) return false
++    const record = this.records.get(symbol)
++    if (!record || record.tradingDate < expected) return true
++    // Exactly one later refetch picks up exchange corrections published until ~20:00 New York.
++    const fetched = newYorkClock(Date.parse(record.fetchedAt)), clock = newYorkClock(now)
++    const fetchedBeforeCorrections = fetched.date < record.tradingDate || (fetched.date === record.tradingDate && fetched.minutes < CLOSE_CORRECTIONS_MINUTES)
++    const correctionsDone = clock.date > record.tradingDate || clock.minutes >= CLOSE_CORRECTIONS_MINUTES
++    return fetchedBeforeCorrections && correctionsDone
++  }
++  private prune(): void { const now = this.clock(); while (this.requests.length && now - this.requests[0]! >= 24 * HOUR) this.requests.shift() }
++  private takeBudget(): boolean {
++    this.prune(); const now = this.clock()
++    if (this.requests.length >= this.config!.maxRequestsPerDay || this.requests.filter(t => now - t < HOUR).length >= this.config!.maxRequestsPerHour) return false
++    this.requests.push(now); return true
++  }
++  private async run(): Promise<void> {
++    await this.load()
++    let updated = 0, session = ''
++    for (const symbol of this.config!.symbols) {
++      const now = this.clock(), expected = latestSessionAt(now, CLOSE_PUBLISHED_MINUTES); session = expected
++      if (now < this.pausedUntil) break
++      if (!this.due(symbol, now, expected)) continue
++      if (!this.takeBudget()) { this.problems.set(symbol, 'BUDGET_EXHAUSTED'); this.nextAttempt.set(symbol, now + 15 * MINUTE); continue }
++      try {
++        const result = await this.provider!.latestClose(symbol, daysBefore(expected, 14))
++        const at = this.clock(), assessment = assessDailyClose(result.tradingDate, at)
++        if (assessment.state === 'INVALID') throw new DailyCloseProviderError('INVALID_DATA')
++        const previous = this.records.get(symbol)
++        // Never replace a newer session with an older one; the same session may be corrected.
++        if (!previous || result.tradingDate >= previous.tradingDate) {
++          const record: DailyCloseRecord = { source: this.provider!.source, symbol, tradingDate: result.tradingDate, close: result.close, currency: 'USD', fetchedAt: new Date(at).toISOString() }
++          this.records.set(symbol, record); updated++
++          await this.store.save(record).catch(() => { this.log('Daily close could not be persisted; kept in memory (details withheld)') })
++        }
++        this.failures.set(symbol, 0)
++        const latest = this.records.get(symbol)!.tradingDate
++        if (latest < expected) { this.problems.set(symbol, 'NOT_YET_PUBLISHED'); this.nextAttempt.set(symbol, at + NOT_PUBLISHED_RETRY_MS) }
++        else { this.problems.set(symbol, null); this.nextAttempt.delete(symbol) }
++      } catch (error) {
++        const at = this.clock(), problem = error instanceof DailyCloseProviderError ? error.problem : 'UNAVAILABLE'
++        const n = (this.failures.get(symbol) ?? 0) + 1; this.failures.set(symbol, n); this.problems.set(symbol, problem)
++        this.nextAttempt.set(symbol, at + (problem === 'NOT_FOUND' ? 6 * HOUR : problem === 'NOT_YET_PUBLISHED' ? NOT_PUBLISHED_RETRY_MS : Math.min(HOUR, MINUTE * 2 ** Math.min(n - 1, 6))))
++        if (problem === 'AUTH_FAILED' || problem === 'RATE_LIMITED') {
++          const wait = problem === 'AUTH_FAILED' ? HOUR : (error as DailyCloseProviderError).retryAfterMs ?? 15 * MINUTE
++          this.pausedUntil = at + wait
++          for (const other of this.config!.symbols) if (other !== symbol && this.problems.get(other) == null) this.problems.set(other, problem)
++          this.log(`Daily close provider ${problem}; pausing ${Math.round(wait / MINUTE)} min (details withheld)`)
++          break
++        }
++      }
++    }
++    if (updated) this.log(`Daily close (${this.provider!.source}): stored ${updated} close(s); expected session ${session}`)
++  }
++}
+diff --git a/apps/api/src/tracker/market-keys.ts b/apps/api/src/tracker/market-keys.ts
+new file mode 100644
+index 0000000..fa0686a
+--- /dev/null
++++ b/apps/api/src/tracker/market-keys.ts
+@@ -0,0 +1,128 @@
++import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes } from 'node:crypto'
++import { STOCK_INSTRUMENTS, marketKeyInputSchema, marketKeyRemoveSchema, type DailyCloseSnapshot, type MarketKeyStatus } from '@finntech/contracts'
++import { latestSessionAt, CLOSE_PUBLISHED_MINUTES } from '@finntech/finance'
++import type { PrismaClient } from '../generated/prisma/client.js'
++import { ownedMutation, TrackerError } from './service.js'
++import { DailyCloseProviderError, DailyCloseRelay, TiingoDailyProvider, prismaDailyCloseStore, type DailyCloseProvider } from './daily-close.js'
++
++/**
++ * Bring-your-own-key end-of-day prices. Each account may store its own personal (free, internal-use)
++ * Tiingo token. Prices fetched with it are cached under that owner's scope and only ever returned to
++ * that owner, so no account sees data obtained with another person's licence.
++ *
++ * Encryption key: HKDF-SHA256 of the server's existing auth secret (no extra secret to provision).
++ * Rotating that secret makes stored tokens undecryptable; owners then simply enter their key again.
++ */
++const SALT = 'finntech-market-key-v1'
++export class MarketKeyCipher {
++  private readonly key: Buffer
++  private readonly mac: Buffer
++  constructor(secret: string) {
++    if (secret.length < 32) throw new Error('Market key encryption requires the server auth secret')
++    this.key = Buffer.from(hkdfSync('sha256', secret, SALT, 'tiingo-token-encryption', 32))
++    this.mac = Buffer.from(hkdfSync('sha256', secret, SALT, 'tiingo-token-request-digest', 32))
++  }
++  /** v1 | iv(12) | tag(16) | ciphertext; the owner id is authenticated data, so rows cannot be swapped. */
++  seal(ownerId: string, token: string): Buffer {
++    const iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', this.key, iv)
++    cipher.setAAD(Buffer.from(ownerId))
++    const body = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()])
++    return Buffer.concat([Buffer.from([1]), iv, cipher.getAuthTag(), body])
++  }
++  open(ownerId: string, sealed: Uint8Array): string {
++    const blob = Buffer.from(sealed)
++    if (blob.length < 30 || blob[0] !== 1) throw new Error('MARKET_KEY_FORMAT')
++    const decipher = createDecipheriv('aes-256-gcm', this.key, blob.subarray(1, 13))
++    decipher.setAAD(Buffer.from(ownerId)); decipher.setAuthTag(blob.subarray(13, 29))
++    return Buffer.concat([decipher.update(blob.subarray(29)), decipher.final()]).toString('utf8')
++  }
++  /** Keyed digest for idempotency hashing, so request receipts never hash the raw token. */
++  digest(ownerId: string, token: string): string { return createHmac('sha256', this.mac).update(ownerId + '\0' + token).digest('hex') }
++}
++
++const HOUR = 3600000
++const daysBefore = (date: string, days: number) => new Date(Date.parse(date + 'T00:00:00.000Z') - days * 86400000).toISOString().slice(0, 10)
++const symbols = STOCK_INSTRUMENTS.map(row => row.symbol)
++
++export class PersonalDailyCloses {
++  private readonly relays = new Map<string, { version: number; relay: DailyCloseRelay }>()
++  private readonly attempts = new Map<string, number[]>()
++  constructor(private readonly db: PrismaClient, private readonly cipher: MarketKeyCipher | null,
++    private readonly makeProvider: (token: string) => DailyCloseProvider = token => new TiingoDailyProvider(token),
++    private readonly clock: () => number = Date.now, private readonly log: (line: string) => void = line => console.info(line),
++    private readonly maxCachedOwners = 200) {}
++
++  get available(): boolean { return !!this.cipher }
++
++  async status(ownerId: string): Promise<MarketKeyStatus> {
++    const row = await this.db.ownerMarketKey.findUnique({ where: { ownerId } })
++    return { available: this.available, provider: 'TIINGO', status: row ? row.status as 'ACTIVE' | 'REMOVED' : 'NONE', hint: row?.keyHint ?? null,
++      updatedAt: row?.updatedAt.toISOString() ?? null, version: row?.version ?? null }
++  }
++
++  /** Verifies the key with one provider request before anything is stored. */
++  async save(ownerId: string, requestKey: unknown, body: unknown) {
++    if (!this.cipher) throw new TrackerError('MARKET_KEY_UNAVAILABLE', 422)
++    const input = marketKeyInputSchema.parse(body)
++    const now = this.clock(), recent = (this.attempts.get(ownerId) ?? []).filter(t => now - t < HOUR)
++    if (recent.length >= 10) throw new TrackerError('MARKET_KEY_ATTEMPTS', 429)
++    this.attempts.set(ownerId, [...recent, now])
++    try { await this.makeProvider(input.token).latestClose('SPY', daysBefore(latestSessionAt(now, CLOSE_PUBLISHED_MINUTES), 14)) }
++    catch (error) {
++      const problem = error instanceof DailyCloseProviderError ? error.problem : 'UNAVAILABLE'
++      // Only an explicit authentication refusal proves the key is wrong; anything else is "try later".
++      if (problem === 'AUTH_FAILED') throw new TrackerError('MARKET_KEY_REJECTED', 422)
++      if (problem !== 'NOT_YET_PUBLISHED') throw new TrackerError('MARKET_KEY_UNVERIFIED', 424)
++    }
++    const cipher = this.cipher
++    const receipt = await ownedMutation(this.db, ownerId, 'market.key', requestKey,
++      { provider: input.provider, token: cipher.digest(ownerId, input.token), confirmPersonalUse: true, expectedVersion: input.expectedVersion },
++      async tx => {
++        const old = await tx.ownerMarketKey.findUnique({ where: { ownerId } })
++        if ((old?.version ?? null) !== input.expectedVersion) throw new TrackerError('MARKET_KEY_CHANGED', 409)
++        const data = { provider: 'TIINGO', ciphertext: new Uint8Array(cipher.seal(ownerId, input.token)), keyHint: input.token.slice(-4), status: 'ACTIVE',
++          personalUseConfirmedAt: new Date(now), updatedAt: new Date(now) }
++        const row = old ? await tx.ownerMarketKey.update({ where: { ownerId }, data: { ...data, version: { increment: 1 } } })
++          : await tx.ownerMarketKey.create({ data: { ownerId, ...data } })
++        return { status: row.status, hint: row.keyHint, version: row.version }
++      })
++    this.relays.delete(ownerId)
++    return receipt
++  }
++
++  /** Clears the ciphertext and this owner's cached closes; ledger data is untouched. */
++  async remove(ownerId: string, requestKey: unknown, body: unknown) {
++    const input = marketKeyRemoveSchema.parse(body)
++    const receipt = await ownedMutation(this.db, ownerId, 'market.key.remove', requestKey, input, async tx => {
++      const old = await tx.ownerMarketKey.findUnique({ where: { ownerId } })
++      if (!old || old.version !== input.expectedVersion) throw new TrackerError('MARKET_KEY_CHANGED', 409)
++      const row = await tx.ownerMarketKey.update({ where: { ownerId }, data: { ciphertext: null, keyHint: null, status: 'REMOVED', updatedAt: new Date(this.clock()), version: { increment: 1 } } })
++      await tx.dailyClosePrice.deleteMany({ where: { ownerId } })
++      return { status: row.status, version: row.version }
++    })
++    this.relays.delete(ownerId)
++    return receipt
++  }
++
++  /** null = this owner has no active personal key (fall back to the shared feed). */
++  async snapshotFor(ownerId: string): Promise<DailyCloseSnapshot | null> {
++    if (!this.cipher) return null
++    const row = await this.db.ownerMarketKey.findUnique({ where: { ownerId } })
++    if (!row || row.status !== 'ACTIVE' || !row.ciphertext) { this.relays.delete(ownerId); return null }
++    let entry = this.relays.get(ownerId)
++    if (!entry || entry.version !== row.version) {
++      let token: string
++      try { token = this.cipher.open(ownerId, row.ciphertext) }
++      catch {
++        this.log('Personal market key could not be decrypted (server secret changed?); owner must re-enter it')
++        return { provider: 'READY', source: 'Tiingo EOD', license: 'PERSONAL', keySource: 'ACCOUNT', expectedSession: latestSessionAt(this.clock(), CLOSE_PUBLISHED_MINUTES), attribution: null,
++          quotes: symbols.map(symbol => ({ symbol, currency: 'USD' as const, priceType: 'CLOSE' as const, close: null, tradingDate: null, fetchedAt: null, status: 'ERROR' as const, problem: 'AUTH_FAILED' as const })) }
++      }
++      entry = { version: row.version, relay: new DailyCloseRelay({ provider: 'tiingo', token, license: 'PERSONAL', ownerId, symbols, maxRequestsPerHour: 40, maxRequestsPerDay: 500 },
++        this.makeProvider(token), prismaDailyCloseStore(this.db, ownerId), this.clock, this.log) }
++      if (this.relays.size >= this.maxCachedOwners) this.relays.delete(this.relays.keys().next().value!)
++    }
++    this.relays.delete(ownerId); this.relays.set(ownerId, entry) // most recently used last
++    return { ...await entry.relay.snapshotFor(ownerId), keySource: 'ACCOUNT' }
++  }
++}
+diff --git a/apps/api/src/tracker/routes.ts b/apps/api/src/tracker/routes.ts
+index 16dc513..6e36a58 100644
+--- a/apps/api/src/tracker/routes.ts
++++ b/apps/api/src/tracker/routes.ts
+@@ -14,8 +14,10 @@ import { createStockPortfolio,createStockTrade,correctStockTrade,stockOverview }
+ import { manualAssets,createManualAsset,updateManualAsset } from './manual-assets.js'
+ import { valuationReferences,saveValuationReference } from './valuation-references.js'
+ import { DailyUsdRelay } from './usd-fx.js'
++import { DailyCloseRelay, MemoryDailyCloseStore } from './daily-close.js'
++import type { PersonalDailyCloses } from './market-keys.js'
+ 
+-export function trackerRouter(auth: AuthRuntime, database: PrismaClient, market = new MarketRelay(), stocks?: StockMarketRelay, fx = new ReferenceFxRelay(), usd = new DailyUsdRelay()): Router {
++export function trackerRouter(auth: AuthRuntime, database: PrismaClient, market = new MarketRelay(), stocks?: StockMarketRelay, fx = new ReferenceFxRelay(), usd = new DailyUsdRelay(), daily = new DailyCloseRelay(null, null, new MemoryDailyCloseStore()), personal?: PersonalDailyCloses): Router {
+   const router = Router()
+   const normalJson = json({ limit: '64kb' }), backupJson = json({ limit: BACKUP_MAX_BYTES + 1024 })
+   router.use((req, _res, next) => {
+@@ -23,8 +25,8 @@ export function trackerRouter(auth: AuthRuntime, database: PrismaClient, market
+     const writable = req.method === 'POST' && ['/finance/categories', '/finance/categories/starter', '/finance/transactions', '/finance/budgets', '/crypto/portfolios', '/crypto/trades', '/backup/preview', '/backup/restore', '/cash'].includes(req.path)
+     const rename = req.method === 'PATCH' && /^\/finance\/categories\/[^/]+$/.test(req.path)
+     const correction = req.method === 'POST' && /^\/(finance\/transactions|crypto\/trades)\/[^/]+\/corrections$/.test(req.path)
+-    const assetRead=req.method==='GET'&&['/stocks','/assets/manual','/valuation/references'].includes(req.path)
+-    const assetWrite=req.method==='POST'&&['/stocks/portfolios','/stocks/trades','/assets/manual','/valuation/references'].includes(req.path)
++    const assetRead=req.method==='GET'&&['/stocks','/assets/manual','/valuation/references','/market-key'].includes(req.path)
++    const assetWrite=req.method==='POST'&&['/stocks/portfolios','/stocks/trades','/assets/manual','/valuation/references','/market-key','/market-key/remove'].includes(req.path)
+     const stockCorrection=req.method==='POST'&&/^\/stocks\/trades\/[^/]+\/corrections$/.test(req.path)
+     const manualUpdate=req.method==='PATCH'&&/^\/assets\/manual\/[^/]+$/.test(req.path)
+     if (readable || writable || rename || correction || assetRead||assetWrite||stockCorrection||manualUpdate||(req.method === 'PATCH' && /^\/cash\/[^/]+$/.test(req.path))) next()
+@@ -51,7 +53,12 @@ export function trackerRouter(auth: AuthRuntime, database: PrismaClient, market
+   router.get('/cash', async (_req, res) => { res.json(await cashOverview(database, (res.locals.owner as OwnerContext).ownerId)) })
+   router.get('/stocks',async(_req,res)=>{res.json(await stockOverview(database,(res.locals.owner as OwnerContext).ownerId))})
+   router.get('/assets/manual',async(_req,res)=>{res.json(await manualAssets(database,(res.locals.owner as OwnerContext).ownerId))})
+-  router.get('/valuation/references',async(_req,res)=>{res.json({references:await valuationReferences(database,(res.locals.owner as OwnerContext).ownerId),usdThb:usd.snapshot()})})
++  // Shared daily closes are filtered per account by the provider licence, never by client input.
++  router.get('/valuation/references',async(_req,res)=>{const owner=(res.locals.owner as OwnerContext).ownerId;res.json({references:await valuationReferences(database,owner),usdThb:usd.snapshot(),dailyCloses:(await personal?.snapshotFor(owner))??await daily.snapshotFor(owner)})})
++  // Personal provider key: write-only. Responses carry only status and the last four characters.
++  router.get('/market-key',async(_req,res)=>{const owner=(res.locals.owner as OwnerContext).ownerId;res.json(personal?await personal.status(owner):{available:false,provider:'TIINGO',status:'NONE',hint:null,updatedAt:null,version:null})})
++  router.post('/market-key',async(req,res)=>{if(!personal)throw new TrackerError('MARKET_KEY_UNAVAILABLE',422);res.json(await personal.save((res.locals.owner as OwnerContext).ownerId,req.headers['idempotency-key'],req.body))})
++  router.post('/market-key/remove',async(req,res)=>{if(!personal)throw new TrackerError('MARKET_KEY_UNAVAILABLE',422);res.json(await personal.remove((res.locals.owner as OwnerContext).ownerId,req.headers['idempotency-key'],req.body))})
+   router.post('/valuation/references',async(req,res)=>{res.json(await saveValuationReference(database,(res.locals.owner as OwnerContext).ownerId,req.headers['idempotency-key'],req.body))})
+   router.post('/assets/manual',async(req,res)=>{res.json(await createManualAsset(database,(res.locals.owner as OwnerContext).ownerId,req.headers['idempotency-key'],req.body))})
+   router.patch('/assets/manual/:id',async(req,res)=>{res.json(await updateManualAsset(database,(res.locals.owner as OwnerContext).ownerId,req.params.id,req.headers['idempotency-key'],req.body))})
+diff --git a/apps/web/src/tracker/Account.tsx b/apps/web/src/tracker/Account.tsx
+index 56a898d..19e2bb6 100644
+--- a/apps/web/src/tracker/Account.tsx
++++ b/apps/web/src/tracker/Account.tsx
+@@ -1,5 +1,6 @@
+ import ProfileEditor from '../media/Profile'
+ import AccountDeletion from '../auth/AccountDeletion'
++import MarketKey from './MarketKey'
+ export default function Account({ name, locked, logout, backup, recovery = false, demo = false, freshDemo, real = false, deletionLock, expired }: {
+   name: string; locked: boolean; logout: () => void; backup: () => void; recovery?: boolean; demo?: boolean; freshDemo?: (() => void) | undefined; real?: boolean; deletionLock?:((value:boolean)=>void)|undefined; expired?:(()=>void)|undefined
+ }): JSX.Element {
+@@ -12,6 +13,7 @@ export default function Account({ name, locked, logout, backup, recovery = false
+       {demo && <><p className="mt-4 text-sm">DEMO — ข้อมูลทดลอง · ใช้ข้อมูลสมมติเท่านั้น พื้นที่หมดอายุตามเวลาที่เจ้าของกำหนด</p><button type="button" className="auth-secondary mt-4" disabled={locked} onClick={freshDemo}>ออกและเริ่มพื้นที่ทดลองใหม่</button><p className="mt-3 text-sm">ออกจาก session เดิมก่อนเริ่มใหม่ ข้อมูลเดิมยังเก็บอยู่และไม่ลบพื้นที่ของผู้อื่น</p></>}
+       <p className="mt-4 text-sm leading-7 text-slate-500">{real ? (recovery ? 'ยืนยันอีเมลแล้ว ข้อมูลอยู่ในบัญชีส่วนบุคคลและไม่หมดอายุเมื่อออกจากระบบ ใช้หน้าลืมรหัสผ่านเพื่อขอลิงก์ไปยังอีเมลบัญชี การ reset จะออกจาก sessions เดิมทั้งหมด' : 'บัญชีอีเมลและรหัสผ่าน — อีเมลยังไม่ยืนยัน ไม่มีบริการกู้รหัสผ่าน ข้อมูลอยู่ในบัญชีส่วนบุคคลและคงอยู่หลังออกจากระบบ เก็บรหัสผ่านและไฟล์ส่งออกไว้ในที่ปลอดภัย') : recovery ? 'บัญชีผ่านเงื่อนไขยืนยันอีเมลของ server แล้ว การกู้คืนเปิดเฉพาะพื้นที่ทดสอบสังเคราะห์นี้ ใช้หน้าลืมรหัสผ่านหลังออกจากระบบ ไม่ใช่อีเมล delivery จริง' : 'การกู้คืนบัญชีและยืนยันอีเมลยังไม่เปิดในรุ่นที่ตรวจ อย่าใช้รุ่นทดลองนี้เป็นพื้นที่เดียวสำหรับข้อมูลสำคัญ'}</p>
+     </div>
++    {!demo && deletionLock && expired && <MarketKey disabled={locked} lock={deletionLock} expired={expired}/>}
+     <div className="tracker-card rounded-2xl border border-slate-200 p-5 sm:p-6">
+       <h2 className="text-xl font-semibold">ดูแลข้อมูลของคุณ</h2>
+       <p className="mt-3 text-sm leading-7 text-slate-500">ไฟล์สำรอง JSON เก็บรายการการเงิน เงินสด และประวัติคริปโตที่บันทึกเอง ไม่รวมรูปโปรไฟล์ รูปแนบ บัญชีล็อกอินหรือการตั้งค่าระบบ ดาวน์โหลดรูปแยกจากแต่ละรายการ; กู้คืน JSON จะไม่มีรูปแนบ ไฟล์ไม่เข้ารหัสและอาจมีบันทึกช่วยจำส่วนตัว เก็บไว้ในที่ส่วนตัวและตรวจว่าไฟล์ถูกบันทึกจริง</p>
+diff --git a/apps/web/src/tracker/Assets.tsx b/apps/web/src/tracker/Assets.tsx
+index 410e46b..60d4fbb 100644
+--- a/apps/web/src/tracker/Assets.tsx
++++ b/apps/web/src/tracker/Assets.tsx
+@@ -1,8 +1,8 @@
+ import { useEffect, useRef, useState, type FormEvent } from 'react'
+ import { cashOverviewSchema, cashInputSchema, referenceRateSchema, stockOverviewSchema,manualAssetOverviewSchema,valuationReferenceInputSchema,type StockOverview,type ManualAssetOverview,type StockMarketSnapshot,type CashOverview, type CryptoOverview, type MarketSnapshot, type ReferenceRate } from '@finntech/contracts'
+-import { valueAssets,valueMixedAssets,valuePosition,parseCryptoDecimal } from '@finntech/finance'
++import { valueAssets,valueMixedAssets,valuePosition,parseCryptoDecimal,serializeThb,summarizeStockHoldings } from '@finntech/finance'
+ import { valuationOverviewSchema,type ValuationOverview } from '@finntech/contracts'
+-import {selectReference} from './valuationPolicy'
++import {selectReference,referenceDateLabel} from './valuationPolicy'
+ import ValuationReferences from './ValuationReferences'
+ import { displayDecimal, trackerRequest, TrackerRequestError } from './client'
+ import { isFreshCryptoQuote } from './marketFreshness'
+@@ -83,6 +83,9 @@ export default function Assets({ crypto, market, now, expired, lock }: { crypto:
+   const usdFx=selectReference('USDTHB',references,stockPrices,stockNow)
+   let mixed:ReturnType<typeof valueMixedAssets>|null=null
+   try{if(valued&&stocks&&manual)mixed=valueMixedAssets(valued,stocks.holdings,eligibleStocks,manual.assets,freshRate?rate!.rate:null,usdFx.value)}catch{/* Incomplete or unrepresentable aggregate remains N/A. */}
++  let stockSummary:ReturnType<typeof summarizeStockHoldings>|null=null,stockThb:string|null=null
++  try{if(stocks){stockSummary=summarizeStockHoldings(stocks.holdings,eligibleStocks);if(stockSummary.valueUsd!==null&&usdFx.value)stockThb=serializeThb(parseCryptoDecimal(stockSummary.valueUsd).times(usdFx.value))}}catch{/* Overflow or invalid data stays N/A. */}
++  const daily=references?.dailyCloses
+   const disabled = busy || !!pending ||manualLocked||referenceLocked||autoLocked||loading || !cash
+   const requestReference=(symbol:string)=>setReferenceTarget({symbol,request:Date.now()})
+   const display = (value: string | null | undefined) => value == null ? 'N/A' : money(displayDecimal(value))
+@@ -91,11 +94,18 @@ export default function Assets({ crypto, market, now, expired, lock }: { crypto:
+     <div className="journal-assets-summary"><div className="tracker-card tracker-balance-card rounded-2xl p-5"><p className="text-sm">สินทรัพย์รวมเทียบบาท · มูลค่าอ้างอิง</p><p className="mt-3 break-all text-3xl font-semibold tabular-nums" data-testid="assets-total">{!mixed && loading ? 'กำลังโหลด…' : <>{display(mixed?.totalThb)} <span className="text-sm">THB</span></>}</p><p className="mt-2 text-xs">{!mixed && loading ? 'กำลังโหลดยอดและราคาอ้างอิง' : mixed?.complete ? 'ครบตามสินทรัพย์ที่บันทึก · ประมาณการตามแหล่งและวันอ้างอิงด้านล่าง ไม่ใช่มูลค่าที่รับประกันซื้อขายได้' : 'ข้อมูลยังไม่ครบ · ราคา/อัตราไม่พร้อม หรือยอดเกินขอบเขต'}</p></div>
+       <div className="tracker-card rounded-2xl p-5"><p className="text-sm">เงินสดที่บันทึก</p><p className="mt-3 break-all text-2xl font-semibold">{display(valued?.cashThb)} THB</p>{!mixed?.complete && <p className="mt-2 break-all text-sm">ยอดที่ประเมินได้บางส่วน: {display(mixed?.knownThb)} THB · ไม่ใช่ยอดรวมทั้งหมด</p>}</div></div>
+     <section className="tracker-card rounded-2xl p-5 space-y-3"><h3 className="font-semibold">ยอดตามสกุล · ไม่ใช่ยอดที่บวกข้ามสกุลได้</h3><p className="break-all">เงินสดและสินทรัพย์ประเมินเอง THB: {display(mixed?.native.THB)} THB</p><p className="break-all">คริปโตและสินทรัพย์ประเมินเอง USDT: {display(mixed?.native.USDT)} USDT</p><p className="break-all">หุ้นและสินทรัพย์ประเมินเอง USD: {display(mixed?.native.USD)} USD</p><p className="break-all text-sm">USD ที่ประเมินได้บางส่วน: {display(mixed?.knownNative.USD)} USD · มูลค่าหุ้นคูณอัตรา USD/THB แยกจาก USDT/THB</p>
+-     {stocks?.holdings.map(row=>{const reference=selectedStocks.get(row.symbol)!,position=stockPosition(row.quantity,row.totalCost,reference.value),manualRecord=references?.references.find(r=>r.symbol===row.symbol&&r.enabled);return <article className="border-t pt-3 space-y-2 break-all" key={row.portfolioId+row.symbol} data-testid={`stock-row-${row.symbol}`}><p>{row.symbol} · {money(row.quantity)} หุ้น · ต้นทุน {display(row.totalCost)} USD</p><p>มูลค่าอ้างอิง {display(position.value)} USD · กำไร/ขาดทุนยังไม่รับรู้ {display(position.unrealized)} USD</p><p className="text-xs">ราคา {display(reference.value)} USD ต่อหุ้น · {reference.source} · {reference.state} · {reference.asOf?`เวลารายการ ${new Date(reference.asOf).toLocaleString('th-TH')}`:'ไม่มีวันอ้างอิง'}</p>
++     {stocks&&stocks.holdings.length>0&&<div className="border-t pt-3 space-y-1 break-all" data-testid="stock-summary"><h4 className="font-medium">หุ้น/ETF รวมทุกพอร์ต · USD</h4>
++      {stockSummary?.complete?<><p>มูลค่าตามราคาอ้างอิง {display(stockSummary.valueUsd)} USD{stockThb?<> ≈ {display(stockThb)} THB</>:null}</p><p>ต้นทุนคงเหลือ {display(stockSummary.costUsd)} USD · กำไร/ขาดทุนยังไม่รับรู้ {display(stockSummary.unrealizedUsd)} USD</p></>
++       :stockSummary?<><p role="status" data-testid="stock-missing">ยังขาดราคา: {stockSummary.missing.join(', ')} · ยอดหุ้นรวมยังไม่ครบ</p><p>มูลค่าที่ประเมินได้บางส่วน {display(stockSummary.knownValueUsd)} USD (ไม่รวม {stockSummary.missing.join(', ')}) · กำไร/ขาดทุนยังไม่รับรู้ของส่วนที่มีราคา {display(stockSummary.knownUnrealizedUsd)} USD จากต้นทุน {display(stockSummary.knownCostUsd)} USD</p><p>ต้นทุนคงเหลือทั้งหมด {display(stockSummary.costUsd)} USD · ไม่ใช้ต้นทุนแทนราคาตลาด</p></>:<p>N/A</p>}
++      <p className="text-xs" data-testid="daily-close-status">{daily?.provider==='READY'?<>ราคาปิดรายวันอัตโนมัติจาก {daily.source}{daily.keySource==='ACCOUNT'?' (key ส่วนตัวของคุณ)':''} · วันซื้อขายล่าสุดที่ควรเผยแพร่แล้ว {daily.expectedSession} (นิวยอร์ก) · เสาร์-อาทิตย์/วันหยุดใช้ราคาปิดของวันซื้อขายล่าสุด{daily.attribution&&<> · ข้อมูลโดย <a className="underline" href={daily.attribution.url} target="_blank" rel="noreferrer">{daily.attribution.label}</a></>}</>:daily?.provider==='NOT_LICENSED'?'ราคาปิดอัตโนมัติยังไม่เปิดให้บัญชีนี้ตามสิทธิ์ข้อมูลของผู้ให้บริการ · ตั้งราคาอ้างอิงเองได้':daily?.provider==='NOT_CONFIGURED'?'ยังไม่มีราคาปิดอัตโนมัติ · ใส่ key ฟรีของคุณเองได้ที่ เพิ่มเติม → บัญชีและดูแลข้อมูล หรือกรอกราคาเองด้านล่าง':null}</p></div>}
++     {stocks?.holdings.map(row=>{const reference=selectedStocks.get(row.symbol)!,position=stockPosition(row.quantity,row.totalCost,reference.value),manualRecord=references?.references.find(r=>r.symbol===row.symbol&&r.enabled);return <article className="border-t pt-3 space-y-2 break-all" key={row.portfolioId+row.symbol} data-testid={`stock-row-${row.symbol}`}><p>{row.symbol} · {money(row.quantity)} หุ้น · ต้นทุน {display(row.totalCost)} USD</p><p>มูลค่าอ้างอิง {display(position.value)} USD · กำไร/ขาดทุนยังไม่รับรู้ {display(position.unrealized)} USD</p><p className="text-xs">{reference.close?'ราคาปิด':'ราคา'} {display(reference.value)} USD ต่อหุ้น · {reference.source} · {reference.state} · {referenceDateLabel(reference)}</p>
++      {reference.close?.status==='DELAYED'&&<p className="text-xs" role="status">ยังไม่มีราคาปิดของวันที่ {reference.close.expectedSession} จึงใช้ราคาปิดวันที่ {reference.close.tradingDate}{reference.close.problem==='NOT_YET_PUBLISHED'?' · ระบบลองดึงใหม่ทุก 30 นาที':''}</p>}
++      {reference.lastKnownClose&&<p className="text-xs" role="status">ราคาปิดล่าสุดที่ทราบ {display(reference.lastKnownClose.price)} USD · วันที่ซื้อขาย {reference.lastKnownClose.tradingDate} · เก่าเกินเกณฑ์ · ไม่นับในยอดรวม</p>}
++      {reference.overriddenDaily&&manualRecord&&<div role="status" className="text-xs space-y-2"><p>มีราคาปิดอัตโนมัติ {display(reference.overriddenDaily.price)} USD (วันที่ {reference.overriddenDaily.tradingDate}) แต่ระบบใช้ราคาที่คุณกรอกเองอยู่</p>{!reference.overriddenLive&&<button type="button" className="auth-secondary" disabled={disabled} onClick={()=>automatic.submit('valuation/references',valuationReferenceInputSchema,{symbol:manualRecord.symbol,currency:manualRecord.currency,value:manualRecord.value,asOf:manualRecord.asOf,enabled:false,expectedVersion:manualRecord.version})}>กลับไปใช้ราคาปิดอัตโนมัติ {row.symbol}</button>}</div>}
+       {reference.state==='LIVE'&&<p className="text-xs" role="status">ราคาสดอัตโนมัติจาก Alpaca IEX (ตลาดเดียว ไม่ใช่ราคารวมทุกตลาด) · อัปเดตเองโดยไม่ต้องกรอก</p>}
+       {reference.lastKnown&&<p className="text-xs" role="status">ราคาล่าสุดที่ทราบ {display(reference.lastKnown.price)} USD · เวลารายการ {reference.lastKnown.observedAt?new Date(reference.lastKnown.observedAt).toLocaleString('th-TH'):'N/A'} · {reference.state==='CLOSED'?'ตลาดปิด':'ไม่สด'} · ไม่นับในยอดรวม</p>}
+       {reference.overriddenLive&&manualRecord&&<div role="status" className="text-xs space-y-2"><p>มีราคาสดจาก Alpaca {display(reference.overriddenLive.price)} USD แต่ระบบใช้ราคาที่คุณกรอกเองอยู่ จึงไม่นำราคาสดมาคิด</p><button type="button" className="auth-secondary" disabled={disabled} onClick={()=>automatic.submit('valuation/references',valuationReferenceInputSchema,{symbol:manualRecord.symbol,currency:manualRecord.currency,value:manualRecord.value,asOf:manualRecord.asOf,enabled:false,expectedVersion:manualRecord.version})}>กลับไปใช้ราคา Alpaca อัตโนมัติ {row.symbol}</button><p>ราคาที่กรอกไว้ยังเก็บอยู่ เปิดใช้อีกครั้งได้ภายหลัง</p></div>}
+-      {reference.value===null&&!parseCryptoDecimal(row.quantity).isZero()&&<p role="status">ขาดราคาอ้างอิง {row.symbol} จึงยังรวมมูลค่าหุ้นนี้ไม่ได้</p>}<button className="auth-secondary" disabled={disabled} onClick={()=>requestReference(row.symbol)}>{reference.state==='LIVE'?`กรอกราคาเองแทน ${row.symbol} (ไม่จำเป็น)`:`ตั้งราคาอ้างอิง ${row.symbol}`}</button></article>})}
++      {reference.value===null&&!parseCryptoDecimal(row.quantity).isZero()&&<p role="status">ขาดราคาอ้างอิง {row.symbol} จึงยังรวมมูลค่าหุ้นนี้ไม่ได้</p>}<button className="auth-secondary" disabled={disabled} onClick={()=>requestReference(row.symbol)}>{reference.state==='LIVE'||reference.state==='CLOSE'?`กรอกราคาเองแทน ${row.symbol} (ไม่จำเป็น)`:`ตั้งราคาอ้างอิง ${row.symbol}`}</button></article>})}
+      {automatic.message&&<p role="alert" className="text-sm">{automatic.message}</p>}{automatic.pending&&<button className="auth-primary" disabled={automatic.busy} onClick={automatic.retry}>ตรวจผลการกลับไปใช้ราคาอัตโนมัติด้วยคำขอเดิม</button>}
+      {stockMarket.access==='owner'&&stockPrices&&stockPrices.connection!=='STREAMING'&&stockPrices.connection!=='NOT_CONFIGURED'&&<p className="text-xs" role="status">สถานะ Alpaca IEX: {stockConnectionLabel(stockPrices.connection)}</p>}
+      {stockPrices?.excluded&&stockPrices.excluded.length>0&&<p className="text-xs" role="status">เกินเพดาน 30 หลักทรัพย์ของ Alpaca Basic จึงไม่ได้ติดตาม: {stockPrices.excluded.join(', ')} · ตั้งราคาอ้างอิงเองได้</p>}
+diff --git a/apps/web/src/tracker/MarketKey.tsx b/apps/web/src/tracker/MarketKey.tsx
+new file mode 100644
+index 0000000..09527f9
+--- /dev/null
++++ b/apps/web/src/tracker/MarketKey.tsx
+@@ -0,0 +1,62 @@
++import { useEffect, useState, type FormEvent } from 'react'
++import { marketKeyInputSchema, marketKeyRemoveSchema, marketKeyStatusSchema, type MarketKeyStatus } from '@finntech/contracts'
++import { trackerRequest, TrackerRequestError } from './client'
++import { useOwnedWrite } from './useOwnedWrite'
++
++/**
++ * The account's own Tiingo key for automatic daily closes. The key is write-only: it is sent once to
++ * this site's server, verified, stored encrypted and never shown again (only its last 4 characters).
++ */
++export default function MarketKey({ disabled, lock, expired }: { disabled: boolean; lock: (value: boolean) => void; expired: () => void }): JSX.Element {
++  const [status, setStatus] = useState<MarketKeyStatus | null>(null), [loadError, setLoadError] = useState(false)
++  const [token, setToken] = useState(''), [confirmed, setConfirmed] = useState(false), [editing, setEditing] = useState(false), [removing, setRemoving] = useState(false)
++  const [hint, setHint] = useState(''), [notice, setNotice] = useState('')
++  async function load(): Promise<void> {
++    try { setStatus(marketKeyStatusSchema.parse(await trackerRequest('market-key'))); setLoadError(false) }
++    catch (error) { setLoadError(true); if (error instanceof TrackerRequestError && error.expired) expired() }
++  }
++  const write = useOwnedWrite(lock, expired, load, (_value, path) => {
++    setToken(''); setConfirmed(false); setEditing(false); setRemoving(false)
++    setNotice(path === 'market-key' ? 'เชื่อมต่อแล้ว ราคาปิดจะขึ้นในหน้าสินทรัพย์รวมภายในประมาณ 1 นาที' : 'ลบ key แล้ว รายการซื้อขาย ต้นทุน และราคาที่กรอกเองยังอยู่ครบ')
++  })
++  useEffect(() => { void load() }, [])
++  const busy = disabled || write.busy || !!write.pending || !status
++  function submit(event: FormEvent): void {
++    event.preventDefault(); setHint('')
++    if (busy) return
++    const body = { provider: 'TIINGO', token: token.trim(), confirmPersonalUse: confirmed, expectedVersion: status?.version ?? null }
++    if (!/^[A-Za-z0-9]{20,128}$/.test(body.token)) { setHint('API Token ต้องเป็นตัวอักษรภาษาอังกฤษและตัวเลขอย่างน้อย 20 ตัว ไม่มีช่องว่าง'); return }
++    if (!confirmed) { setHint('ติ๊กยืนยันว่าเป็น key ส่วนตัวของคุณก่อน'); return }
++    write.submit('market-key', marketKeyInputSchema, body)
++  }
++  const active = status?.status === 'ACTIVE', showForm = status?.available && (!active || editing)
++  return <div className="tracker-card rounded-2xl border border-slate-200 p-5 sm:p-6" aria-label="ราคาปิดอัตโนมัติ (key ส่วนตัว)" role="region">
++    <h2 className="text-xl font-semibold">ราคาปิดอัตโนมัติ (key ส่วนตัว)</h2>
++    <p className="mt-3 text-sm leading-7 text-slate-500">ใช้ API Token ฟรีของคุณเองจาก Tiingo เพื่อให้ระบบดึงราคาปิดรายวันของหุ้น/ETF ที่คุณถือ ราคาที่ได้แสดงให้บัญชีนี้เท่านั้น ไม่ต้องกรอกราคาเองทุกวัน</p>
++    {!status && !loadError && <p className="mt-3 text-sm" role="status">กำลังโหลดสถานะ…</p>}
++    {loadError && <><p className="mt-3 text-sm" role="alert">โหลดสถานะ key ไม่สำเร็จ</p><button type="button" className="auth-secondary mt-2" onClick={() => { void load() }}>ลองโหลดอีกครั้ง</button></>}
++    {status && !status.available && <p className="mt-3 text-sm" role="status">server นี้ยังไม่เปิดให้ใส่ key · ยังกรอกราคาเองในหน้าสินทรัพย์รวมได้</p>}
++    {active && <div className="mt-4 space-y-2" data-testid="market-key-active">
++      <p className="font-medium">✅ เชื่อมต่อแล้ว · key ลงท้าย ••••{status.hint}</p>
++      <p className="text-xs text-slate-500">ตั้งค่าเมื่อ {status.updatedAt ? new Date(status.updatedAt).toLocaleString('th-TH') : 'N/A'} · ดูวันที่และสถานะราคาได้ในหน้าสินทรัพย์รวม</p>
++      {!editing && !removing && <div className="flex flex-wrap gap-3"><button type="button" className="auth-secondary" disabled={busy} onClick={() => { setEditing(true); write.setMessage('') }}>เปลี่ยน key</button><button type="button" className="auth-secondary" disabled={busy} onClick={() => { setRemoving(true); write.setMessage('') }}>ลบ key</button></div>}
++      {removing && <div className="space-y-2"><p className="text-sm">ลบ key และราคาปิดที่ดึงด้วย key นี้? รายการซื้อขาย ต้นทุน และราคาที่กรอกเองไม่ถูกลบ</p>
++        <div className="flex flex-wrap gap-3"><button type="button" className="auth-primary" disabled={busy} onClick={() => write.submit('market-key/remove', marketKeyRemoveSchema, { expectedVersion: status.version })}>ยืนยันลบ key</button><button type="button" className="auth-secondary" disabled={write.busy || !!write.pending} onClick={() => setRemoving(false)}>ยกเลิก</button></div></div>}
++    </div>}
++    {status?.status === 'REMOVED' && !editing && <p className="mt-3 text-sm">ยังไม่มี key ที่ใช้งาน (เคยลบแล้ว)</p>}
++    {showForm && <form aria-label="บันทึก key ราคาปิด" className="mt-4 space-y-4" onSubmit={submit}>
++      <ol className="list-decimal space-y-1 pl-5 text-sm leading-7">
++        <li>สมัครฟรีที่ <a className="underline" href="https://www.tiingo.com" target="_blank" rel="noreferrer">tiingo.com</a> (ไม่ต้องใช้บัตร) แล้วยืนยันอีเมล</li>
++        <li>เปิดเมนูบัญชีหัวข้อ API แล้วคัดลอก API Token</li>
++        <li>วางด้านล่าง แล้วกดบันทึกและทดสอบ</li>
++      </ol>
++      <label className="auth-label">API Token ของ Tiingo<input className="auth-input" type="password" autoComplete="off" spellCheck={false} maxLength={128} disabled={busy} value={token} onChange={event => setToken(event.target.value)} /></label>
++      <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={confirmed} disabled={busy} onChange={event => setConfirmed(event.target.checked)} /><span>ยืนยันว่าเป็น key ส่วนตัวของฉัน ใช้ดูพอร์ตของฉันเท่านั้น และไม่ได้รับ key นี้มาจากคนอื่น</span></label>
++      <p className="text-xs leading-6 text-slate-500">ห้ามส่ง key ทางแชทหรือให้ผู้อื่น · key ถูกเข้ารหัสฝั่ง server และจะไม่แสดงอีก (เห็นเฉพาะ 4 ตัวท้าย) · ระบบทดสอบ key ด้วยคำขอ 1 ครั้งก่อนบันทึก</p>
++      <div className="flex flex-wrap gap-3"><button className="auth-primary" disabled={busy}>{write.busy ? 'กำลังทดสอบ key…' : 'บันทึกและทดสอบ'}</button>{editing && <button type="button" className="auth-secondary" disabled={write.busy || !!write.pending} onClick={() => { setEditing(false); setToken(''); setConfirmed(false) }}>ยกเลิก</button>}</div>
++    </form>}
++    {hint && <p className="mt-3 text-sm" role="alert">{hint}</p>}
++    {write.message === 'บันทึกสำเร็จ' ? notice && <p className="mt-3 text-sm" role="status">{notice}</p> : write.message && <p className="mt-3 text-sm" role="alert">{write.message}</p>}
++    {write.pending && <div className="mt-3"><p className="text-sm">ยังไม่ทราบผล ตรวจผลด้วยคำขอเดิมก่อนเปลี่ยนหน้า</p><button type="button" className="auth-primary mt-2" disabled={write.busy} onClick={write.retry}>ตรวจผลด้วยคำขอเดิม</button></div>}
++  </div>
++}
+diff --git a/apps/web/src/tracker/StockHoldings.tsx b/apps/web/src/tracker/StockHoldings.tsx
+index 640ad70..ff24276 100644
+--- a/apps/web/src/tracker/StockHoldings.tsx
++++ b/apps/web/src/tracker/StockHoldings.tsx
+@@ -1,7 +1,7 @@
+ import ReceiptAssist from '../media/ReceiptAssist'
+ import Attachment from '../media/Attachment'
+ import { useEffect,useState,type FormEvent } from 'react'
+-import { STOCK_INSTRUMENTS,resourceIdSchema,stockOverviewSchema,stockPortfolioInputSchema,stockTradeEntrySchema,stockCorrectionSchema,type StockOverview,type StockMarketSnapshot } from '@finntech/contracts'
++import { STOCK_INSTRUMENTS,resourceIdSchema,stockOverviewSchema,stockPortfolioInputSchema,stockTradeEntrySchema,stockCorrectionSchema,type StockOverview,type StockMarketSnapshot,valuationOverviewSchema,type ValuationOverview } from '@finntech/contracts'
+ import { parseCryptoDecimal,serializeCrypto,serializeThb,valuePosition } from '@finntech/finance'
+ import { trackerRequest,TrackerRequestError,displayDecimal } from './client'
+ import { usePresentation } from '../presentation'
+@@ -9,21 +9,22 @@ import { useOwnedWrite } from './useOwnedWrite'
+ import ModalDialog from './ModalDialog'
+ import StockPortfolioValue from './StockPortfolioValue'
+ import StockQuote, {stockSymbols} from './StockQuote'
+-import { liveStockQuote } from './valuationPolicy'
++import { selectReference,referenceDateLabel } from './valuationPolicy'
+ const today=()=>new Date(Date.now()+7*3600000).toISOString().slice(0,10)
+ export default function StockHoldings({snapshot,now,lock,expired,blocked=false,refreshRevision=0,mediaEnabled=true}:{snapshot:StockMarketSnapshot|null;now:number;lock:(v:boolean)=>void;expired:()=>void;blocked?:boolean;refreshRevision?:number;mediaEnabled?:boolean}){
+- const {money}=usePresentation(),[data,setData]=useState<StockOverview|null>(null),[loading,setLoading]=useState(true),[loadError,setLoadError]=useState('')
++ const {money}=usePresentation(),[data,setData]=useState<StockOverview|null>(null),[references,setReferences]=useState<ValuationOverview|null>(null),[loading,setLoading]=useState(true),[loadError,setLoadError]=useState('')
+  const [attachmentId,setAttachmentId]=useState<string>(),[receiptReset,setReceiptReset]=useState(0)
+  const [portfolio,setPortfolio]=useState(''),[name,setName]=useState(''),[symbol,setSymbol]=useState('AAPL'),[side,setSide]=useState<'buy'|'sell'>('buy')
+  const [quantity,setQuantity]=useState(''),[price,setPrice]=useState(''),[fee,setFee]=useState('0'),[date,setDate]=useState(today()),[note,setNote]=useState('')
+  const [editing,setEditing]=useState<string|null>(null),[voiding,setVoiding]=useState<string|null>(null),[reason,setReason]=useState('')
+- async function load(){setLoading(true);try{const next=stockOverviewSchema.parse(await trackerRequest('stocks'));setData(next);setPortfolio(selected=>next.portfolios.some(row=>row.id===selected)?selected:next.portfolios[0]?.id??'');setLoadError('')}catch(e){setData(null);setLoadError('โหลดประวัติหุ้นไม่สำเร็จ');if(e instanceof TrackerRequestError&&e.expired)expired()}finally{setLoading(false)}}
++ async function load(){setLoading(true);try{const [raw,refs]=await Promise.all([trackerRequest('stocks'),trackerRequest('valuation/references').catch(()=>null)]);const next=stockOverviewSchema.parse(raw);const parsedRefs=valuationOverviewSchema.safeParse(refs);setReferences(parsedRefs.success?parsedRefs.data:null);setData(next);setPortfolio(selected=>next.portfolios.some(row=>row.id===selected)?selected:next.portfolios[0]?.id??'');setLoadError('')}catch(e){setData(null);setLoadError('โหลดประวัติหุ้นไม่สำเร็จ');if(e instanceof TrackerRequestError&&e.expired)expired()}finally{setLoading(false)}}
+  const write=useOwnedWrite(lock,expired,load,(value,path)=>{if(path.startsWith('stocks/trades')){setAttachmentId(undefined);setReceiptReset(v=>v+1)}cancel();setQuantity('');setPrice('');setNote('');setName('');if(path==='stocks/portfolios'&&value&&typeof value==='object'&&'id' in value){const id=resourceIdSchema.safeParse(value.id);if(id.success)setPortfolio(id.data)}});useEffect(()=>{void load()},[refreshRevision])
+  const disabled=blocked||loading||!data||write.busy||!!write.pending
+  const display=(v:string|null)=>v===null?'N/A':money(displayDecimal(v))
+  const rows=(data?.holdings??[]).filter(row=>row.portfolioId===portfolio).map(row=>{
+-  const q=snapshot?.quotes.find(q=>q.symbol===row.symbol),fresh=!!liveStockQuote(row.symbol,snapshot,now)
+-  try{return {...row,...valuePosition(row.quantity,row.totalCost,fresh?q!.price:null),reference:q??null,fresh:!!fresh}}catch{return {...row,averageCost:null,value:null,unrealized:null,returnPercent:null,reference:q??null,fresh:false}}
++  // Same policy as Assets: manual override, then live (key owner only), then the shared daily close.
++  const reference=selectReference(row.symbol,references,snapshot,now),fresh=reference.value!==null
++  try{return {...row,...valuePosition(row.quantity,row.totalCost,reference.value),reference,fresh}}catch{return {...row,averageCost:null,value:null,unrealized:null,returnPercent:null,reference,fresh:false}}
+  })
+  let total:string|null=null;try{if(portfolio&&rows.every(row=>row.value!==null))total=serializeCrypto(rows.reduce((sum,row)=>sum.plus(row.value!),parseCryptoDecimal('0')))}catch{/* Overflow stays unavailable. */}
+  let remainingCost:string|null=null,realized:string|null=null;try{if(portfolio){if(rows.every(row=>row.totalCost!==null))remainingCost=serializeCrypto(rows.reduce((sum,row)=>sum.plus(row.totalCost!),parseCryptoDecimal('0')));realized=serializeCrypto(rows.reduce((sum,row)=>sum.plus(row.realizedPnl),parseCryptoDecimal('0')))}}catch{/* Honest unavailable on overflow. */}
+@@ -34,10 +35,11 @@ export default function StockHoldings({snapshot,now,lock,expired,blocked=false,r
+   <section className="tracker-card rounded-2xl p-5"><h2 className="text-xl font-semibold">หุ้นและ ETF ที่คุณบันทึก · USD</h2><p className="mt-2 text-sm">ติดตามสิ่งที่ถืออยู่ภายนอก ไม่มีการส่งคำสั่งหรือหักเงินสด ไม่รองรับ split/dividend หรือ corporate actions อัตโนมัติ</p>
+    <label className="auth-label mt-4">พอร์ตหุ้น<select className="auth-input" value={portfolio} disabled={disabled||!!editing} onChange={e=>setPortfolio(e.target.value)}><option value="">เลือกพอร์ต</option>{data?.portfolios.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
+    {total !== null && <p className="mt-4 break-all">มูลค่าประเมินของพอร์ต: {display(total)} USD · ครบตามรายการที่บันทึก</p>}
++   {total === null && rows.some(row=>row.value!==null) && <p className="mt-4 break-all" role="status">ยังขาดราคา: {rows.filter(row=>row.value===null).map(row=>row.symbol).join(', ')} · มูลค่าที่ประเมินได้บางส่วน {display(serializeCrypto(rows.reduce((sum,row)=>row.value===null?sum:sum.plus(row.value),parseCryptoDecimal('0'))))} USD ไม่ใช่ยอดรวมของพอร์ต</p>}
+    {portfolio && <div className="mt-4 space-y-2" aria-label="ยอดตามประวัติหุ้น"><p>ต้นทุนคงเหลือรวม: {display(remainingCost)} USD</p><p>กำไร/ขาดทุนที่ขายแล้วรวม: {display(realized)} USD</p><p className="text-xs">จำนวน ต้นทุน และประวัติอัปเดตหลังบันทึกโดยไม่ต้องรอราคาหรือกราฟ</p></div>}
+    {!rows.length&&<p className="mt-4">ยังไม่มีการถือครองในพอร์ตที่เลือก</p>}
+    <StockPortfolioValue key={portfolio} holdings={rows}/>
+-   <div className="mt-4 grid gap-4 sm:grid-cols-2">{rows.map(row=>{let allocation:string|null=null;try{if(total&&row.value&&parseCryptoDecimal(total).gt('0'))allocation=serializeThb(parseCryptoDecimal(row.value).div(total).times('100'))}catch{};return <article key={row.symbol} className="tracker-card rounded-xl p-4 break-all"><h3 className="font-semibold">{row.symbol}</h3>{!row.fresh && stockSymbols[row.symbol] && parseCryptoDecimal(row.quantity).gt('0') && <StockQuote expression={stockSymbols[row.symbol]!} title={`ราคาหุ้นที่ถือ ${row.symbol} โดย TradingView`}/>}<p>จำนวน {display(row.quantity)} หุ้น</p><p>ต้นทุน {display(row.totalCost)} USD · เฉลี่ย {display(row.averageCost)} USD</p>{row.fresh && <><p>มูลค่าประเมิน {display(row.value)} USD</p><p>ราคาอ้างอิง {display(row.reference!.price)} USD/หุ้น</p><p className="text-xs">Alpaca IEX · เวลาต้นทาง {row.reference?.observedAt}<br/>เวลารับ {row.reference?.receivedAt}</p><p>ยังไม่รับรู้ {display(row.unrealized)} USD · ผลตอบแทน {display(row.returnPercent)}%</p><p>สัดส่วน {display(allocation)}%</p></>}<p>กำไร/ขาดทุนรับรู้ {display(row.realizedPnl)} USD</p>{!row.fresh && <p className="mt-2 text-sm">ดูมูลค่าและกำไร/ขาดทุนยังไม่รับรู้ได้จากกราฟฟรีด้านบน ต้นทุนและประวัติที่บันทึกยังอยู่ครบ</p>}</article>})}</div>
++   <div className="mt-4 grid gap-4 sm:grid-cols-2">{rows.map(row=>{let allocation:string|null=null;try{if(total&&row.value&&parseCryptoDecimal(total).gt('0'))allocation=serializeThb(parseCryptoDecimal(row.value).div(total).times('100'))}catch{};return <article key={row.symbol} className="tracker-card rounded-xl p-4 break-all"><h3 className="font-semibold">{row.symbol}</h3>{!row.fresh && stockSymbols[row.symbol] && parseCryptoDecimal(row.quantity).gt('0') && <StockQuote expression={stockSymbols[row.symbol]!} title={`ราคาหุ้นที่ถือ ${row.symbol} โดย TradingView`}/>}<p>จำนวน {display(row.quantity)} หุ้น</p><p>ต้นทุน {display(row.totalCost)} USD · เฉลี่ย {display(row.averageCost)} USD</p>{row.fresh && <><p>มูลค่าประเมิน {display(row.value)} USD</p><p>{row.reference.close?'ราคาปิด':'ราคาอ้างอิง'} {display(row.reference.value)} USD/หุ้น</p><p className="text-xs">{row.reference.source}<br/>{referenceDateLabel(row.reference)}</p><p>ยังไม่รับรู้ {display(row.unrealized)} USD · ผลตอบแทน {display(row.returnPercent)}%</p><p>สัดส่วน {display(allocation)}%</p></>}<p>กำไร/ขาดทุนรับรู้ {display(row.realizedPnl)} USD</p>{!row.fresh && parseCryptoDecimal(row.quantity).gt('0') && <p className="mt-2 text-sm" role="status">ขาดราคา · {row.reference.source}{row.reference.lastKnownClose?` · ราคาปิดล่าสุดที่ทราบ ${display(row.reference.lastKnownClose.price)} USD (วันที่ ${row.reference.lastKnownClose.tradingDate}) ไม่นับในยอดรวม`:''} · ต้นทุนและประวัติที่บันทึกยังอยู่ครบ</p>}</article>})}</div>
+   </section>
+   <section className="tracker-card rounded-2xl p-5"><h3 className="font-semibold">สร้างพอร์ตหุ้น</h3><form className="mt-4 flex flex-wrap gap-3" aria-label="สร้างพอร์ตหุ้น" onSubmit={e=>{e.preventDefault();if(!disabled)write.submit('stocks/portfolios',stockPortfolioInputSchema,{name,quoteCurrency:'USD'})}}><label className="auth-label flex-1">ชื่อพอร์ตหุ้น<input required maxLength={100} className="auth-input" value={name} disabled={disabled} onChange={e=>setName(e.target.value)}/></label><button className="auth-secondary" disabled={disabled}>สร้างพอร์ตหุ้น</button></form></section>
+   <section className="tracker-card rounded-2xl p-5"><h3 className="font-semibold">{editing?'แก้ไขประวัติหุ้น':'บันทึกประวัติซื้อ/ขายหุ้น'}</h3><p className="mt-2 text-sm">เริ่มตำแหน่งที่ถืออยู่ด้วยประวัติซื้อ ระบุวันที่ จำนวน และต้นทุนจริงที่ทราบ ค่าธรรมเนียมเป็น USD · วันเดียวกันเรียงตามลำดับบันทึก การแก้ไขคงลำดับเดิมและย้อนคำนวณทั้งประวัติ</p>
+diff --git a/apps/web/src/tracker/client.ts b/apps/web/src/tracker/client.ts
+index ae68902..ab3d758 100644
+--- a/apps/web/src/tracker/client.ts
++++ b/apps/web/src/tracker/client.ts
+@@ -25,6 +25,11 @@ const messages: Record<string, string> = {
+   BACKUP_INCONSISTENT: 'ยอดบัญชีไม่ตรงกับประวัติในไฟล์ จึงยังสำรองหรือกู้คืนไม่ได้',
+   BACKUP_PREVIEW_CHANGED: 'ไฟล์ไม่ตรงกับ preview กรุณาตรวจไฟล์ใหม่',
+   BACKUP_TARGET_NOT_EMPTY: 'บัญชีนี้มีข้อมูลการเงินแล้ว ระบบจะไม่เขียนทับหรือรวมข้อมูล',
++  MARKET_KEY_REJECTED: 'Tiingo ปฏิเสธ key นี้ (ยืนยันตัวตนไม่ผ่าน) ตรวจว่าคัดลอก API Token ครบแล้วลองใหม่ ระบบไม่ได้บันทึก key',
++  MARKET_KEY_UNVERIFIED: 'ยังติดต่อ Tiingo เพื่อทดสอบ key ไม่ได้ ระบบไม่ได้บันทึก key กรุณาลองใหม่ภายหลัง',
++  MARKET_KEY_CHANGED: 'การตั้งค่า key เปลี่ยนจากอีกหน้าหนึ่งแล้ว โหลดสถานะล่าสุดก่อนทำอีกครั้ง',
++  MARKET_KEY_UNAVAILABLE: 'server นี้ยังไม่เปิดให้ใส่ key ราคาปิด',
++  MARKET_KEY_ATTEMPTS: 'ทดสอบ key บ่อยเกินไป กรุณารอ 1 ชั่วโมงแล้วลองใหม่',
+   BACKUP_VERIFY_FAILED: 'ตรวจยอดหลังนำเข้าไม่ตรง ระบบยกเลิกการกู้คืนทั้งหมดแล้ว',
+ }
+ /** Whole-dataset backup requests may run far longer than ordinary reads/writes on the free instance. */
+diff --git a/apps/web/src/tracker/valuationPolicy.ts b/apps/web/src/tracker/valuationPolicy.ts
+index b42dc38..eb7fa21 100644
+--- a/apps/web/src/tracker/valuationPolicy.ts
++++ b/apps/web/src/tracker/valuationPolicy.ts
+@@ -1,8 +1,15 @@
+-import type { ValuationOverview, StockMarketSnapshot } from '@finntech/contracts'
++import type { ValuationOverview, StockMarketSnapshot, DailyCloseQuote } from '@finntech/contracts'
++import { assessDailyClose } from '@finntech/finance'
+ export const REFERENCE_MAX_AGE=7*86400000
+ export const LIVE_MAX_AGE=30000
+ const CLOCK_SKEW=2000
+-export type SelectedReference={value:string|null;source:string;asOf:string|null;state:'LIVE'|'DAILY'|'MANUAL'|'STALE'|'CLOSED'|'MISSING'|'ERROR'
++export type SelectedReference={value:string|null;source:string;asOf:string|null;state:'LIVE'|'CLOSE'|'DAILY'|'MANUAL'|'STALE'|'CLOSED'|'MISSING'|'ERROR'
++ /** Daily close used for valuation (state CLOSE): its own New York trading date, never a receipt time. */
++ close?:{tradingDate:string;fetchedAt:string|null;status:'CURRENT'|'DELAYED';expectedSession:string;problem:DailyCloseQuote['problem']}
++ /** A daily close too old for valuation, shown for context only; never counted in totals. */
++ lastKnownClose?:{price:string;tradingDate:string}
++ /** An eligible daily close that an enabled manual override is currently hiding. */
++ overriddenDaily?:{price:string;tradingDate:string}
+  /** A last observed provider trade shown for context only; never counted in totals. */
+  lastKnown?:{price:string;observedAt:string|null}
+  /** A fresh live price that an enabled manual override is currently hiding. */
+@@ -13,6 +20,20 @@ const providerProblem:Partial<Record<StockMarketSnapshot['connection'],string>>=
+  NOT_ENTITLED:'บัญชี Alpaca ไม่มีสิทธิ์ข้อมูล feed นี้ · ตั้งราคาอ้างอิงเองได้',
+  CONNECTION_LIMIT:'Alpaca จำกัดจำนวนการเชื่อมต่อ กำลังรอเชื่อมใหม่ · ตั้งราคาอ้างอิงเองได้',
+ }
++const fetchedLabel=(at:string|null)=>at?new Date(at).toLocaleString('th-TH',{timeZone:'Asia/Bangkok'}):'N/A'
++/** A close is dated by its New York trading session; live/manual prices by their observation time. */
++export const referenceDateLabel=(r:SelectedReference)=>r.close?`ราคาปิดวันที่ซื้อขาย ${r.close.tradingDate} (นิวยอร์ก) · ดึงเมื่อ ${fetchedLabel(r.close.fetchedAt)}`:r.asOf?`เวลารายการ ${new Date(r.asOf).toLocaleString('th-TH')}`:'ไม่มีวันอ้างอิง'
++export const dailyProblemText:Record<NonNullable<DailyCloseQuote['problem']>,string>={
++ AUTH_FAILED:'ผู้ให้บริการปฏิเสธ key ฝั่ง server',RATE_LIMITED:'ถึงโควตาผู้ให้บริการ กำลังรอลองใหม่',NOT_FOUND:'ผู้ให้บริการไม่มีข้อมูลหลักทรัพย์นี้',
++ UNAVAILABLE:'ดึงข้อมูลไม่สำเร็จ กำลังลองใหม่',INVALID_DATA:'ข้อมูลจากผู้ให้บริการไม่ผ่านการตรวจสอบ',NOT_YET_PUBLISHED:'ราคาปิดวันล่าสุดยังไม่เผยแพร่ ระบบลองใหม่ทุก 30 นาที',BUDGET_EXHAUSTED:'ใช้โควตาคำขอของระบบครบแล้ว จะลองใหม่ภายหลัง',
++}
++/** Daily close eligibility is judged in trading sessions (weekends/holidays keep the last close), not by the 30 s live rule. */
++export function dailyCloseFor(symbol:string,overview:ValuationOverview|null,now:number){
++ const daily=overview?.dailyCloses,q=daily?.provider==='READY'?daily.quotes.find(q=>q.symbol===symbol):undefined
++ if(!q?.close||!q.tradingDate)return {quote:q??null,eligible:null}
++ const a=assessDailyClose(q.tradingDate,now)
++ return {quote:q,eligible:a.eligible&&(a.state==='CURRENT'||a.state==='DELAYED')?{price:q.close,tradingDate:q.tradingDate,fetchedAt:q.fetchedAt,status:a.state as 'CURRENT'|'DELAYED',expectedSession:a.expectedSession,problem:q.problem}:null}
++}
+ /** Live = provider trade time and receipt both within 30 s while streaming (last trade, not bid/ask). */
+ export function liveStockQuote(symbol:string,market:StockMarketSnapshot|null,now:number){
+  const q=market?.quotes.find(q=>q.symbol===symbol)
+@@ -24,18 +45,28 @@ export function liveStockQuote(symbol:string,market:StockMarketSnapshot|null,now
+ export function selectReference(symbol:string, overview:ValuationOverview|null,market:StockMarketSnapshot|null,now:number):SelectedReference {
+  const manual=overview?.references.find(r=>r.symbol===symbol&&r.enabled)
+  if(manual){
+-  const live=symbol==='USDTHB'?null:liveStockQuote(symbol,market,now)
+-  return {value:valid(manual.asOf,now,REFERENCE_MAX_AGE)?manual.value:null,source:'กรอกเอง (แทนอัตโนมัติ)',asOf:manual.asOf,state:valid(manual.asOf,now,REFERENCE_MAX_AGE)?'MANUAL':'STALE',...(live?{overriddenLive:live}:{})}
++  const live=symbol==='USDTHB'?null:liveStockQuote(symbol,market,now),daily=symbol==='USDTHB'?null:dailyCloseFor(symbol,overview,now).eligible
++  return {value:valid(manual.asOf,now,REFERENCE_MAX_AGE)?manual.value:null,source:'กรอกเอง (แทนอัตโนมัติ)',asOf:manual.asOf,state:valid(manual.asOf,now,REFERENCE_MAX_AGE)?'MANUAL':'STALE',...(live?{overriddenLive:live}:{}),...(daily?{overriddenDaily:{price:daily.price,tradingDate:daily.tradingDate}}:{})}
+  }
+  if(symbol==='USDTHB'){
+   const fx=overview?.usdThb
+   if(fx?.status==='DAILY'&&valid(fx.asOf,now,REFERENCE_MAX_AGE)&&fx.rate)return {value:fx.rate,source:'ECB · อ้างอิงรายวัน (THB/EUR ÷ USD/EUR)',asOf:fx.asOf,state:'DAILY'}
+   return {value:null,source:'ECB · อ้างอิงรายวัน',asOf:fx?.asOf??null,state:fx?.status==='ERROR'?'ERROR':fx?.asOf?'STALE':'MISSING'}
+  }
+- // An unconfigured feed is not a provider failure: guide the owner to a manual reference instead.
+- if(market?.connection==='NOT_CONFIGURED')return {value:null,source:'ยังไม่มี feed ราคาอัตโนมัติ · ตั้งราคาอ้างอิงเองได้',asOf:null,state:'MISSING'}
+  const live=liveStockQuote(symbol,market,now)
+  if(live)return {value:live.price,source:'Alpaca IEX · ราคาซื้อขายล่าสุด (last trade)',asOf:live.observedAt,state:'LIVE'}
++ const dailySnapshot=overview?.dailyCloses,{quote:closeQuote,eligible:close}=dailyCloseFor(symbol,overview,now)
++ const closeSource=`${dailySnapshot?.source??'แหล่งราคาปิด'} · ราคาปิดรายวัน (ราคาปิดจริง ไม่ปรับปันผล/แตกหุ้น)`
++ if(close)return {value:close.price,source:closeSource,asOf:null,state:'CLOSE',close:{tradingDate:close.tradingDate,fetchedAt:close.fetchedAt,status:close.status,expectedSession:close.expectedSession,problem:close.problem}}
++ if(dailySnapshot?.provider==='READY'){
++  // Shared daily feed is configured: report its own last known close/problem instead of a live-feed message.
++  const problem=closeQuote?.problem?` · ${dailyProblemText[closeQuote.problem]}`:''
++  if(closeQuote?.close&&closeQuote.tradingDate)return {value:null,source:`${dailySnapshot.source} · ราคาปิดล่าสุดเก่าเกิน 1 วันซื้อขาย ไม่นับในยอดรวม${problem}`,asOf:null,state:'STALE',lastKnownClose:{price:closeQuote.close,tradingDate:closeQuote.tradingDate}}
++  return {value:null,source:`${dailySnapshot.source} · ยังไม่มีราคาปิด${problem||' · กำลังดึงข้อมูล'} · ตั้งราคาอ้างอิงเองได้`,asOf:null,state:closeQuote?.status==='ERROR'?'ERROR':'MISSING'}
++ }
++ if(dailySnapshot?.provider==='NOT_LICENSED'&&market?.connection!=='STREAMING')return {value:null,source:'ราคาปิดอัตโนมัติยังไม่เปิดให้บัญชีนี้ (สิทธิ์ข้อมูลของผู้ให้บริการครอบคลุมเฉพาะเจ้าของ key) · ตั้งราคาอ้างอิงเองได้',asOf:null,state:'MISSING'}
++ // An unconfigured feed is not a provider failure: guide the owner to a manual reference instead.
++ if(market?.connection==='NOT_CONFIGURED')return {value:null,source:'ยังไม่มี feed ราคาอัตโนมัติ · ตั้งราคาอ้างอิงเองได้',asOf:null,state:'MISSING'}
+  const q=market?.quotes.find(q=>q.symbol===symbol)
+  const lastKnown=q?.price?{lastKnown:{price:q.price,observedAt:q.observedAt}}:{}
+  const problem=market?providerProblem[market.connection]:undefined
+diff --git a/packages/contracts/src/index.ts b/packages/contracts/src/index.ts
+index ae78cf2..998f401 100644
+--- a/packages/contracts/src/index.ts
++++ b/packages/contracts/src/index.ts
+@@ -221,7 +221,30 @@ export const valuationReferenceSchema=referenceFields.extend({id:resourceIdSchem
+ export type ValuationReference=z.infer<typeof valuationReferenceSchema>
+ export const dailyUsdRateSchema=z.object({source:z.literal('ECB'),kind:z.literal('DAILY'),status:z.enum(['DAILY','STALE','MISSING','ERROR']),rate:positiveCryptoAmount.nullable(),asOf:z.string().datetime().nullable(),receivedAt:z.string().datetime().nullable()})
+ export type DailyUsdRate=z.infer<typeof dailyUsdRateSchema>
+-export const valuationOverviewSchema=z.object({references:z.array(valuationReferenceSchema).max(STOCK_INSTRUMENTS.length+1),usdThb:dailyUsdRateSchema})
++// Shared end-of-day closes fetched by the server (never by the browser, never with a browser key).
++// `close` is the unadjusted official close per share for `tradingDate` (New York). Freshness is
++// judged in trading sessions by @finntech/finance assessDailyClose, never by the 30 s live rule.
++// provider: NOT_CONFIGURED = no server key/licence; NOT_LICENSED = licence does not cover this account.
++export const dailyCloseQuoteSchema=z.object({symbol:stockSymbolSchema,currency:z.literal('USD'),priceType:z.literal('CLOSE'),
++ close:positiveCryptoAmount.nullable(),tradingDate:calendarDateSchema.nullable(),fetchedAt:z.string().datetime().nullable(),
++ status:z.enum(['CURRENT','DELAYED','STALE','MISSING','ERROR']),
++ problem:z.enum(['AUTH_FAILED','RATE_LIMITED','NOT_FOUND','UNAVAILABLE','INVALID_DATA','NOT_YET_PUBLISHED','BUDGET_EXHAUSTED']).nullable()}).strict()
++export const dailyCloseSnapshotSchema=z.object({provider:z.enum(['NOT_CONFIGURED','READY','NOT_LICENSED']),
++ source:z.string().max(64).nullable(),license:z.enum(['REDISTRIBUTION','PERSONAL']).nullable(),expectedSession:calendarDateSchema,
++ attribution:z.object({label:z.string().max(64),url:z.string().url().max(200)}).nullable(),
++ // SERVER: shared licensed key. ACCOUNT: this account's own personal key (data never shown to others).
++ keySource:z.enum(['SERVER','ACCOUNT']).optional(),
++ quotes:z.array(dailyCloseQuoteSchema).max(STOCK_INSTRUMENTS.length)}).strict()
++// A personal provider key: sent once over HTTPS to this server, stored encrypted, never returned.
++export const marketKeyInputSchema=z.object({provider:z.literal('TIINGO'),token:z.string().trim().regex(/^[A-Za-z0-9]{20,128}$/),
++ confirmPersonalUse:z.literal(true),expectedVersion:z.number().int().positive().max(2147483646).nullable()}).strict()
++export const marketKeyRemoveSchema=z.object({expectedVersion:z.number().int().positive().max(2147483646)}).strict()
++export const marketKeyStatusSchema=z.object({available:z.boolean(),provider:z.literal('TIINGO'),status:z.enum(['NONE','ACTIVE','REMOVED']),
++ hint:z.string().regex(/^[A-Za-z0-9]{4}$/).nullable(),updatedAt:z.string().datetime().nullable(),version:z.number().int().positive().nullable()}).strict()
++export type MarketKeyStatus=z.infer<typeof marketKeyStatusSchema>
++export type DailyCloseSnapshot=z.infer<typeof dailyCloseSnapshotSchema>
++export type DailyCloseQuote=z.infer<typeof dailyCloseQuoteSchema>
++export const valuationOverviewSchema=z.object({references:z.array(valuationReferenceSchema).max(STOCK_INSTRUMENTS.length+1),usdThb:dailyUsdRateSchema,dailyCloses:dailyCloseSnapshotSchema.optional()})
+ export type ValuationOverview=z.infer<typeof valuationOverviewSchema>
+ 
+ // Chosen from measurements on a 0.1 CPU / 512 MB container (Render Free): at 5,000 mixed rows export
+diff --git a/packages/finance/src/analytics.ts b/packages/finance/src/analytics.ts
+index afb18b2..613626e 100644
+--- a/packages/finance/src/analytics.ts
++++ b/packages/finance/src/analytics.ts
+@@ -30,6 +30,29 @@ export function valuePosition(quantity:string,cost:string,price:string|null){
+  return {averageCost,value:serializeCrypto(value),unrealized:serializeCrypto(pnl),returnPercent:c.isZero()?null:serializeThb(pnl.div(c).times('100'))}
+ }
+ 
++/**
++ * USD stock/ETF totals across every portfolio. Same-symbol rows in different portfolios share one
++ * price. A missing price never becomes a zero or the purchase cost: totals become null and the
++ * known (priced) part plus the missing symbols are reported instead.
++ */
++export function summarizeStockHoldings(holdings:readonly {symbol:string;quantity:string;totalCost:string}[],prices:ReadonlyMap<string,string>){
++ const zero=()=>parseCryptoDecimal('0')
++ let value=zero(),cost=zero(),pricedCost=zero();const missing=new Set<string>()
++ for(const row of holdings){
++  const q=parseCryptoDecimal(row.quantity),c=parseCryptoDecimal(row.totalCost)
++  if(q.lt('0')||c.lt('0'))throw new RangeError('Negative holding/cost')
++  cost=cost.plus(c)
++  if(q.isZero()){pricedCost=pricedCost.plus(c);continue}
++  const p=prices.get(row.symbol)
++  if(p===undefined){missing.add(row.symbol);continue}
++  const price=parseCryptoDecimal(p);if(!price.gt('0'))throw new RangeError('Invalid stock price')
++  value=value.plus(q.times(price));pricedCost=pricedCost.plus(c)
++ }
++ const complete=missing.size===0
++ return {complete,missing:[...missing].sort(),costUsd:serializeCrypto(cost),
++  valueUsd:complete?serializeCrypto(value):null,unrealizedUsd:complete?serializeCrypto(value.minus(cost)):null,
++  knownValueUsd:serializeCrypto(value),knownCostUsd:serializeCrypto(pricedCost),knownUnrealizedUsd:serializeCrypto(value.minus(pricedCost))}
++}
+ /** Manual amounts are dated total valuations, not a second market-priced quantity or cash debit. */
+ export function valueMixedAssets(base:ReturnType<typeof valueAssets>,stocks:readonly {quantity:string;symbol:string}[],stockPrices:ReadonlyMap<string,string>,
+  manual:readonly {currency:'THB'|'USD'|'USDT';value:string}[],usdtThb:string|null,usdThb:string|null){
+diff --git a/packages/finance/src/index.ts b/packages/finance/src/index.ts
+index 738d700..bbd1c6f 100644
+--- a/packages/finance/src/index.ts
++++ b/packages/finance/src/index.ts
+@@ -1,6 +1,7 @@
+ import { Decimal } from 'decimal.js'
+ export { replayCryptoTrades, LedgerError, type LedgerTrade, type LedgerResult } from './ledger.js'
+-export { expenseBreakdown, valueAssets, valuePosition,valueMixedAssets } from './analytics.js'
++export { expenseBreakdown, valueAssets, valuePosition,valueMixedAssets,summarizeStockHoldings } from './analytics.js'
++export * from './market-calendar.js'
+ 
+ export const FINANCE_DECIMAL_PRECISION = 80 as const
+ export const FINANCE_DECIMAL_ROUNDING = Decimal.ROUND_HALF_EVEN
+diff --git a/packages/finance/src/market-calendar.ts b/packages/finance/src/market-calendar.ts
+new file mode 100644
+index 0000000..8ece849
+--- /dev/null
++++ b/packages/finance/src/market-calendar.ts
+@@ -0,0 +1,86 @@
++/**
++ * NYSE/Nasdaq regular-session calendar and the daily-close freshness policy.
++ *
++ * This policy is deliberately separate from the 30-second live-quote rule: a daily close is the
++ * official end-of-day price of one trading session, so its age is measured in trading sessions,
++ * not seconds. Weekends and exchange holidays never make the latest close stale.
++ *
++ * Rule-based holidays only. Unscheduled closures (e.g. a national day of mourning) are not known
++ * in advance; the one-session DELAYED allowance below keeps valuations honest-but-usable then.
++ */
++export type CalendarDate = string // YYYY-MM-DD, America/New_York trading date
++
++const DAY = 86400000
++const iso = (y: number, m: number, d: number): CalendarDate => new Date(Date.UTC(y, m - 1, d)).toISOString().slice(0, 10)
++const utc = (date: CalendarDate) => Date.parse(date + 'T00:00:00.000Z')
++const shift = (date: CalendarDate, days: number): CalendarDate => new Date(utc(date) + days * DAY).toISOString().slice(0, 10)
++const weekday = (date: CalendarDate) => new Date(utc(date)).getUTCDay()
++/** n-th (1-based) weekday of a month; n=-1 means the last one. */
++function nthWeekday(y: number, m: number, day: number, n: number): CalendarDate {
++  if (n > 0) { const first = iso(y, m, 1); return shift(first, (day - weekday(first) + 7) % 7 + (n - 1) * 7) }
++  const last = shift(iso(m === 12 ? y + 1 : y, m === 12 ? 1 : m + 1, 1), -1)
++  return shift(last, -((weekday(last) - day + 7) % 7))
++}
++/** Anonymous Gregorian algorithm (Meeus/Jones/Butcher). */
++function easter(y: number): CalendarDate {
++  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25)
++  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4
++  const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451)
++  return iso(y, Math.floor((h + l - 7 * m + 114) / 31), ((h + l - 7 * m + 114) % 31) + 1)
++}
++/** Saturday holidays move to Friday, Sunday holidays to Monday (NYSE Rule 7.2). */
++const observed = (date: CalendarDate) => weekday(date) === 6 ? shift(date, -1) : weekday(date) === 0 ? shift(date, 1) : date
++const holidayCache = new Map<number, ReadonlySet<CalendarDate>>()
++export function nyseHolidays(year: number): ReadonlySet<CalendarDate> {
++  const cached = holidayCache.get(year); if (cached) return cached
++  const days = [
++    // New Year's Day on a Saturday is not observed on the prior Friday (year-end accounting).
++    ...(weekday(iso(year, 1, 1)) === 6 ? [] : [observed(iso(year, 1, 1))]),
++    nthWeekday(year, 1, 1, 3), nthWeekday(year, 2, 1, 3), shift(easter(year), -2), nthWeekday(year, 5, 1, -1),
++    ...(year >= 2022 ? [observed(iso(year, 6, 19))] : []), observed(iso(year, 7, 4)), nthWeekday(year, 9, 1, 1),
++    nthWeekday(year, 11, 4, 4), observed(iso(year, 12, 25)),
++  ]
++  const set = new Set(days); holidayCache.set(year, set); return set
++}
++export function isTradingDay(date: CalendarDate): boolean {
++  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || shift(date, 0) !== date) return false
++  const w = weekday(date)
++  return w !== 0 && w !== 6 && !nyseHolidays(Number(date.slice(0, 4))).has(date)
++}
++export function previousTradingDay(date: CalendarDate): CalendarDate {
++  let d = shift(date, -1); while (!isTradingDay(d)) d = shift(d, -1); return d
++}
++/** Wall-clock date and minutes after midnight in New York (DST-aware via the platform tz database). */
++export function newYorkClock(now: number): { date: CalendarDate; minutes: number } {
++  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
++    .formatToParts(new Date(now)).map(p => [p.type, p.value]))
++  return { date: `${parts.year}-${parts.month}-${parts.day}`, minutes: Number(parts.hour) * 60 + Number(parts.minute) }
++}
++/** Latest trading day whose event (close at 16:00, or publication cut-off) has passed in New York. */
++export function latestSessionAt(now: number, afterMinutes: number): CalendarDate {
++  const clock = newYorkClock(now)
++  return isTradingDay(clock.date) && clock.minutes >= afterMinutes ? clock.date : previousTradingDay(clock.date)
++}
++export const MARKET_CLOSE_MINUTES = 16 * 60
++/** Providers publish end-of-day data ~17:30 New York; we expect it from 18:00 and retry until then. */
++export const CLOSE_PUBLISHED_MINUTES = 18 * 60
++/** Exchanges may still correct the day's prints until ~20:00; one later refetch picks those up. */
++export const CLOSE_CORRECTIONS_MINUTES = 20 * 60 + 30
++
++export type DailyCloseState = 'CURRENT' | 'DELAYED' | 'STALE' | 'INVALID'
++export interface DailyCloseAssessment { state: DailyCloseState; eligible: boolean; expectedSession: CalendarDate; latestClosedSession: CalendarDate }
++/**
++ * CURRENT: the latest published session (or a newer, already closed one).
++ * DELAYED: exactly one session behind (provider not yet published / unscheduled closure); still valued,
++ *          always shown with its own trading date.
++ * STALE: older; shown as last known only and never counted in totals.
++ * INVALID: not a trading day, or a session that has not closed yet (not a closing price).
++ */
++export function assessDailyClose(tradingDate: CalendarDate, now: number): DailyCloseAssessment {
++  const expectedSession = latestSessionAt(now, CLOSE_PUBLISHED_MINUTES), latestClosedSession = latestSessionAt(now, MARKET_CLOSE_MINUTES)
++  const base = { expectedSession, latestClosedSession }
++  if (!isTradingDay(tradingDate) || tradingDate > latestClosedSession) return { ...base, state: 'INVALID', eligible: false }
++  if (tradingDate >= expectedSession) return { ...base, state: 'CURRENT', eligible: true }
++  if (tradingDate === previousTradingDay(expectedSession)) return { ...base, state: 'DELAYED', eligible: true }
++  return { ...base, state: 'STALE', eligible: false }
++}

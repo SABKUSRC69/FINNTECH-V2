@@ -12,6 +12,9 @@ export function attachMarketStream(server: Server, auth: AuthRuntime, market: Ma
   stockOwner?: (authUserId: string) => Promise<string | null>, subjectGate?: (authUserId: string) => Promise<boolean>): () => void {
   const sockets = new WebSocketServer({ noServer: true, maxPayload: 1024, perMessageDeflate: false })
   const origins = new Map<WebSocket, IncomingMessage>()
+  // Last successful session check per client: event pushes skip clients not re-validated recently.
+  const validatedAt = new Map<WebSocket, number>()
+  const PUSH_VALIDATION_MS = 10_000
   const revoke = (client: WebSocket) => {
     if (client.readyState !== WebSocket.OPEN) return
     client.close(1008, 'session expired')
@@ -47,10 +50,10 @@ export function attachMarketStream(server: Server, auth: AuthRuntime, market: Ma
       clearTimeout(deadline)
       if (!allowed) { socket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n'); return }
       sockets.handleUpgrade(request, socket, head, client => {
-        origins.set(client, request)
+        origins.set(client, request); validatedAt.set(client, Date.now())
         client.on('error', () => client.terminate())
         client.on('message', () => client.close(1008, 'read only'))
-        client.once('close', () => origins.delete(client))
+        client.once('close', () => { origins.delete(client); validatedAt.delete(client) })
         void (request.url === '/ws/stocks' ? stocks!.snapshot() : market.snapshot())
           .then(snapshot => { if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify(snapshot)) })
       })
@@ -65,7 +68,8 @@ export function attachMarketStream(server: Server, auth: AuthRuntime, market: Ma
       const cryptoSnapshot = requests.some(request => request.url === '/ws/market') ? JSON.stringify(await market.snapshot()) : ''
       const stockSnapshot = requests.some(request => request.url === '/ws/stocks') ? JSON.stringify(await stocks!.snapshot()) : ''
       await Promise.all([...origins].map(async ([client, request]) => {
-        if (!await validSession(request)) { revoke(client); return }
+        if (!await validSession(request)) { validatedAt.delete(client); revoke(client); return }
+        validatedAt.set(client, Date.now())
         if (client.readyState === WebSocket.OPEN) {
           if (client.bufferedAmount > 65536) client.terminate()
           else client.send(request.url === '/ws/stocks' ? stockSnapshot : cryptoSnapshot)
@@ -74,5 +78,27 @@ export function attachMarketStream(server: Server, auth: AuthRuntime, market: Ma
     })().finally(() => { broadcasting = false })
   }, 5000)
   timer.unref()
-  return () => { clearInterval(timer); for (const client of origins.keys()) client.terminate(); sockets.close() }
+  // Provider events reach owner sockets validated within the last 10 s in ~1 s; the 5 s loop above
+  // re-validates sessions (revoking expired ones) and reconciles. Coalescing keeps only the latest state.
+  let pushTimer: ReturnType<typeof setTimeout> | undefined, lastPush = 0
+  const pushStocks = () => {
+    pushTimer = undefined; lastPush = Date.now()
+    // If the 5 s loop stalls (slow session store), pushes stop instead of reaching unchecked sessions.
+    const clients = [...origins].filter(([client, request]) => request.url === '/ws/stocks' && client.readyState === WebSocket.OPEN
+      && lastPush - (validatedAt.get(client) ?? 0) <= PUSH_VALIDATION_MS)
+    if (!clients.length || !stocks) return
+    void stocks.snapshot().then(snapshot => {
+      const text = JSON.stringify(snapshot)
+      for (const [client] of clients) {
+        if (client.readyState !== WebSocket.OPEN) continue
+        if (client.bufferedAmount > 65536) client.terminate(); else client.send(text)
+      }
+    }).catch(() => { /* the 5 s loop retries */ })
+  }
+  const stopUpdates = stocks?.onUpdate(() => {
+    if (pushTimer) return
+    pushTimer = setTimeout(pushStocks, Math.max(0, 1000 - (Date.now() - lastPush)))
+    pushTimer.unref()
+  })
+  return () => { clearInterval(timer); if (pushTimer) clearTimeout(pushTimer); stopUpdates?.(); for (const client of origins.keys()) client.terminate(); sockets.close() }
 }

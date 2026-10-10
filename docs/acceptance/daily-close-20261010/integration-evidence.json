@@ -1,0 +1,66 @@
+{
+  "kind": "SYNTHETIC upstream; real PostgreSQL and auth",
+  "sharedFetch": {
+    "upstreamRequests": 8,
+    "accounts": 2,
+    "storedRows": 8,
+    "aapl": {
+      "symbol": "AAPL",
+      "currency": "USD",
+      "priceType": "CLOSE",
+      "close": "227.5",
+      "tradingDate": "2026-10-09",
+      "fetchedAt": "2026-10-09T23:00:00.000Z",
+      "status": "CURRENT",
+      "problem": null
+    }
+  },
+  "ownerValuations": {
+    "A": {
+      "complete": true,
+      "missing": [],
+      "costUsd": "744.5",
+      "valueUsd": "770.75",
+      "unrealizedUsd": "26.25",
+      "knownValueUsd": "770.75",
+      "knownCostUsd": "744.5",
+      "knownUnrealizedUsd": "26.25"
+    },
+    "B": {
+      "complete": true,
+      "missing": [],
+      "costUsd": "960",
+      "valueUsd": "1000",
+      "unrealizedUsd": "40",
+      "knownValueUsd": "1000",
+      "knownCostUsd": "960",
+      "knownUnrealizedUsd": "40"
+    }
+  },
+  "outage": {
+    "monday": {
+      "symbol": "AAPL",
+      "currency": "USD",
+      "priceType": "CLOSE",
+      "close": "227.5",
+      "tradingDate": "2026-10-09",
+      "fetchedAt": "2026-10-09T23:00:00.000Z",
+      "status": "DELAYED",
+      "problem": "UNAVAILABLE"
+    },
+    "tuesdayStatus": "STALE"
+  },
+  "personalLicence": {
+    "owner": "READY",
+    "otherAccount": "NOT_LICENSED"
+  },
+  "personalKey": {
+    "rejectedWrongToken": 422,
+    "savedOnce": true,
+    "ciphertextContainsToken": false,
+    "ownerAAppl": "327.5",
+    "ownerBAppl": "227.5",
+    "personalRows": 8,
+    "removedRowsLeft": 0
+  }
+}

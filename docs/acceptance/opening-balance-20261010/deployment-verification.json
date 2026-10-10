@@ -1,0 +1,12 @@
+{
+  "commit": "a05b7f0158aafc12a7366b17eeb9ce5b3d80025e",
+  "deployment": "dep-db4qrpad0e5s73d5nn20",
+  "homeStatus": 200,
+  "healthStatus": 200,
+  "readyStatus": 200,
+  "ready": true,
+  "healthy": true,
+  "databaseReady": true,
+  "bundle": "/assets/index-Cpv5sIj0.js",
+  "expectedBundleServed": true
+}

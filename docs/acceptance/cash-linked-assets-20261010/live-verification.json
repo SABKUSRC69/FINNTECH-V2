@@ -1,0 +1,38 @@
+{
+  "commit": "22c5e5edbc7ecee4d9e2ea0e62a1891693ed55b0",
+  "deployment": "dep-db4lopvlot8c73bhbr20",
+  "status": "Deploy succeeded|Live",
+  "origin": "https://finntech-personal.onrender.com/",
+  "ui": {
+    "alerts": 0,
+    "cashAvailable": true,
+    "heldImmediatelyAfterSummary": true,
+    "heldRows": 5,
+    "kinds": [
+      "cash",
+      "stock",
+      "stock",
+      "crypto",
+      "manual"
+    ],
+    "loading": true,
+    "masked": true,
+    "noDocumentOverflow": true,
+    "priceToolsBelowCash": true,
+    "sourceTextShort": true,
+    "totalAvailable": true
+  },
+  "forms": {
+    "financeCashSelect": true,
+    "cryptoCashSelect": true,
+    "cryptoActualThb": true,
+    "stockCashSelect": true,
+    "stockActualThb": true,
+    "stockSaleAccount": true,
+    "stockSaleNetCash": true,
+    "legacyStockEditNoCashSelect": true
+  },
+  "fakeFinancialWrites": 0,
+  "quoteValuesStored": false,
+  "screenshot": "C:/Users/Admin/Downloads/FINNTECH/docs/acceptance/cash-linked-assets-20261010/held-assets-live-masked.png"
+}

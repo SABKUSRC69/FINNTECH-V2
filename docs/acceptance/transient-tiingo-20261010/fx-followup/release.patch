@@ -1,0 +1,65 @@
+diff --git a/apps/api/src/tracker/fx.ts b/apps/api/src/tracker/fx.ts
+index e8f159d..43a0906 100644
+--- a/apps/api/src/tracker/fx.ts
++++ b/apps/api/src/tracker/fx.ts
+@@ -22,6 +22,8 @@ export class ReferenceFxRelay {
+     return referenceRateSchema.parse({ base: 'USDT', quote: 'THB', rate: this.rate, receivedAt: this.receivedAt,
+       status: this.rate === null ? 'UNAVAILABLE' : fresh ? 'FRESH' : 'STALE', source: 'Bitkub public', kind: 'LAST_PRICE_SNAPSHOT' })
+   }
++  /** A visible valuation read waits for a due refresh instead of returning the previous snapshot. */
++  async current(): Promise<ReferenceRate> { await this.refresh(); return this.snapshot() }
+   async refresh(): Promise<void> {
+     if (this.refreshing) return this.refreshing
+     if (this.now() < this.nextAttempt) return
+@@ -35,9 +37,13 @@ export class ReferenceFxRelay {
+   }
+   private async update(): Promise<void> {
+     try {
+-      const metadata = symbols.parse(await this.request(`${root}/symbols`))
++      // Both public reads are bounded by one 5 s window, within the client's 10 s read timeout.
++      const [rawMetadata, rawTickers] = await Promise.all([
++        this.request(`${root}/symbols`), this.request(`${root}/ticker?sym=usdt_thb`),
++      ])
++      const metadata = symbols.parse(rawMetadata)
+       if (!metadata.result.some(row => row.symbol === 'USDT_THB' && row.base_asset === 'USDT' && row.quote_asset === 'THB' && row.status === 'active')) throw new Error('Unsupported pair')
+-      const rows = tickers.parse(await this.request(`${root}/ticker?sym=usdt_thb`))
++      const rows = tickers.parse(rawTickers)
+       if (rows.length !== 1 || rows[0]!.symbol !== 'USDT_THB') throw new Error('Invalid pair response')
+       const rate = parseCryptoDecimal(rows[0]!.last)
+       if (!rate.gt('0')) throw new Error('Invalid rate')
+diff --git a/apps/api/src/tracker/routes.ts b/apps/api/src/tracker/routes.ts
+index 977f95f..8a1d5a5 100644
+--- a/apps/api/src/tracker/routes.ts
++++ b/apps/api/src/tracker/routes.ts
+@@ -70,7 +70,7 @@ export function trackerRouter(auth: AuthRuntime, database: PrismaClient, market
+   router.post('/stocks/trades/:id/corrections',async(req,res)=>{const owner=(res.locals.owner as OwnerContext).ownerId;res.json(await correctStockTrade(database,owner,req.params.id,req.headers['idempotency-key'],req.body));stocks?.holdingsChanged(owner)})
+   router.post('/cash', async (req, res) => { res.json(await createCash(database, (res.locals.owner as OwnerContext).ownerId, req.headers['idempotency-key'], req.body)) })
+   router.patch('/cash/:id', async (req, res) => { res.json(await updateCash(database, (res.locals.owner as OwnerContext).ownerId, req.params.id, req.headers['idempotency-key'], req.body)) })
+-  router.get('/reference-rate', (_req, res) => { res.json(fx.snapshot()) })
++  router.get('/reference-rate', async (_req, res) => { res.set('Cache-Control','no-store'); res.json(await fx.current()) })
+   router.get('/stocks/market', async (_req, res) => {
+     if (!stocks) { res.status(503).json({ error: { code: 'STOCK_NOT_CONFIGURED' } }); return }
+     if (!stocks.allowsOwner((res.locals.owner as OwnerContext).ownerId)) {
+diff --git a/apps/web/src/tracker/Assets.tsx b/apps/web/src/tracker/Assets.tsx
+index c1af468..043e6fe 100644
+--- a/apps/web/src/tracker/Assets.tsx
++++ b/apps/web/src/tracker/Assets.tsx
+@@ -72,12 +72,15 @@ export default function Assets({ crypto, market, now, expired, lock }: { crypto:
+     if (!input.success) { setMessage('ตรวจชื่อ ยอดเงินบาทที่ไม่ติดลบ (ทศนิยมไม่เกิน 2 ตำแหน่ง) และวันที่อีกครั้ง'); return }
+     void send({ path: editing ? `cash/${editing.id}` : 'cash', method: editing ? 'PATCH' : 'POST', body: editing ? { ...input.data, expectedVersion: editing.version } : input.data, key: globalThis.crypto.randomUUID() })
+   }
+-  const freshRate = rate?.status === 'FRESH' && rate.rate !== null && rate.receivedAt !== null && now - Date.parse(rate.receivedAt) >= 0 && now - Date.parse(rate.receivedAt) <= 30000
+-  const prices = new Map(market.quotes.filter(quote => isFreshCryptoQuote(quote, now)).map(quote => [quote.asset, quote.price!]))
++  // Responses may arrive between clock ticks. Judge them at this render's time, while preserving
++  // the 30 s upper age limit and rejecting timestamps in the future.
++  const valuationNow = Math.max(now, Date.now())
++  const freshRate = rate?.status === 'FRESH' && rate.rate !== null && rate.receivedAt !== null && valuationNow - Date.parse(rate.receivedAt) >= 0 && valuationNow - Date.parse(rate.receivedAt) <= 30000
++  const prices = new Map(market.quotes.filter(quote => isFreshCryptoQuote(quote, valuationNow)).map(quote => [quote.asset, quote.price!]))
+   let valued: ReturnType<typeof valueAssets> | null = null
+   try { if (cash && crypto) valued = valueAssets(cash.accounts.map(row => row.balance), crypto.holdings, prices, freshRate ? rate!.rate : null) } catch { /* Invalid/overflow totals must remain unavailable. */ }
+   // A live event re-renders immediately; evaluate it at its receipt time rather than the last 1 s tick.
+-  const stockNow=Math.max(now,stockMarket.receivedAt)
++  const stockNow=Math.max(valuationNow,stockMarket.receivedAt)
+   const selectedStocks=new Map((stocks?.holdings??[]).map(r=>[r.symbol,selectReference(r.symbol,references,stockPrices,stockNow)]))
+   const eligibleStocks=new Map([...selectedStocks].flatMap(([symbol,r])=>r.value===null?[]:[[symbol,r.value] as [string,string]]))
+   const usdFx=selectReference('USDTHB',references,stockPrices,stockNow)

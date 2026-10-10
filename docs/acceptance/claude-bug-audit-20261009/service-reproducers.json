@@ -1,0 +1,57 @@
+{
+  "R1": [
+    "ok",
+    "P2010 40P01"
+  ],
+  "R2": {
+    "rows": 2001,
+    "outcome": "413 BACKUP_TOO_LARGE"
+  },
+  "R3": {
+    "timings": {
+      "createTrade_with_10_prior": 44,
+      "createTrade_with_300_prior": 532,
+      "createTrade_with_1000_prior": 1448,
+      "createTrade_with_1990_prior": 3005,
+      "restore_ms": 4963
+    },
+    "restored": "restored",
+    "localRoundTripMs": 0.71,
+    "tradesInScope": 1991
+  },
+  "R4": {
+    "priced": [],
+    "unavailable": [
+      "BTC",
+      "ETH",
+      "SOL",
+      "XRP",
+      "BNB",
+      "DOGE",
+      "ADA"
+    ]
+  },
+  "R5": {
+    "complete": {
+      "totalThb": "3500",
+      "knownThb": "3500",
+      "usd": "100",
+      "priceState": "MANUAL",
+      "fxState": "MANUAL"
+    },
+    "noPrice": {
+      "totalThb": null,
+      "knownThb": "0",
+      "usd": "0",
+      "priceState": "MISSING",
+      "fxState": "MANUAL"
+    },
+    "noFx": {
+      "totalThb": null,
+      "knownThb": "0",
+      "usd": "100",
+      "priceState": "MANUAL",
+      "fxState": "MISSING"
+    }
+  }
+}
