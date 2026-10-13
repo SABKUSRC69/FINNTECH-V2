@@ -30,6 +30,7 @@ async function setup(initial: MarketSnapshot, secondAsset = false, pollFails = f
       : path === '/api/crypto'
         ? { quoteCurrency: 'USDT', portfolios: [{ id: portfolioId, name: 'สังเคราะห์' }], trades: [],
           holdings: (secondAsset ? ['BTC', 'ETH'] : ['BTC']).map(asset => ({ portfolioId, asset, quantity: '1', totalCost: '1', realizedPnl: '2' })) }
+        : path === '/api/cash' ? { accounts: [] }
         : initial
     return { ok: true, status: 200, json: async () => body }
   }))
@@ -91,6 +92,7 @@ describe('crypto UI local expiration and recovery', () => {
     vi.setSystemTime(start + 62_000)
     fireEvent(document, new Event('visibilitychange'))
     assertUnavailable()
+    await act(async () => {})
     cleanup()
     expect(vi.getTimerCount()).toBe(0)
     expect(socket.close).toHaveBeenCalledOnce()

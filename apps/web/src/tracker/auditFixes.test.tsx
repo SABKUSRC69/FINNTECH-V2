@@ -28,6 +28,7 @@ function setupDashboard(options: { failFinance?: boolean } = {}) {
       if (failFinance) return { ok: false, status: 503, json: async () => ({ error: { code: 'STORAGE_UNAVAILABLE' } }) }
       return { ok: true, status: 200, json: async () => finance(categories) }
     }
+    if (path === '/api/cash') return { ok: true, status: 200, json: async () => ({ accounts: [] }) }
     if (path === '/api/crypto') return { ok: true, status: 200, json: async () => ({ quoteCurrency: 'USDT', portfolios: [], holdings: [], trades: [] }) }
     return { ok: true, status: 200, json: async () => ({ quotes: [] }) }
   }))

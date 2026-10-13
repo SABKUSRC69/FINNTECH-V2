@@ -7,6 +7,8 @@ const finance = { month: '2026-10', currency: 'THB', income: '0', expense: '0', 
 const transactionId = '00000000-0000-4000-8000-000000000002'
 const portfolioId = '00000000-0000-4000-8000-000000000003'
 const tradeId = '00000000-0000-4000-8000-000000000004'
+const cashId = '00000000-0000-4000-8000-000000000005'
+const cash = { accounts: [{ id: cashId, name: 'กระเป๋าเงิน', balance: '1000.00', currency: 'THB', asOf: '2026-01-01', version: 1 }] }
 function setup(operation?: (options: RequestInit) => Promise<unknown>, withHistory = false) {
   vi.stubGlobal('WebSocket', undefined)
   const writes: RequestInit[] = []
@@ -15,6 +17,7 @@ function setup(operation?: (options: RequestInit) => Promise<unknown>, withHisto
     if (options.method === 'POST') { writes.push(options); body = operation ? await operation(options) : { id: categoryId } }
     else if (path.startsWith('/api/finance?')) body = { ...finance, transactions: withHistory ? [{ id: transactionId, type: 'expense', amount: '1.25', date: '2026-10-04', note: 'ทดสอบ', categoryId }] : [] }
     else if (path === '/api/crypto') body = { quoteCurrency: 'USDT', portfolios: withHistory ? [{ id: portfolioId, name: 'ทดสอบพอร์ต' }] : [], holdings: [], trades: withHistory ? [{ id: tradeId, portfolioId, asset: 'BTC', side: 'buy', quantity: '0.00000001', price: '2', fee: '0', realizedPnl: '0', date: '2026-10-04' }] : [] }
+    else if (path === '/api/cash') body = cash
     else body = { quotes: [] }
     return { ok: true, status: 200, json: async () => body }
   }))
@@ -25,6 +28,7 @@ async function fill(amount: string) {
   const form = screen.getByRole('form', { name: 'บันทึกรายรับรายจ่าย' })
   await waitFor(() => expect(within(form).getByRole('button', { name: 'บันทึกรายการ' }).hasAttribute('disabled')).toBe(false))
   fireEvent.change(within(form).getByLabelText(/หมวดหมู่/), { target: { value: categoryId } })
+  fireEvent.change(within(form).getByLabelText('จ่ายจากบัญชีเงินสด'), { target: { value: cashId } })
   fireEvent.change(within(form).getByLabelText('จำนวนเงิน THB'), { target: { value: amount } })
   return form
 }
@@ -146,7 +150,9 @@ describe('tracker UI mutation boundaries', () => {
     await screen.findByRole('button', { name: 'แก้ไขรายการ' })
     fireEvent.click(screen.getByRole('button', { name: 'พอร์ตคริปโต' }))
     fireEvent.change(screen.getByLabelText('พอร์ตที่ดู'), { target: { value: portfolioId } })
-    fireEvent.click(screen.getByRole('button', { name: 'แก้ไขประวัติ' }))
+    const editTrade = screen.getByRole('button', { name: 'แก้ไขประวัติ' })
+    await waitFor(() => expect(editTrade.hasAttribute('disabled')).toBe(false))
+    fireEvent.click(editTrade)
     expect(screen.getByLabelText('สินทรัพย์').hasAttribute('disabled')).toBe(true)
     expect(screen.getByLabelText('พอร์ตที่ดู').hasAttribute('disabled')).toBe(true)
     fireEvent.change(screen.getByLabelText('ราคาต่อหน่วย USDT'), { target: { value: '3' } })

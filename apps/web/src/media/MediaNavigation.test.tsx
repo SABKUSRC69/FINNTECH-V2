@@ -7,7 +7,7 @@ it('keeps header logout and section navigation locked after an uncertain media u
  let retry=false
  vi.stubGlobal('fetch',vi.fn(async(url:string)=>{
   if(url==='/api/media/stage/receipt'){if(!retry)throw Error('lost response');return {ok:true,json:async()=>({id:'33333333-3333-4333-8333-333333333333'})}}
-  const body=url.startsWith('/api/finance?')?{month:'2026-10',currency:'THB',income:'0',expense:'0',balance:'0',categories:[],transactions:[],budgets:[]}:url==='/api/crypto'?{quoteCurrency:'USDT',portfolios:[],holdings:[],trades:[]}:{quotes:[]}
+  const body=url.startsWith('/api/finance?')?{month:'2026-10',currency:'THB',income:'0',expense:'0',balance:'0',categories:[],transactions:[],budgets:[]}:url==='/api/crypto'?{quoteCurrency:'USDT',portfolios:[],holdings:[],trades:[]}:url==='/api/cash'?{accounts:[]}:{quotes:[]}
   return {ok:true,json:async()=>body}
  }))
  render(<Dashboard name="Synthetic" logout={vi.fn()} expired={vi.fn()} authBusy={false}/>)

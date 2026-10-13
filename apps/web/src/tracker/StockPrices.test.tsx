@@ -40,7 +40,7 @@ describe('US stock watchlist', () => {
     const body = snapshot('STREAMING', '123', 'LIVE') as unknown as { quotes: { price: unknown }[] }
     body.quotes[0]!.price = 123
     fixture(body)
-    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('N/A'))
+    await waitFor(() => expect(screen.getAllByRole('status').find(e => e.textContent?.startsWith('การประเมินอัตโนมัติผ่าน API'))?.textContent).toContain('N/A'))
     expect(screen.queryByText('ราคาสด IEX')).toBeNull()
   })
 })
