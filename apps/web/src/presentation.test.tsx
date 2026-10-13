@@ -23,13 +23,14 @@ function Surface({ children }: { children?: React.ReactNode }): JSX.Element {
   </div>
 }
 
+const cashId = '00000000-0000-4000-8000-0000000000c1'
 function dashboard(): RequestInit[] {
   const writes: RequestInit[] = []
   vi.stubGlobal('WebSocket', undefined)
   vi.stubGlobal('fetch', vi.fn(async (path: string, options: RequestInit = {}) => {
     if (options.method && options.method !== 'GET') writes.push(options)
     const value = options.method === 'POST' ? { id: categoryId }
-      : path.startsWith('/api/finance?') ? finance : path === '/api/crypto' ? crypto : { quotes: [] }
+      : path.startsWith('/api/finance?') ? finance : path === '/api/crypto' ? crypto : path === '/api/cash' ? { accounts: [{ id: cashId, name: 'กระเป๋าเงิน', balance: '1000.00', currency: 'THB', asOf: '2026-01-01', version: 1 }] } : { quotes: [] }
     return { ok: true, status: 200, json: async () => value }
   }))
   render(<PresentationProvider><Surface><Dashboard name="สังเคราะห์" logout={vi.fn()} expired={vi.fn()} authBusy={false} /></Surface></PresentationProvider>)
@@ -104,6 +105,7 @@ describe('tracker presentation preserves financial boundaries', () => {
     fireEvent.click(screen.getByRole('button', { name: 'ซ่อนยอดเงิน' }))
     fireEvent.change(screen.getByLabelText('จำนวนเงิน THB'), { target: { value: '1.25' } })
     fireEvent.change(screen.getByLabelText('หมวดหมู่'), { target: { value: categoryId } })
+    fireEvent.change(screen.getByLabelText('จ่ายจากบัญชีเงินสด'), { target: { value: cashId } })
     expect((screen.getByLabelText('จำนวนเงิน THB') as HTMLInputElement).value).toBe('1.25')
     expect(screen.getByRole('button', { name: 'บันทึกรายการ' }).hasAttribute('disabled')).toBe(false)
     fireEvent.submit(screen.getByRole('form', { name: 'บันทึกรายรับรายจ่าย' }))

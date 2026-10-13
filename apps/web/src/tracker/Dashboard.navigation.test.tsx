@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import App from '../App'
 import TrackerNavigation from './TrackerNavigation'
 import Account from './Account'
+const cashId = '00000000-0000-4000-8000-0000000000c1'
 const categoryId = '00000000-0000-4000-8000-000000000001'
 const transactionId = '00000000-0000-4000-8000-000000000002'
 const reply = (body: unknown) => ({ ok: true, status: 200, json: async () => body })
@@ -23,7 +24,7 @@ function setup(lostPath?: string) {
     if (path === '/api/me') return reply({ ownerId: 'synthetic-owner' })
     if (path.startsWith('/api/finance?')) return reply({ month: '2026-10', currency: 'THB', income: '0', expense: '1.25', balance: '-1.25', categories: [{ id: categoryId, type: 'expense', name: 'อาหาร' }], transactions: [{ id: transactionId, categoryId, type: 'expense', amount: '1.25', date: '2026-10-07', note: '' }], budgets: [] })
     if (path === '/api/crypto') return reply({ quoteCurrency: 'USDT', portfolios: [], holdings: [], trades: [] })
-    if (path === '/api/cash') return reply({ accounts: [] })
+    if (path === '/api/cash') return reply({ accounts: [{ id: cashId, name: 'กระเป๋าเงิน', balance: '1000.00', currency: 'THB', asOf: '2026-01-01', version: 1 }] })
     if (path === '/api/stocks') return reply({quoteCurrency:'USD',portfolios:[],holdings:[],trades:[]})
     if (path === '/api/assets/manual') return reply({assets:[]})
     if (path === '/api/reference-rate') return reply({ base: 'USDT', quote: 'THB', rate: null, receivedAt: null, status: 'UNAVAILABLE', source: 'Bitkub public', kind: 'LAST_PRICE_SNAPSHOT' })
@@ -42,6 +43,7 @@ async function more() {
 async function fillFinance(value: string) {
   await ready()
   fireEvent.change(screen.getByLabelText('หมวดหมู่'), { target: { value: categoryId } })
+  fireEvent.change(screen.getByLabelText('จ่ายจากบัญชีเงินสด'), { target: { value: cashId } })
   fireEvent.change(screen.getByLabelText('จำนวนเงิน THB'), { target: { value } })
   return screen.getByRole('form', { name: 'บันทึกรายรับรายจ่าย' })
 }
@@ -124,7 +126,7 @@ it('preserves the cash pending request when More is opened and closed', async ()
   fireEvent.change(screen.getByLabelText('ชื่อเงินสดหรือบัญชี'), { target: { value: 'สังเคราะห์' } })
   fireEvent.change(screen.getByLabelText('ยอดคงเหลือ THB'), { target: { value: '0.10' } })
   fireEvent.click(save)
-  const retry = await screen.findByRole('button', { name: 'ตรวจผลบันทึกเงินสดด้วยคำขอเดิม' })
+  const retry = await screen.findByRole('button', { name: 'ตรวจผลด้วยคำขอเดิม' })
   const sheet = await more()
   expect(sheet.getByRole('button', { name: 'บัญชีและดูแลข้อมูล' }).hasAttribute('disabled')).toBe(true)
   fireEvent.click(sheet.getByRole('button', { name: 'ปิดเพิ่มเติม' }))

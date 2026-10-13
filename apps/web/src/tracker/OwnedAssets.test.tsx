@@ -5,10 +5,13 @@ import ManualAssets from './ManualAssets'
 import {PresentationProvider,PresentationControls} from '../presentation'
 const id='00000000-0000-4000-8000-000000000001',trade='00000000-0000-4000-8000-000000000002'
 const stock={quoteCurrency:'USD',portfolios:[{id,name:'พอร์ตสังเคราะห์'}],holdings:[{portfolioId:id,symbol:'AAPL',quantity:'0.5',totalCost:'51',realizedPnl:'0'}],trades:[{id:trade,portfolioId:id,symbol:'AAPL',side:'buy',quantity:'0.5',price:'100',fee:'1',date:'2026-10-08',quoteCurrency:'USD',note:'ประวัติสมมติ',realizedPnl:'0',voidedAt:null,voidReason:null}]}
+const cash={accounts:[{id,name:'เงินสดสังเคราะห์',balance:'1000.00',currency:'THB',asOf:'2026-01-01',version:1}]}
+// Stock pages also read cash accounts; every other GET returns the stock ledger.
+const read=(path:string)=>path==='/api/cash'?cash:stock
 afterEach(()=>{cleanup();vi.unstubAllGlobals();vi.restoreAllMocks()})
 it('keeps unknown stock void reconciliation inside its trapped dialog until the same request completes',async()=>{
  const lock=vi.fn(),writes:RequestInit[]=[];let lost=true
- vi.stubGlobal('fetch',vi.fn(async(_p:string,o:RequestInit)=>{if(o.method!=='GET'){writes.push(o);if(lost){lost=false;throw Error('lost commit response')}}return {ok:true,status:200,json:async()=>o.method==='GET'?stock:{id:trade}}}))
+ vi.stubGlobal('fetch',vi.fn(async(p:string,o:RequestInit)=>{if(o.method!=='GET'){writes.push(o);if(lost){lost=false;throw Error('lost commit response')}}return {ok:true,status:200,json:async()=>o.method==='GET'?read(p):{id:trade}}}))
  render(<StockHoldings snapshot={null} now={Date.now()} expired={vi.fn()} lock={lock}/>);await waitFor(()=>expect(screen.getByLabelText('พอร์ตหุ้น').hasAttribute('disabled')).toBe(false));fireEvent.change(screen.getByLabelText('พอร์ตหุ้น'),{target:{value:id}})
  fireEvent.click(screen.getByRole('button',{name:'ยกเลิกประวัติหุ้น'}));const dialog=screen.getByRole('dialog',{name:'ยกเลิกประวัติหุ้น'})
  fireEvent.change(within(dialog).getByLabelText('เหตุผลยกเลิกหุ้น'),{target:{value:'Synthetic correction'}});fireEvent.click(within(dialog).getByRole('button',{name:'ยืนยันยกเลิกหุ้น'}))
@@ -19,7 +22,7 @@ it('keeps unknown stock void reconciliation inside its trapped dialog until the 
 })
 it('ordinary users see their recorded stock cost with unavailable prices; unknown write locks navigation and retries exact payload/key',async()=>{
  const lock=vi.fn(),writes:RequestInit[]=[];let lost=true
- vi.stubGlobal('fetch',vi.fn(async(_p:string,o:RequestInit)=>{if(o.method!=='GET'){writes.push(o);if(lost){lost=false;throw Error('lost response')}}return {ok:true,status:200,json:async()=>o.method==='GET'?stock:{id:trade}}}))
+ vi.stubGlobal('fetch',vi.fn(async(p:string,o:RequestInit)=>{if(o.method!=='GET'){writes.push(o);if(lost){lost=false;throw Error('lost response')}}return {ok:true,status:200,json:async()=>o.method==='GET'?read(p):{id:trade}}}))
  render(<PresentationProvider><PresentationControls/><StockHoldings snapshot={null} now={Date.now()} expired={vi.fn()} lock={lock}/></PresentationProvider>)
  await waitFor(()=>expect(screen.getByLabelText('พอร์ตหุ้น').hasAttribute('disabled')).toBe(false))
  fireEvent.change(screen.getByLabelText('พอร์ตหุ้น'),{target:{value:id}})
@@ -28,6 +31,8 @@ it('ordinary users see their recorded stock cost with unavailable prices; unknow
  fireEvent.click(screen.getByRole('button',{name:'ซ่อนยอดเงิน'}));expect(screen.queryByText('ต้นทุน 51.00 USD · เฉลี่ย 102.00 USD')).toBeNull()
  fireEvent.change(screen.getByLabelText('จำนวนหุ้น (รวมเศษหุ้น)'),{target:{value:'0.25'}})
  fireEvent.change(screen.getByLabelText('ราคาประวัติต่อหุ้น USD'),{target:{value:'120'}})
+ fireEvent.change(screen.getByLabelText('จ่ายจากบัญชีเงินสด'),{target:{value:id}})
+ fireEvent.change(screen.getByLabelText(/^เงินบาทที่จ่ายจริง/),{target:{value:'1100'}})
  fireEvent.submit(screen.getByRole('form',{name:'บันทึกประวัติหุ้น'}))
  const retry=await screen.findByRole('button',{name:'ตรวจผลหุ้นด้วยคำขอเดิม'})
  expect(lock.mock.calls.at(-1)).toEqual([true]);expect(screen.getByLabelText('พอร์ตหุ้น').hasAttribute('disabled')).toBe(true)
@@ -38,7 +43,7 @@ it('ordinary users see their recorded stock cost with unavailable prices; unknow
  expect(JSON.parse(String(writes[0]?.body))).toMatchObject({portfolioId:id,quantity:'0.25',price:'120',quoteCurrency:'USD'})
 })
 it('provider observation changes USD estimate without rewriting recorded quantity/cost and ages to N/A',async()=>{
- vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,status:200,json:async()=>stock})))
+ vi.stubGlobal('fetch',vi.fn(async(p:string)=>({ok:true,status:200,json:async()=>read(p)})))
  const now=Date.now(),time=new Date(now).toISOString(),props={now,lock:vi.fn(),expired:vi.fn()}
  const quote={source:'Alpaca IEX' as const,currency:'USD' as const,connection:'STREAMING' as const,quotes:[{symbol:'AAPL',price:'120',status:'LIVE' as const,observedAt:time,receivedAt:time}]}
  const {rerender}=render(<StockHoldings {...props} snapshot={quote}/>);await waitFor(()=>expect(screen.getByLabelText('พอร์ตหุ้น').hasAttribute('disabled')).toBe(false));fireEvent.change(screen.getByLabelText('พอร์ตหุ้น'),{target:{value:id}})

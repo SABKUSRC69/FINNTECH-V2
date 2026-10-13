@@ -2,13 +2,15 @@
 import {cleanup,fireEvent,render,screen,waitFor,within} from '@testing-library/react'
 import {afterEach,expect,it,vi} from 'vitest'
 import StockPrices from './StockPrices'
-const portfolio='00000000-0000-4000-8000-000000000001',newPortfolio='00000000-0000-4000-8000-000000000002'
+const portfolio='00000000-0000-4000-8000-000000000001',newPortfolio='00000000-0000-4000-8000-000000000002',cashId='00000000-0000-4000-8000-0000000000c1'
+const cash={accounts:[{id:cashId,name:'กระเป๋าเงิน',balance:'100000.00',currency:'THB',asOf:'2026-01-01',version:1}]}
 const base={quoteCurrency:'USD',portfolios:[{id:portfolio,name:'พอร์ตทดสอบ'}],holdings:[{portfolioId:portfolio,symbol:'AAPL',quantity:'0.5',totalCost:'51',realizedPnl:'0'}],trades:[] as unknown[]}
 afterEach(()=>{cleanup();vi.unstubAllGlobals();vi.restoreAllMocks()})
 function setup(){
  let data=structuredClone(base),phase=0
  vi.stubGlobal('WebSocket',undefined)
  const fetch=vi.fn(async(path:string,options:RequestInit={})=>{
+  if(path==='/api/cash')return reply(cash)
   if(path==='/api/stocks/market')return reply({source:'Alpaca IEX',currency:'USD',connection:'NOT_CONFIGURED',quotes:[]})
   if(options.method==='POST'){
    if(path==='/api/stocks/portfolios'){data.portfolios.push({id:newPortfolio,name:'พอร์ตใหม่'});return reply({id:newPortfolio})}
@@ -29,6 +31,8 @@ async function submit(side:string,quantity:string,price:string){
  fireEvent.change(form.getByLabelText('จำนวนหุ้น (รวมเศษหุ้น)'),{target:{value:quantity}})
  fireEvent.change(form.getByLabelText('ราคาประวัติต่อหุ้น USD'),{target:{value:price}})
  fireEvent.change(form.getByLabelText('ค่าธรรมเนียม USD'),{target:{value:'1'}})
+ fireEvent.change(form.getByLabelText(side==='buy'?'จ่ายจากบัญชีเงินสด':'รับเข้าบัญชีเงินสด'),{target:{value:cashId}})
+ fireEvent.change(form.getByLabelText(side==='buy'?/^เงินบาทที่จ่ายจริง/:/^เงินบาทที่ได้รับจริง/),{target:{value:'1000'}})
  fireEvent.submit(screen.getByRole('form',{name:'บันทึกประวัติหุ้น'}))
  await waitFor(()=>expect(form.getByRole('button',{name:'บันทึกประวัติหุ้น'}).hasAttribute('disabled')).toBe(false))
 }

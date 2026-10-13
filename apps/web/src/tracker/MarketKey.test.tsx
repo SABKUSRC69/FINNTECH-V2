@@ -34,7 +34,7 @@ it('validates locally, requires the personal-use confirmation, sends the key onc
   fireEvent.click(screen.getByRole('checkbox')); fireEvent.submit(screen.getByRole('form', { name: 'บันทึก key ราคาปิด' }))
   await screen.findByText(/เชื่อมต่อแล้ว · key ลงท้าย ••••abcd/)
   expect(writes).toEqual([{ path: '/api/market-key', body: { provider: 'TIINGO', token: TOKEN, confirmPersonalUse: true, expectedVersion: null } }])
-  expect(screen.getByRole('status').textContent).toMatch(/ราคาปิดจะขึ้นในหน้าสินทรัพย์รวม/)
+  expect(screen.getByRole('status').textContent).toMatch(/เปิดหน้าสินทรัพย์รวมเพื่อดึงราคาปิด/)
   expect(document.body.textContent).not.toContain(TOKEN)
   expect(screen.queryByLabelText('API Token ของ Tiingo')).toBeNull()
 })

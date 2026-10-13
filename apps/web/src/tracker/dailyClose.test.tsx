@@ -7,6 +7,7 @@ import Assets from './Assets'
 import StockPrices from './StockPrices'
 import {selectReference} from './valuationPolicy'
 import {resetStockMarketForTests} from './stockMarket'
+import {expectHeld} from './heldAssetsTestUtils'
 
 // Dates follow the real clock so the trading-session policy is exercised as deployed.
 const expected=latestSessionAt(Date.now(),CLOSE_PUBLISHED_MINUTES),previous=previousTradingDay(expected),old=previousTradingDay(previousTradingDay(previous))
@@ -43,42 +44,46 @@ describe('Assets with automatic daily closes (any signed-in account, no live key
   setup(ready([close('AAPL','200'),close('SPY','500'),close('QQQ','400')]));assets()
   // AAPL 0.75×200 + SPY 1.5×500 + QQQ 0.1×400 = 940 USD; ×35 = 32,900 THB; + 100 THB cash.
   await waitFor(()=>expect(total()).toBe('33,000.00 THB'))
+  expect(document.body.textContent).toContain('USD: 940.00')
   const summary=screen.getByTestId('stock-summary').textContent!
-  expect(summary).toContain('มูลค่าตามราคาอ้างอิง 940.00 USD ≈ 32,900.00 THB');expect(summary).toContain('ต้นทุนคงเหลือ 1,031.00 USD');expect(summary).toMatch(/ยังไม่รับรู้ -91\.00 USD/)
-  expect(screen.getByTestId('daily-close-status').textContent).toContain(`Synthetic EOD · วันซื้อขายล่าสุดที่ควรเผยแพร่แล้ว ${expected}`)
-  expect(screen.getAllByText(new RegExp(`ราคาปิดวันที่ซื้อขาย ${expected} \\(นิวยอร์ก\\)`)).length).toBe(4)
+  expect(summary).toContain('ต้นทุนหุ้น/ETF 1,031.00 USD');expect(summary).toMatch(/ยังไม่รับรู้ -91\.00 USD/)
+  expect(screen.getByTestId('daily-close-status').textContent).toContain(`Synthetic EOD · ราคาปิด ${expected}`)
+  expectHeld('AAPL',[`Synthetic EOD · ${expected}`,'0.5 หุ้น','3,500.00 THB','100.00 USD'],'Synthetic A')
+  expectHeld('AAPL',[`Synthetic EOD · ${expected}`,'0.25 หุ้น','1,750.00 THB','50.00 USD'],'Synthetic B')
+  expectHeld('SPY',[`Synthetic EOD · ${expected}`,'26,250.00 THB','750.00 USD'])
+  expectHeld('QQQ',[`Synthetic EOD · ${expected}`,'1,400.00 THB','40.00 USD'])
   expect(screen.getByTestId('usd-thb-label').textContent).toContain('ECB')
-  expect(screen.getAllByRole('button',{name:/กรอกราคาเองแทน AAPL/}).length).toBe(2)
  })
  it('a missing or stale close lists the symbol, shows a partial total and never substitutes cost or a made-up price',async()=>{
   setup(ready([close('AAPL','200'),close('SPY','500'),close('QQQ','400',old,{status:'STALE',problem:'UNAVAILABLE'})]));assets()
   await screen.findByTestId('stock-missing')
-  expect(total()).toBe('N/A THB');expect(screen.getByTestId('stock-missing').textContent).toContain('ยังขาดราคา: QQQ')
+  expect(total()).toBe('N/A THB');expect(screen.getByTestId('stock-missing').textContent).toBe('ขาดราคา: QQQ')
   // Known part: 900 USD × 35 + 100 = 31,600 THB, explicitly labelled partial.
-  expect(screen.getByText(/ยอดที่ประเมินได้บางส่วน: 31,600.00 THB/)).toBeTruthy()
-  expect(screen.getByTestId('stock-summary').textContent).toMatch(/บางส่วน 900\.00 USD \(ไม่รวม QQQ\).*-81\.00 USD จากต้นทุน 981\.00 USD/)
-  expect(screen.getByText(new RegExp(`ราคาปิดล่าสุดที่ทราบ 400.00 USD · วันที่ซื้อขาย ${old} · เก่าเกินเกณฑ์`))).toBeTruthy()
-  expect(screen.getByText(/ขาดราคาอ้างอิง QQQ/)).toBeTruthy()
+  expect(screen.getByText(/ประเมินได้บางส่วน 31,600.00 THB · ยังไม่ใช่ยอดรวม/)).toBeTruthy()
+  expect(screen.getByTestId('stock-summary').textContent).toContain('กำไร/ขาดทุนยังไม่รับรู้ N/A USD')
+  expectHeld('QQQ',['ราคาไม่พร้อม','0.1 หุ้น','N/A THB','N/A USD'])
  })
- it('one session late (not yet published) still values, with both dates shown',async()=>{
+ it('one session late (not yet published) still values, labelled as waiting for the latest day',async()=>{
   setup(ready([close('AAPL','200',previous,{status:'DELAYED',problem:'NOT_YET_PUBLISHED'}),close('SPY','500'),close('QQQ','400')]));assets()
   await waitFor(()=>expect(total()).toBe('33,000.00 THB'))
-  expect(screen.getAllByText(new RegExp(`ยังไม่มีราคาปิดของวันที่ ${expected} จึงใช้ราคาปิดวันที่ ${previous}`)).length).toBe(2)
+  for(const account of ['Synthetic A','Synthetic B'])expectHeld('AAPL',[`Synthetic EOD · ${previous} · รอวันล่าสุด`],account)
+  expectHeld('SPY',[`Synthetic EOD · ${expected}`])
  })
- it('manual entry stays available, is labelled as replacing automatic, and can be switched back',async()=>{
+ it('manual entry replaces automatic and can be switched back',async()=>{
   const {writes}=setup(ready([close('AAPL','200'),close('SPY','500'),close('QQQ','400')]),{value:'210',enabled:true});assets()
   await waitFor(()=>expect(total()).toBe('33,262.50 THB')) // AAPL 0.75 × 210 instead of 200
-  expect(screen.getAllByText(/มีราคาปิดอัตโนมัติ 200.00 USD .* แต่ระบบใช้ราคาที่คุณกรอกเองอยู่/).length).toBe(2)
-  expect(screen.getAllByText(/กรอกเอง \(แทนอัตโนมัติ\)/).length).toBe(2)
-  fireEvent.click(screen.getAllByRole('button',{name:'กลับไปใช้ราคาปิดอัตโนมัติ AAPL'})[0]!)
+  expectHeld('AAPL',['กรอกเอง','105.00 USD'],'Synthetic A');expectHeld('AAPL',['กรอกเอง','52.50 USD'],'Synthetic B')
+  fireEvent.click(screen.getByRole('button',{name:'แก้ไข / เปิดปิด AAPL'}))
+  fireEvent.click(screen.getByRole('checkbox',{name:'ใช้ค่าที่กรอกแทนอัตโนมัติ'}))
+  fireEvent.submit(screen.getByRole('form',{name:'บันทึกราคาอ้างอิง'}))
   await waitFor(()=>expect(total()).toBe('33,000.00 THB'))
   expect(writes).toHaveLength(1);expect(writes[0]).toMatchObject({path:'/api/valuation/references',body:{symbol:'AAPL',value:'210',enabled:false,expectedVersion:1}})
  })
  it('licence or configuration gaps are explicit and leave totals unavailable',async()=>{
   setup({provider:'NOT_LICENSED',source:'Synthetic EOD',license:'PERSONAL',expectedSession:expected,attribution:null,quotes:[]});const view=assets()
-  await screen.findByText(/ราคาปิดอัตโนมัติยังไม่เปิดให้บัญชีนี้ตามสิทธิ์ข้อมูล/);expect(total()).toBe('N/A THB');view.unmount();cleanup()
+  await waitFor(()=>expect(screen.getByTestId('daily-close-status').textContent).toBe('หุ้น/ETF: ยังไม่มีสิทธิ์ราคาปิด'));expect(total()).toBe('N/A THB');view.unmount();cleanup()
   setup({provider:'NOT_CONFIGURED',source:null,license:null,expectedSession:expected,attribution:null,quotes:[]});assets()
-  await screen.findByText(/ใส่ key ฟรีของคุณเองได้ที่ เพิ่มเติม → บัญชีและดูแลข้อมูล/);expect(total()).toBe('N/A THB')
+  await waitFor(()=>expect(screen.getByTestId('daily-close-status').textContent).toContain('เชื่อม key ส่วนตัวในหน้าบัญชี หรือกรอกราคาเอง'));expect(total()).toBe('N/A THB')
  })
 })
 it('stock portfolio page values the selected portfolio from the same daily closes',async()=>{

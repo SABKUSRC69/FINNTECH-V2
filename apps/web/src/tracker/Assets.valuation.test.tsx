@@ -3,6 +3,7 @@ import {render,cleanup,screen,fireEvent,waitFor,within} from '@testing-library/r
 import Assets from './Assets'
 import StockPrices from './StockPrices'
 import {PresentationProvider,PresentationControls} from '../presentation'
+import {expectHeld,heldRow} from './heldAssetsTestUtils'
 const now=Date.now(),asOf=new Date(now-60000).toISOString(),id='00000000-0000-4000-8000-000000000001'
 const baseStocks={quoteCurrency:'USD',portfolios:[{id,name:'Synthetic'}],holdings:[{portfolioId:id,symbol:'AAPL',quantity:'0.5',totalCost:'50',realizedPnl:'0'}],trades:[] as unknown[]}
 const emptyCrypto={quoteCurrency:'USDT' as const,portfolios:[],holdings:[],trades:[]},emptyMarket={quotes:[]}
@@ -28,19 +29,26 @@ it('confirmed buy/sell then navigating to Assets reads current holdings once and
  const {writes,fetch}=setup()
  for(const [side,quantity,total] of [['buy','0.5','4,300.00 THB'],['sell','0.25','3,250.00 THB']]){
   const page=render(<StockPrices expired={vi.fn()}/>);await screen.findByText(side==='buy'?'จำนวน 0.50 หุ้น':'จำนวน 1.00 หุ้น')
-  const form=within(screen.getByRole('form',{name:'บันทึกประวัติหุ้น'}));fireEvent.change(form.getByLabelText('ชนิดประวัติหุ้น'),{target:{value:side}});fireEvent.change(form.getByLabelText('จำนวนหุ้น (รวมเศษหุ้น)'),{target:{value:quantity}});fireEvent.change(form.getByLabelText('ราคาประวัติต่อหุ้น USD'),{target:{value:'100'}});fireEvent.submit(screen.getByRole('form',{name:'บันทึกประวัติหุ้น'}));await screen.findByText('บันทึกสำเร็จ');await waitFor(()=>expect(form.getByRole('button',{name:'บันทึกประวัติหุ้น'}).hasAttribute('disabled')).toBe(false));page.unmount()
+  const form=within(screen.getByRole('form',{name:'บันทึกประวัติหุ้น'}));fireEvent.change(form.getByLabelText('ชนิดประวัติหุ้น'),{target:{value:side}});fireEvent.change(form.getByLabelText('จำนวนหุ้น (รวมเศษหุ้น)'),{target:{value:quantity}});fireEvent.change(form.getByLabelText('ราคาประวัติต่อหุ้น USD'),{target:{value:'100'}});fireEvent.change(form.getByLabelText(side==='buy'?'จ่ายจากบัญชีเงินสด':'รับเข้าบัญชีเงินสด'),{target:{value:id}});fireEvent.change(form.getByLabelText(side==='buy'?/^เงินบาทที่จ่ายจริง/:/^เงินบาทที่ได้รับจริง/),{target:{value:'1000'}});fireEvent.submit(screen.getByRole('form',{name:'บันทึกประวัติหุ้น'}));await screen.findByText('บันทึกสำเร็จ');await waitFor(()=>expect(form.getByRole('button',{name:'บันทึกประวัติหุ้น'}).hasAttribute('disabled')).toBe(false));page.unmount()
   const assets=render(asset());await waitFor(()=>expect(screen.getByTestId('assets-total').textContent).toBe(total));assets.unmount()
  }
  expect(writes).toHaveLength(2);expect(fetch.mock.calls.filter(([p,o])=>p==='/api/stocks/trades'&&o?.method==='POST')).toHaveLength(2)
 })
 it('missing FX keeps native USD/partial THB; missing quote is actionable rather than zero; privacy masks valuation',async()=>{
  const control=setup();control.missingFx();const view=render(<PresentationProvider><PresentationControls/>{asset()}</PresentationProvider>)
- await screen.findByText('หุ้นและสินทรัพย์ประเมินเอง USD: 60.00 USD');expect(screen.getByTestId('assets-total').textContent).toBe('N/A THB');expect(screen.getByText(/ยอดที่ประเมินได้บางส่วน: 100.00 THB/)).toBeTruthy();expect(screen.getByText(/ขาดอัตรา USD\/THB/)).toBeTruthy()
- fireEvent.click(screen.getByRole('button',{name:'ซ่อนยอดเงิน'}));expect(screen.queryByText('หุ้นและสินทรัพย์ประเมินเอง USD: 60.00 USD')).toBeNull();view.unmount();control.missingQuote();render(asset());await screen.findByText(/ขาดราคาอ้างอิง AAPL/);expect(screen.getByTestId('assets-total').textContent).toBe('N/A THB');expect(screen.getByRole('button',{name:'ตั้งราคาอ้างอิง AAPL'})).toBeTruthy()
+ await waitFor(()=>expectHeld('AAPL',['กรอกเอง','0.5 หุ้น','N/A THB','60.00 USD']))
+ expect(document.body.textContent).toContain('USD: 60.00');expect(screen.getByTestId('assets-total').textContent).toBe('N/A THB')
+ expect(screen.getByText(/ประเมินได้บางส่วน 100.00 THB · ยังไม่ใช่ยอดรวม/)).toBeTruthy();expect(screen.getByTestId('usd-thb-label').textContent).toContain('USD → THB: N/A')
+ fireEvent.click(screen.getByRole('button',{name:'ซ่อนยอดเงิน'}));expect(document.body.textContent).not.toContain('USD: 60.00');expect(heldRow('AAPL').textContent).not.toContain('60.00 USD')
+ view.unmount();control.missingQuote();render(asset())
+ await waitFor(()=>expect(screen.getByTestId('stock-missing').textContent).toBe('ขาดราคา: AAPL'))
+ expect(screen.getByTestId('assets-total').textContent).toBe('N/A THB');expectHeld('AAPL',['ราคาไม่พร้อม','N/A THB','N/A USD'])
+ // Actionable: the reference editor offers AAPL so the owner can enter a price.
+ expect(within(screen.getByRole('form',{name:'บันทึกราคาอ้างอิง'})).getByRole('option',{name:'AAPL'})).toBeTruthy()
 })
 it('reference unknown outcome locks all asset forms/navigation and retries identical version, payload and key before refreshing',async()=>{
- const {writes,lose}=setup();const lock=vi.fn();render(asset(lock));await waitFor(()=>expect(screen.getByRole('button',{name:'ตั้งราคาอ้างอิง AAPL'}).hasAttribute('disabled')).toBe(false))
- fireEvent.click(screen.getByRole('button',{name:'ตั้งราคาอ้างอิง AAPL'}));fireEvent.change(screen.getByLabelText('ราคา USD ต่อหุ้น'),{target:{value:'130'}});lose();fireEvent.submit(screen.getByRole('form',{name:'บันทึกราคาอ้างอิง'}))
+ const {writes,lose}=setup();const lock=vi.fn();render(asset(lock));await waitFor(()=>expect(screen.getByLabelText('รายการอ้างอิง').hasAttribute('disabled')).toBe(false))
+ fireEvent.change(screen.getByLabelText('รายการอ้างอิง'),{target:{value:'AAPL'}});fireEvent.change(screen.getByLabelText('ราคา USD ต่อหุ้น'),{target:{value:'130'}});lose();fireEvent.submit(screen.getByRole('form',{name:'บันทึกราคาอ้างอิง'}))
  const retry=await screen.findByRole('button',{name:'ตรวจผลราคาอ้างอิงด้วยคำขอเดิม'});expect(lock.mock.calls.at(-1)).toEqual([true]);expect(screen.getByLabelText('ชื่อเงินสดหรือบัญชี').hasAttribute('disabled')).toBe(true);expect(screen.getByLabelText('ชื่อสินทรัพย์อื่น').hasAttribute('disabled')).toBe(true)
  fireEvent.submit(screen.getByRole('form',{name:'บันทึกราคาอ้างอิง'}));expect(writes).toHaveLength(1);fireEvent.click(retry);await waitFor(()=>expect(screen.getByTestId('assets-total').textContent).toBe('2,375.00 THB'));expect(writes).toHaveLength(2);expect(writes[0]!.body).toBe(writes[1]!.body);expect(writes[0]!.headers).toEqual(writes[1]!.headers);expect(JSON.parse(String(writes[0]!.body)).expectedVersion).toBe(1);await waitFor(()=>expect(lock.mock.calls.at(-1)).toEqual([false]))
 })

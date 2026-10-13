@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Assets from './Assets'
 import { resetStockMarketForTests } from './stockMarket'
+import { expectHeld, heldRow } from './heldAssetsTestUtils'
 
 const today = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate())).toISOString()
 const referenceId = '00000000-0000-4000-8000-0000000000a1'
@@ -45,44 +46,44 @@ describe('Alpaca IEX events reach Assets without reload or manual entry', () => 
     const { marketCalls } = setup()
     await waitFor(() => expect(FakeSocket.instances).toHaveLength(1))
     expect(FakeSocket.instances[0]!.url).toMatch(/\/ws\/stocks$/)
-    await waitFor(() => expect(screen.getByTestId('stock-row-AAPL')).toBeTruthy())
+    await waitFor(() => expect(heldRow('AAPL', 'US')).toBeTruthy())
     const calls = marketCalls()
     FakeSocket.instances[0]!.push(quote('200'))
     await waitFor(() => expect(total()).toContain('3,500.00'))
-    expect(screen.getByText(/มูลค่าอ้างอิง 100.00 USD · กำไร\/ขาดทุนยังไม่รับรู้ 25.00 USD/)).toBeTruthy()
-    expect(screen.getByText(/ราคาสดอัตโนมัติจาก Alpaca IEX/)).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'กรอกราคาเองแทน AAPL (ไม่จำเป็น)' })).toBeTruthy()
-    expect(screen.getByTestId('usd-thb-label').textContent).toMatch(/ECB.*ไม่ใช่เรียลไทม์/)
+    expectHeld('AAPL', ['Alpaca IEX · ราคาสด', '0.5 หุ้น', '3,500.00 THB', '100.00 USD'], 'US')
+    expect(screen.getByTestId('stock-summary').textContent).toContain('กำไร/ขาดทุนยังไม่รับรู้ 25.00 USD')
+    expect(screen.getByTestId('usd-thb-label').textContent).toMatch(/35\.00 · ECB รายวัน/)
     FakeSocket.instances[0]!.push(quote('210.5'))
     await waitFor(() => expect(total()).toContain('3,683.75'))
     expect(marketCalls()).toBe(calls) // the update came from the stream, not another REST poll
   })
-  it('shows when a manual override hides a live price and returns to automatic without deleting it', async () => {
+  it('keeps a manual override over a live price and returns to automatic without deleting it', async () => {
     const { writes } = setup({ manual: { value: '190', enabled: true } })
     await waitFor(() => expect(FakeSocket.instances).toHaveLength(1))
-    await waitFor(() => expect(screen.getByTestId('stock-row-AAPL')).toBeTruthy())
+    await waitFor(() => expect(heldRow('AAPL', 'US')).toBeTruthy())
     FakeSocket.instances[0]!.push(quote('200'))
-    await waitFor(() => expect(screen.getByText(/มีราคาสดจาก Alpaca 200.00 USD แต่ระบบใช้ราคาที่คุณกรอกเองอยู่/)).toBeTruthy())
-    expect(total()).toContain('3,325.00')
-    fireEvent.click(screen.getByRole('button', { name: 'กลับไปใช้ราคา Alpaca อัตโนมัติ AAPL' }))
+    await waitFor(() => expect(total()).toContain('3,325.00'))
+    expectHeld('AAPL', ['กรอกเอง', '95.00 USD'], 'US')
+    fireEvent.click(screen.getByRole('button', { name: 'แก้ไข / เปิดปิด AAPL' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'ใช้ค่าที่กรอกแทนอัตโนมัติ' }))
+    fireEvent.submit(screen.getByRole('form', { name: 'บันทึกราคาอ้างอิง' }))
     await waitFor(() => expect(writes).toHaveLength(1))
     expect(writes[0]).toMatchObject({ path: '/api/valuation/references', body: { symbol: 'AAPL', value: '190', enabled: false, expectedVersion: 1 } })
     await waitFor(() => expect(total()).toContain('3,500.00'))
+    expectHeld('AAPL', ['Alpaca IEX · ราคาสด', '100.00 USD'], 'US')
   })
-  it('keeps a closed-market last trade visible with its time but out of the total', async () => {
+  it('keeps a closed-market last trade out of the total', async () => {
     setup()
     await waitFor(() => expect(FakeSocket.instances).toHaveLength(1))
-    await waitFor(() => expect(screen.getByTestId('stock-row-AAPL')).toBeTruthy())
+    await waitFor(() => expect(heldRow('AAPL', 'US')).toBeTruthy())
     FakeSocket.instances[0]!.push({ ...quote('199', 'CLOSED', new Date(Date.now() - 3600_000).toISOString()), session: 'CLOSED' })
-    await waitFor(() => expect(screen.getByText(/ราคาล่าสุดที่ทราบ 199.00 USD .* ตลาดปิด · ไม่นับในยอดรวม/)).toBeTruthy())
+    await waitFor(() => expectHeld('AAPL', ['ราคาไม่พร้อม', 'N/A THB', 'N/A USD'], 'US'))
     expect(total()).toContain('N/A')
-    expect(screen.getByText('ขาดราคาอ้างอิง AAPL จึงยังรวมมูลค่าหุ้นนี้ไม่ได้')).toBeTruthy()
   })
   it('never opens the stock socket for an account that is not the key owner', async () => {
     const { marketCalls } = setup({ marketStatus: 403 })
     await waitFor(() => expect(marketCalls()).toBe(1))
-    await waitFor(() => expect(screen.getByTestId('stock-row-AAPL')).toBeTruthy())
+    await waitFor(() => expectHeld('AAPL', ['ราคาไม่พร้อม', 'N/A THB'], 'US'))
     expect(FakeSocket.instances).toHaveLength(0)
-    expect(screen.getByText(/ยังไม่มี feed ที่อนุญาต/)).toBeTruthy()
   })
 })
