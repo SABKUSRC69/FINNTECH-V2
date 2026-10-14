@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import Dashboard from './Dashboard'
 
@@ -11,6 +11,8 @@ function setup(accounts: unknown[]) {
     if (path.startsWith('/api/finance?')) body = { month: '2026-10', currency: 'THB', income: '0', expense: '0', balance: '0', categories: [], transactions: [], budgets: [] }
     else if (path === '/api/crypto') body = { quoteCurrency: 'USDT', portfolios: [], holdings: [], trades: [] }
     else if (path === '/api/cash') body = { accounts }
+    else if (path === '/api/stocks') body = { quoteCurrency: 'USD', portfolios: [], holdings: [], trades: [] }
+    else if (path === '/api/stocks/market') body = { source: 'Alpaca IEX', currency: 'USD', connection: 'NOT_CONFIGURED', quotes: [] }
     return { ok: true, status: 200, json: async () => body }
   }))
   render(<Dashboard name="สังเคราะห์" logout={vi.fn()} expired={vi.fn()} authBusy={false} />)
@@ -22,6 +24,36 @@ it('points a user without a cash account to Assets from the finance form', async
   fireEvent.click(await within(form).findByRole('button', { name: 'ไปที่สินทรัพย์รวม' }))
   const nav = screen.getByRole('navigation', { name: 'ส่วนการเงิน' })
   expect(within(nav).getByRole('button', { name: 'สินทรัพย์รวม' }).getAttribute('aria-current')).toBe('page')
+})
+
+function open(section: string) {
+  fireEvent.click(within(screen.getByRole('navigation', { name: 'ส่วนการเงิน' })).getByRole('button', { name: section }))
+}
+function expectAssetsOpen() {
+  const nav = screen.getByRole('navigation', { name: 'ส่วนการเงิน' })
+  expect(within(nav).getByRole('button', { name: 'สินทรัพย์รวม' }).getAttribute('aria-current')).toBe('page')
+}
+
+it('lets a user with no crypto portfolio selected reach Assets from the crypto form', async () => {
+  setup([])
+  await screen.findByRole('button', { name: 'ไปที่สินทรัพย์รวม' })
+  open('พอร์ตคริปโต')
+  const form = await screen.findByRole('form', { name: 'บันทึกคริปโต' })
+  const button = await within(form).findByRole('button', { name: 'ไปที่สินทรัพย์รวม' })
+  await waitFor(() => { expect(button.hasAttribute('disabled')).toBe(false) })
+  fireEvent.click(button)
+  expectAssetsOpen()
+})
+
+it('points a user without a cash account to Assets from the stock form', async () => {
+  setup([])
+  await screen.findByRole('button', { name: 'ไปที่สินทรัพย์รวม' })
+  open('ราคาหุ้นสหรัฐ')
+  const form = await screen.findByRole('form', { name: 'บันทึกประวัติหุ้น' })
+  const button = await within(form).findByRole('button', { name: 'ไปที่สินทรัพย์รวม' })
+  await waitFor(() => { expect(button.hasAttribute('disabled')).toBe(false) })
+  fireEvent.click(button)
+  expectAssetsOpen()
 })
 
 it('shows no setup hint once a cash account exists', async () => {

@@ -8,7 +8,7 @@ import { liveStockQuote, stockConnectionLabels } from './valuationPolicy'
 
 const clock = (value: string) => new Date(value).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
 
-export default function StockPrices({ expired,lock=()=>{},blocked=false,refreshRevision=0,mediaEnabled=true }: { expired: () => void;lock?:(value:boolean)=>void;blocked?:boolean;refreshRevision?:number;mediaEnabled?:boolean }): JSX.Element {
+export default function StockPrices({ expired,lock=()=>{},blocked=false,refreshRevision=0,mediaEnabled=true,onCashSetup }: { expired: () => void;onCashSetup?:(()=>void)|undefined;lock?:(value:boolean)=>void;blocked?:boolean;refreshRevision?:number;mediaEnabled?:boolean }): JSX.Element {
   const { money } = usePresentation()
   const market = useStockMarket(expired, refreshRevision), snapshot = market.snapshot
   const [tick, setTick] = useState(Date.now())
@@ -20,7 +20,7 @@ export default function StockPrices({ expired,lock=()=>{},blocked=false,refreshR
 
   return <section className="space-y-5" aria-label="ราคาหุ้นสหรัฐ">
     <FreeStockPrices refreshRevision={refreshRevision}/>
-    <StockHoldings mediaEnabled={mediaEnabled} snapshot={snapshot} now={viewTime} expired={expired} lock={lock} blocked={blocked} refreshRevision={refreshRevision}/>
+    <StockHoldings onCashSetup={onCashSetup} mediaEnabled={mediaEnabled} snapshot={snapshot} now={viewTime} expired={expired} lock={lock} blocked={blocked} refreshRevision={refreshRevision}/>
     {snapshot?.connection !== 'NOT_CONFIGURED' && snapshot !== null && <div className="journal-stock-intro tracker-card rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
       <h2 className="text-xl font-semibold">ติดตามหุ้นและ ETF สหรัฐ · USD</h2>
       <p className="mt-2 text-sm leading-7 text-slate-600">Alpaca Basic · ราคา last trade จาก IEX เท่านั้น ไม่ใช่ราคาครบทุกตลาดสหรัฐ · สูงสุด 30 หลักทรัพย์ (หุ้นที่ถืออยู่มาก่อน แล้วจึง watchlist)</p>
